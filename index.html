@@ -510,7 +510,7 @@ const FOTOS = {};
 function productImgSrc(p) {
   if (p.FOTO && p.FOTO.startsWith('http')) return p.FOTO;
   const safe = (p.CODIGO || '').replace(/\//g, '_');
-  return FOTOS[safe] || `fotos/${safe}.jpeg`;
+  return FOTOS[safe] || `${safe}.jpeg`;
 }
 
 function productCardHTML(p) {
