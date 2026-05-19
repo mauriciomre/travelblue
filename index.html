@@ -141,7 +141,7 @@ function activateLazy() {
 function start() {
   if (!SHEET_URL) { products = DATA; render(); return; }
   var xhr = new XMLHttpRequest();
-  xhr.open('GET', SHEET_URL + '?t=' + Date.now());
+  xhr.open('GET', SHEET_URL + '&t=' + Date.now());
   xhr.onload = function() { products = xhr.status===200 ? parseCSV(xhr.responseText) : DATA; render(); };
   xhr.onerror = function() { products = DATA; render(); };
   xhr.send();
