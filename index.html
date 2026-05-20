@@ -39,10 +39,12 @@
                 justify-content: space-between;
                 align-items: center;
                 margin-bottom: 10px;
+                gap: 10px;
             }
             .brand {
                 font-size: 20px;
                 font-weight: 800;
+                flex: 1;
             }
             .brand span {
                 color: #90caf9;
@@ -54,6 +56,31 @@
                 opacity: 0.75;
                 letter-spacing: 0.5px;
                 margin-top: 1px;
+            }
+            .h-right {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+            }
+            .view-btns {
+                display: flex;
+                gap: 4px;
+            }
+            .view-btn {
+                background: rgba(255, 255, 255, 0.15);
+                border: none;
+                color: #fff;
+                width: 32px;
+                height: 32px;
+                border-radius: 8px;
+                cursor: pointer;
+                font-size: 16px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+            .view-btn.on {
+                background: rgba(255, 255, 255, 0.35);
             }
             .cart-btn {
                 background: #fff;
@@ -67,6 +94,7 @@
                 align-items: center;
                 gap: 6px;
                 font-size: 14px;
+                white-space: nowrap;
             }
             .cart-n {
                 background: var(--red);
@@ -135,6 +163,7 @@
                 text-transform: uppercase;
                 letter-spacing: 0.5px;
             }
+            /* GRID */
             .grid {
                 display: grid;
                 grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
@@ -299,6 +328,90 @@
                 color: #aaa;
                 margin-top: 2px;
             }
+            /* LIST */
+            .list-wrap {
+                overflow-x: auto;
+            }
+            .list-table {
+                width: 100%;
+                border-collapse: collapse;
+                background: #fff;
+                border-radius: 12px;
+                overflow: hidden;
+                box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+                min-width: 600px;
+            }
+            .list-table th {
+                background: var(--blue);
+                color: #fff;
+                padding: 10px 14px;
+                text-align: left;
+                font-size: 13px;
+                white-space: nowrap;
+            }
+            .list-table td {
+                padding: 9px 14px;
+                border-bottom: 1px solid var(--border);
+                font-size: 13px;
+                vertical-align: middle;
+            }
+            .list-table tr:last-child td {
+                border-bottom: none;
+            }
+            .list-table tr.sold-row td {
+                opacity: 0.5;
+            }
+            .list-table tr.picked-row {
+                background: #f0f4ff;
+            }
+            .list-thumb {
+                width: 40px;
+                height: 40px;
+                object-fit: contain;
+                border-radius: 6px;
+                background: #f8f9fb;
+                border: 1px solid var(--border);
+            }
+            .list-qty {
+                display: flex;
+                align-items: center;
+                gap: 4px;
+                background: #f5f5f5;
+                border-radius: 16px;
+                padding: 2px 5px;
+                width: fit-content;
+            }
+            .list-qty .qb {
+                width: 22px;
+                height: 22px;
+                font-size: 14px;
+            }
+            .list-qty .qn {
+                width: 22px;
+                font-size: 13px;
+            }
+            .list-add {
+                background: var(--pale);
+                color: var(--blue);
+                border: 1.5px solid var(--pale);
+                border-radius: 16px;
+                padding: 5px 12px;
+                font-size: 12px;
+                font-weight: 700;
+                cursor: pointer;
+                white-space: nowrap;
+                transition: all 0.15s;
+            }
+            .list-add:hover {
+                background: var(--blue);
+                color: #fff;
+            }
+            .list-add.on {
+                background: var(--green);
+                color: #fff;
+                border-color: var(--green);
+            }
+            /* CART */
             .overlay {
                 display: none;
                 position: fixed;
@@ -509,13 +622,36 @@
         <header>
             <div class="h-top">
                 <div class="brand">
-                    Travel Blue <span>Argentina</span
-                    ><small>CATÁLOGO MAYORISTA</small>
+                    <img
+                        src="imgs/logo_tb.png"
+                        alt="Travel Blue Argentina"
+                        style="height: 44px; filter: brightness(0) invert(1)"
+                    /><small>CATÁLOGO MAYORISTA</small>
                 </div>
-                <button class="cart-btn" onclick="openCart()">
-                    🛒 Mi pedido
-                    <div class="cart-n" id="cartN">0</div>
-                </button>
+                <div class="h-right">
+                    <div class="view-btns">
+                        <button
+                            class="view-btn on"
+                            id="btnGrid"
+                            onclick="setView('grid')"
+                            title="Vista grilla"
+                        >
+                            ⊞
+                        </button>
+                        <button
+                            class="view-btn"
+                            id="btnList"
+                            onclick="setView('list')"
+                            title="Vista lista"
+                        >
+                            ☰
+                        </button>
+                    </div>
+                    <button class="cart-btn" onclick="openCart()">
+                        🛒 Mi pedido
+                        <div class="cart-n" id="cartN">0</div>
+                    </button>
+                </div>
             </div>
             <div class="search">
                 <input
@@ -526,7 +662,6 @@
                 />
             </div>
         </header>
-
         <div class="tabs" id="tabs"></div>
         <div class="body" id="prods">
             <div class="loading">
@@ -534,7 +669,6 @@
                 Cargando catálogo...
             </div>
         </div>
-
         <div class="overlay" id="overlay" onclick="bgClose(event)">
             <div class="panel">
                 <div class="p-head">
@@ -563,14 +697,14 @@
                 </div>
             </div>
         </div>
-
         <script>
-            var API_URL = "api.php";
-            var WA_NUM = "5493534062150";
-            var products = [];
-            var cart = {};
-            var activeCat = "TODOS";
-            var query = "";
+            var API_URL = "api.php",
+                WA_NUM = "5493535697188";
+            var products = [],
+                cart = {},
+                activeCat = "TODOS",
+                query = "",
+                viewMode = "grid";
 
             var lazyObs = null;
             if (window.IntersectionObserver) {
@@ -578,8 +712,8 @@
                     function (entries) {
                         entries.forEach(function (e) {
                             if (e.isIntersecting) {
-                                var img = e.target;
-                                var src = img.getAttribute("data-src");
+                                var img = e.target,
+                                    src = img.getAttribute("data-src");
                                 if (src) {
                                     img.src = src;
                                     img.removeAttribute("data-src");
@@ -591,35 +725,41 @@
                     { rootMargin: "200px" },
                 );
             }
-
             function activateLazy() {
                 if (!lazyObs) {
                     document
                         .querySelectorAll("img[data-src]")
-                        .forEach(function (img) {
-                            img.src = img.getAttribute("data-src") || "";
+                        .forEach(function (i) {
+                            i.src = i.getAttribute("data-src") || "";
                         });
                     return;
                 }
                 document
                     .querySelectorAll("img[data-src]")
-                    .forEach(function (img) {
-                        lazyObs.observe(img);
+                    .forEach(function (i) {
+                        lazyObs.observe(i);
                     });
             }
-
             function getImgSrc(p) {
                 if (p.FOTO && p.FOTO.indexOf("http") === 0) return p.FOTO;
                 if (p.FOTO) return p.FOTO;
-                var code = (p.CODIGO || "").replace(/\//g, "_");
-                return "imgs/" + code + ".jpeg";
+                return "imgs/" + (p.CODIGO || "").replace(/\//g, "_") + ".jpeg";
             }
-
+            function setView(v) {
+                viewMode = v;
+                document
+                    .getElementById("btnGrid")
+                    .classList.toggle("on", v === "grid");
+                document
+                    .getElementById("btnList")
+                    .classList.toggle("on", v === "list");
+                renderProds();
+            }
             function start() {
                 fetch(API_URL + "?action=productos&t=" + Date.now())
-                    .then(function (res) {
-                        if (!res.ok) throw new Error("HTTP " + res.status);
-                        return res.json();
+                    .then(function (r) {
+                        if (!r.ok) throw new Error();
+                        return r.json();
                     })
                     .then(function (data) {
                         products = data.map(function (p) {
@@ -631,17 +771,23 @@
                                 PVP: p.pvp,
                                 FOTO: p.foto,
                                 ESTADO: p.estado,
+                                ORDEN: p.orden,
                             };
+                        });
+                        products.sort(function (a, b) {
+                            return String(a.CODIGO).localeCompare(
+                                String(b.CODIGO),
+                                undefined,
+                                { numeric: true },
+                            );
                         });
                         render();
                     })
-                    .catch(function (err) {
-                        console.error("Error:", err);
+                    .catch(function () {
                         document.getElementById("prods").innerHTML =
-                            '<div class="loading">Error al cargar el catálogo. Intentá recargar la página.</div>';
+                            '<div class="loading">Error al cargar. Intentá recargar la página.</div>';
                     });
             }
-
             function getCats() {
                 var seen = {},
                     list = ["TODOS"];
@@ -653,12 +799,10 @@
                 });
                 return list;
             }
-
             function render() {
                 renderTabs();
                 renderProds();
             }
-
             function renderTabs() {
                 document.getElementById("tabs").innerHTML = getCats()
                     .map(function (c) {
@@ -674,7 +818,6 @@
                     })
                     .join("");
             }
-
             function setTab(c) {
                 activeCat = c;
                 renderTabs();
@@ -687,7 +830,6 @@
                     .trim();
                 renderProds();
             }
-
             function getVisible() {
                 return products.filter(function (p) {
                     var catOk =
@@ -700,7 +842,6 @@
                     return catOk && srchOk;
                 });
             }
-
             function fmt(v) {
                 return (
                     "$ " +
@@ -709,6 +850,9 @@
             }
             function sid(code) {
                 return "p" + code.replace(/[^a-zA-Z0-9]/g, "_");
+            }
+            function getQty(code) {
+                return cart[code] ? cart[code].qty : 1;
             }
 
             function renderProds() {
@@ -719,6 +863,11 @@
                         '<div class="loading">No hay productos que coincidan.</div>';
                     return;
                 }
+                if (viewMode === "grid") renderGrid(list, el);
+                else renderList(list, el);
+            }
+
+            function renderGrid(list, el) {
                 var bycat = {},
                     order = [];
                 list.forEach(function (p) {
@@ -737,7 +886,7 @@
                     bycat[cat].forEach(function (p) {
                         var sold = (p.ESTADO || "").toUpperCase() === "AGOTADO";
                         var inCart = !!cart[p.CODIGO];
-                        var qty = inCart ? cart[p.CODIGO].qty : 1;
+                        var qty = getQty(p.CODIGO);
                         var id = sid(p.CODIGO);
                         var src = getImgSrc(p);
                         html +=
@@ -779,9 +928,9 @@
                             html +=
                                 '<button class="qb" onclick="chgQty(\'' +
                                 p.CODIGO +
-                                "',-1)\"" +
-                                (inCart ? "" : " disabled") +
-                                ">−</button>";
+                                "',-1," +
+                                (inCart ? "true" : "false") +
+                                ')">−</button>';
                             html +=
                                 '<span class="qn" id="qn_' +
                                 id +
@@ -791,7 +940,9 @@
                             html +=
                                 '<button class="qb" onclick="chgQty(\'' +
                                 p.CODIGO +
-                                "',1)\">+</button></div>";
+                                "',1," +
+                                (inCart ? "true" : "false") +
+                                ')">+</button></div>';
                             html +=
                                 '<button class="add' +
                                 (inCart ? " on" : "") +
@@ -811,12 +962,115 @@
                 setTimeout(activateLazy, 30);
             }
 
-            function chgQty(code, delta) {
-                if (!cart[code]) return;
-                cart[code].qty = Math.max(1, cart[code].qty + delta);
-                var el = document.getElementById("qn_" + sid(code));
-                if (el) el.textContent = cart[code].qty;
-                updateCart();
+            function renderList(list, el) {
+                var bycat = {},
+                    order = [];
+                list.forEach(function (p) {
+                    if (!bycat[p.CATEGORIA]) {
+                        bycat[p.CATEGORIA] = [];
+                        order.push(p.CATEGORIA);
+                    }
+                    bycat[p.CATEGORIA].push(p);
+                });
+                var html = "";
+                order.forEach(function (cat) {
+                    html +=
+                        '<div class="cat-title">' +
+                        cat +
+                        '</div><div class="list-wrap"><table class="list-table">';
+                    html +=
+                        "<thead><tr><th>Img</th><th>Código</th><th>Descripción</th><th>Precio May.</th><th>PVP</th><th>Cantidad</th><th></th></tr></thead><tbody>";
+                    bycat[cat].forEach(function (p) {
+                        var sold = (p.ESTADO || "").toUpperCase() === "AGOTADO";
+                        var inCart = !!cart[p.CODIGO];
+                        var qty = getQty(p.CODIGO);
+                        var id = sid(p.CODIGO);
+                        var src = getImgSrc(p);
+                        html +=
+                            '<tr class="' +
+                            (sold ? "sold-row" : "") +
+                            (inCart ? " picked-row" : "") +
+                            '" id="lr_' +
+                            id +
+                            '">';
+                        html +=
+                            '<td><img class="list-thumb" data-src="' +
+                            src +
+                            '" alt="" onerror="this.style.display=\'none\'"></td>';
+                        html +=
+                            '<td><span class="code">' +
+                            p.CODIGO +
+                            "</span>" +
+                            (sold
+                                ? ' <span class="badge">AGOTADO</span>'
+                                : "") +
+                            "</td>";
+                        html +=
+                            '<td style="font-weight:600">' +
+                            p.DESCRIPCION +
+                            "</td>";
+                        html +=
+                            '<td style="font-weight:800;color:var(--blue)">' +
+                            fmt(p.PRECIO_MAYORISTA) +
+                            "</td>";
+                        html +=
+                            '<td style="color:var(--muted)">' +
+                            (p.PVP ? fmt(p.PVP) : "—") +
+                            "</td>";
+                        if (sold) {
+                            html +=
+                                '<td colspan="2"><span style="color:#aaa;font-size:12px">No disponible</span></td>';
+                        } else {
+                            html += '<td><div class="list-qty">';
+                            html +=
+                                '<button class="qb" onclick="chgQty(\'' +
+                                p.CODIGO +
+                                "',-1," +
+                                (inCart ? "true" : "false") +
+                                ')">−</button>';
+                            html +=
+                                '<span class="qn" id="qn_' +
+                                id +
+                                '">' +
+                                qty +
+                                "</span>";
+                            html +=
+                                '<button class="qb" onclick="chgQty(\'' +
+                                p.CODIGO +
+                                "',1," +
+                                (inCart ? "true" : "false") +
+                                ')">+</button>';
+                            html += "</div></td>";
+                            html +=
+                                '<td><button class="list-add' +
+                                (inCart ? " on" : "") +
+                                '" id="ab_' +
+                                id +
+                                '" onclick="addCart(\'' +
+                                p.CODIGO +
+                                "')\">" +
+                                (inCart ? "✓ En pedido" : "+ Agregar") +
+                                "</button></td>";
+                        }
+                        html += "</tr>";
+                    });
+                    html += "</tbody></table></div>";
+                });
+                el.innerHTML = html;
+                setTimeout(activateLazy, 30);
+            }
+
+            function chgQty(code, delta, inCart) {
+                var id = sid(code);
+                var el = document.getElementById("qn_" + id);
+                if (!el) return;
+                var cur = parseInt(el.textContent) || 1;
+                var next = Math.max(1, cur + delta);
+                el.textContent = next;
+                if (inCart && cart[code]) {
+                    cart[code].qty = next;
+                    updateCart();
+                }
             }
 
             function addCart(code) {
@@ -832,6 +1086,7 @@
                 var qEl = document.getElementById("qn_" + id);
                 var qty = qEl ? parseInt(qEl.textContent) || 1 : 1;
                 cart[code] = { p: p, qty: qty };
+                // update grid card
                 var card = document.getElementById(id);
                 if (card) {
                     card.classList.add("picked");
@@ -840,8 +1095,16 @@
                         btn.textContent = "✓ En pedido";
                         btn.classList.add("on");
                     }
-                    var minusBtn = card.querySelector(".qb");
-                    if (minusBtn) minusBtn.disabled = false;
+                }
+                // update list row
+                var row = document.getElementById("lr_" + id);
+                if (row) {
+                    row.classList.add("picked-row");
+                    var lbtn = document.getElementById("ab_" + id);
+                    if (lbtn) {
+                        lbtn.textContent = "✓ En pedido";
+                        lbtn.classList.add("on");
+                    }
                 }
                 updateCart();
             }
@@ -964,7 +1227,6 @@
                     "_blank",
                 );
             }
-
             start();
         </script>
     </body>

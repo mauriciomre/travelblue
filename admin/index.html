@@ -68,7 +68,7 @@
                 margin-left: auto;
             }
             .wrap {
-                max-width: 1100px;
+                max-width: 1200px;
                 margin: 0 auto;
                 padding: 20px;
             }
@@ -133,6 +133,22 @@
                 background: #ff6f00;
                 color: #fff;
             }
+            .btn-toggle {
+                background: #fff;
+                color: var(--blue);
+                border: 2px solid var(--blue);
+                padding: 7px 16px;
+                border-radius: 8px;
+                font-size: 13px;
+                font-weight: 700;
+                cursor: pointer;
+            }
+            .btn-toggle.on {
+                background: var(--blue);
+                color: #fff;
+            }
+
+            /* TABLE */
             table {
                 width: 100%;
                 border-collapse: collapse;
@@ -147,9 +163,10 @@
                 padding: 11px 14px;
                 text-align: left;
                 font-size: 13px;
+                white-space: nowrap;
             }
             td {
-                padding: 10px 14px;
+                padding: 8px 14px;
                 border-bottom: 1px solid var(--border);
                 font-size: 13px;
                 vertical-align: middle;
@@ -199,7 +216,72 @@
             .actions {
                 display: flex;
                 gap: 6px;
+                align-items: center;
             }
+
+            /* DRAG & DROP */
+            tr.dragging {
+                opacity: 0.4;
+                background: #e8f0fb !important;
+            }
+            tr.drag-over td {
+                border-top: 3px solid var(--blue) !important;
+            }
+            .drag-handle {
+                cursor: grab;
+                color: #ccc;
+                font-size: 18px;
+                padding: 0 6px;
+                user-select: none;
+            }
+            .drag-handle:active {
+                cursor: grabbing;
+            }
+
+            /* INLINE EDIT */
+            .inline-input {
+                width: 100%;
+                padding: 5px 8px;
+                border: 1.5px solid var(--blue);
+                border-radius: 6px;
+                font-size: 13px;
+                outline: none;
+                background: #fff;
+                min-width: 80px;
+            }
+            .inline-select {
+                padding: 5px 8px;
+                border: 1.5px solid var(--blue);
+                border-radius: 6px;
+                font-size: 13px;
+                outline: none;
+                background: #fff;
+            }
+            .inline-save {
+                background: var(--green);
+                color: #fff;
+                border: none;
+                border-radius: 6px;
+                padding: 5px 10px;
+                font-size: 12px;
+                font-weight: 700;
+                cursor: pointer;
+                white-space: nowrap;
+            }
+            .inline-cancel {
+                background: #eee;
+                color: #555;
+                border: none;
+                border-radius: 6px;
+                padding: 5px 8px;
+                font-size: 12px;
+                cursor: pointer;
+            }
+            td.editing {
+                background: #f0f8ff !important;
+            }
+
+            /* MODAL */
             .modal-bg {
                 display: none;
                 position: fixed;
@@ -452,10 +534,25 @@
             .cat-inline input:focus {
                 border-color: var(--blue);
             }
+            .edit-mode-bar {
+                background: #fff3cd;
+                border: 1px solid #ffc107;
+                border-radius: 8px;
+                padding: 10px 16px;
+                margin-bottom: 12px;
+                font-size: 13px;
+                font-weight: 600;
+                color: #856404;
+                display: none;
+            }
+            .edit-mode-bar.on {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+            }
         </style>
     </head>
     <body>
-        <!-- LOGIN -->
         <div class="login-wrap" id="loginWrap">
             <div class="login-box">
                 <h2>Travel Blue Admin</h2>
@@ -472,18 +569,20 @@
             </div>
         </div>
 
-        <!-- APP -->
         <div id="appWrap" style="display: none">
             <header>
                 <h1>🧳 Travel Blue</h1>
                 <div class="nav">
                     <button
                         class="nav-btn on"
-                        onclick="showSection('productos')"
+                        onclick="showSection('productos', this)"
                     >
                         Productos
                     </button>
-                    <button class="nav-btn" onclick="showSection('categorias')">
+                    <button
+                        class="nav-btn"
+                        onclick="showSection('categorias', this)"
+                    >
                         Categorías
                     </button>
                 </div>
@@ -492,7 +591,7 @@
                 </button>
             </header>
 
-            <!-- SECCIÓN PRODUCTOS -->
+            <!-- PRODUCTOS -->
             <div class="wrap section on" id="secProductos">
                 <div class="stats">
                     <div class="stat">
@@ -516,7 +615,7 @@
                     <input
                         type="text"
                         id="srch"
-                        placeholder="🔍 Buscar por nombre o código..."
+                        placeholder="🔍 Buscar..."
                         oninput="filterTable()"
                     />
                     <select id="filtCat" onchange="filterTable()">
@@ -527,16 +626,28 @@
                         <option value="DISPONIBLE">Disponible</option>
                         <option value="AGOTADO">Agotado</option>
                     </select>
+                    <button
+                        class="btn-toggle"
+                        id="btnEditMode"
+                        onclick="toggleEditMode()"
+                    >
+                        ✏ Modo edición
+                    </button>
                     <button class="btn btn-primary" onclick="openModal()">
                         + Nuevo producto
                     </button>
                     <button class="btn btn-import" onclick="importarData()">
-                        ⬆ Importar datos iniciales
+                        ⬆ Importar
                     </button>
                 </div>
-                <table>
+                <div class="edit-mode-bar" id="editModeBar">
+                    ✏ Modo edición activo — hacé clic en cualquier celda para
+                    editar. Arrastrá las filas para reordenar.
+                </div>
+                <table id="mainTable">
                     <thead>
                         <tr>
+                            <th></th>
                             <th>Img</th>
                             <th>Código</th>
                             <th>Descripción</th>
@@ -551,7 +662,7 @@
                 </table>
             </div>
 
-            <!-- SECCIÓN CATEGORÍAS -->
+            <!-- CATEGORÍAS -->
             <div class="wrap section" id="secCategorias">
                 <h2
                     style="
@@ -570,13 +681,6 @@
                         placeholder="Nombre de nueva categoría"
                         onkeydown="if (event.key === 'Enter') crearCategoria();"
                     />
-                    <input
-                        type="number"
-                        id="newCatOrden"
-                        placeholder="Orden"
-                        value="0"
-                        style="width: 80px; flex: none"
-                    />
                     <button class="btn btn-primary" onclick="crearCategoria()">
                         + Agregar
                     </button>
@@ -585,7 +689,6 @@
                     <thead>
                         <tr>
                             <th>Nombre</th>
-                            <th>Orden</th>
                             <th>Productos</th>
                             <th>Acciones</th>
                         </tr>
@@ -601,10 +704,9 @@
                 <h2 id="modalTitle">Nuevo producto</h2>
                 <input type="hidden" id="fId" />
                 <input type="hidden" id="fFotoActual" />
-
                 <div class="field">
                     <label>Imagen del producto</label>
-                    <div class="img-upload" id="imgUploadBox">
+                    <div class="img-upload">
                         <input
                             type="file"
                             id="fImagen"
@@ -631,7 +733,6 @@
                         </div>
                     </div>
                 </div>
-
                 <div class="row2">
                     <div class="field">
                         <label>Código *</label>
@@ -640,7 +741,9 @@
                     </div>
                     <div class="field">
                         <label>Categoría *</label>
-                        <select id="fCategoria"></select>
+                        <select id="fCategoria">
+                            <option value="">— Seleccioná —</option>
+                        </select>
                     </div>
                 </div>
                 <div class="field">
@@ -652,22 +755,16 @@
                         ><input id="fMay" type="number" />
                     </div>
                     <div class="field">
-                        <label>PVP Sugerido ($)</label
+                        <label>PVP Sugerido ($) *</label
                         ><input id="fPvp" type="number" />
                     </div>
                 </div>
-                <div class="row2">
-                    <div class="field">
-                        <label>Estado</label>
-                        <select id="fEstado">
-                            <option value="DISPONIBLE">Disponible</option>
-                            <option value="AGOTADO">Agotado</option>
-                        </select>
-                    </div>
-                    <div class="field">
-                        <label>Orden</label
-                        ><input id="fOrden" type="number" value="0" />
-                    </div>
+                <div class="field">
+                    <label>Estado *</label>
+                    <select id="fEstado">
+                        <option value="DISPONIBLE">Disponible</option>
+                        <option value="AGOTADO">Agotado</option>
+                    </select>
                 </div>
                 <div class="modal-foot">
                     <button
@@ -696,10 +793,6 @@
                 <div class="field">
                     <label>Nombre</label><input id="catEditNombre" />
                 </div>
-                <div class="field">
-                    <label>Orden</label
-                    ><input id="catEditOrden" type="number" value="0" />
-                </div>
                 <div class="modal-foot">
                     <button
                         class="btn"
@@ -721,17 +814,19 @@
         <div class="toast" id="toast"></div>
 
         <script>
-            var API = "../api.php";
-            var UPLOAD = "../upload.php";
+            var API = "../api.php",
+                UPLOAD = "../upload.php";
             var authUser = "",
                 authPass = "";
             var allProducts = [],
                 allCats = [];
-            var pendingFile = null;
-            var codigoOk = true;
-            var checkTimeout = null;
+            var pendingFile = null,
+                codigoOk = true,
+                checkTimeout = null;
+            var editMode = false;
+            var dragSrc = null;
 
-            // ── AUTH ─────────────────────────────────────────────────────────────────────
+            // ── AUTH ──────────────────────────────────────────────────────────────────────
             async function doLogin() {
                 var u = document.getElementById("luser").value.trim();
                 var p = document.getElementById("lpass").value.trim();
@@ -752,17 +847,16 @@
                     document.getElementById("appWrap").style.display = "block";
                     await loadCats();
                     await loadProducts();
-                } else {
+                } else
                     document.getElementById("lerr").textContent =
                         "Usuario o contraseña incorrectos";
-                }
             }
             function doLogout() {
                 location.reload();
             }
 
-            // ── NAVEGACIÓN ───────────────────────────────────────────────────────────────
-            function showSection(s) {
+            // ── NAVEGACIÓN ────────────────────────────────────────────────────────────────
+            function showSection(s, btn) {
                 document
                     .querySelectorAll(".section")
                     .forEach((el) => el.classList.remove("on"));
@@ -774,11 +868,23 @@
                         "sec" + s.charAt(0).toUpperCase() + s.slice(1),
                     )
                     .classList.add("on");
-                event.target.classList.add("on");
+                btn.classList.add("on");
                 if (s === "categorias") renderCatTable();
             }
 
-            // ── CATEGORÍAS ───────────────────────────────────────────────────────────────
+            // ── MODO EDICIÓN ──────────────────────────────────────────────────────────────
+            function toggleEditMode() {
+                editMode = !editMode;
+                document
+                    .getElementById("btnEditMode")
+                    .classList.toggle("on", editMode);
+                document
+                    .getElementById("editModeBar")
+                    .classList.toggle("on", editMode);
+                renderTable(getFiltered());
+            }
+
+            // ── CATEGORÍAS ────────────────────────────────────────────────────────────────
             async function loadCats() {
                 var res = await fetch(API + "?action=categorias");
                 allCats = await res.json();
@@ -788,29 +894,29 @@
 
             function renderCatSelector() {
                 var sel = document.getElementById("fCategoria");
-                var current = sel.value;
+                var cur = sel.value;
                 sel.innerHTML = '<option value="">— Seleccioná —</option>';
-                allCats.forEach((c) => {
+                allCats.forEach(function (c) {
                     var o = document.createElement("option");
                     o.value = c.nombre;
                     o.textContent = c.nombre;
                     sel.appendChild(o);
                 });
-                if (current) sel.value = current;
+                if (cur) sel.value = cur;
             }
 
             function renderCatFilter() {
                 var sel = document.getElementById("filtCat");
-                var current = sel.value;
+                var cur = sel.value;
                 sel.innerHTML =
                     '<option value="">Todas las categorías</option>';
-                allCats.forEach((c) => {
+                allCats.forEach(function (c) {
                     var o = document.createElement("option");
                     o.value = c.nombre;
                     o.textContent = c.nombre;
                     sel.appendChild(o);
                 });
-                if (current) sel.value = current;
+                if (cur) sel.value = cur;
             }
 
             function renderCatTable() {
@@ -819,9 +925,7 @@
                     var count = allProducts.filter(
                         (p) => p.categoria === c.nombre,
                     ).length;
-                    html += "<tr>";
-                    html += "<td><strong>" + c.nombre + "</strong></td>";
-                    html += "<td>" + c.orden + "</td>";
+                    html += "<tr><td><strong>" + c.nombre + "</strong></td>";
                     html +=
                         "<td>" +
                         count +
@@ -845,7 +949,7 @@
                 });
                 document.getElementById("catTbody").innerHTML =
                     html ||
-                    '<tr><td colspan="4" style="text-align:center;color:#aaa;padding:20px">No hay categorías</td></tr>';
+                    '<tr><td colspan="3" style="text-align:center;color:#aaa;padding:20px">No hay categorías</td></tr>';
             }
 
             async function crearCategoria() {
@@ -853,10 +957,8 @@
                     .getElementById("newCatNombre")
                     .value.trim()
                     .toUpperCase();
-                var orden =
-                    parseInt(document.getElementById("newCatOrden").value) || 0;
                 if (!nombre) {
-                    toast("Ingresá un nombre para la categoría", "#c62828");
+                    toast("Ingresá un nombre", "#c62828");
                     return;
                 }
                 var res = await fetch(API + "?action=categoria_crear", {
@@ -866,18 +968,17 @@
                         _user: authUser,
                         _pass: authPass,
                         nombre,
-                        orden,
+                        orden: 0,
                     }),
                 });
                 var json = await res.json();
                 if (json.ok) {
                     document.getElementById("newCatNombre").value = "";
-                    document.getElementById("newCatOrden").value = "0";
                     toast("Categoría creada");
                     await loadCats();
                     renderCatTable();
                 } else
-                    toast("Error: " + (json.error || "desconocido"), "#c62828");
+                    toast("Error: " + (json.error || "ya existe"), "#c62828");
             }
 
             function openCatModal(id) {
@@ -885,7 +986,6 @@
                 if (!cat) return;
                 document.getElementById("catEditId").value = cat.id;
                 document.getElementById("catEditNombre").value = cat.nombre;
-                document.getElementById("catEditOrden").value = cat.orden;
                 document.getElementById("catModalBg").classList.add("open");
             }
             function closeCatModal() {
@@ -898,9 +998,6 @@
                     .getElementById("catEditNombre")
                     .value.trim()
                     .toUpperCase();
-                var orden =
-                    parseInt(document.getElementById("catEditOrden").value) ||
-                    0;
                 var res = await fetch(
                     API + "?action=categoria_editar&id=" + id,
                     {
@@ -910,7 +1007,7 @@
                             _user: authUser,
                             _pass: authPass,
                             nombre,
-                            orden,
+                            orden: 0,
                         }),
                     },
                 );
@@ -928,15 +1025,12 @@
             async function eliminarCategoria(id, nombre, count) {
                 if (count > 0) {
                     toast(
-                        "No se puede eliminar: tiene " +
-                            count +
-                            " productos asociados",
+                        "No se puede eliminar: tiene " + count + " productos",
                         "#c62828",
                     );
                     return;
                 }
-                if (!confirm('¿Eliminar la categoría "' + nombre + '"?'))
-                    return;
+                if (!confirm('¿Eliminar "' + nombre + '"?')) return;
                 var res = await fetch(
                     API + "?action=categoria_eliminar&id=" + id,
                     {
@@ -953,16 +1047,22 @@
                     toast("Categoría eliminada");
                     await loadCats();
                     renderCatTable();
-                } else
-                    toast("Error: " + (json.error || "desconocido"), "#c62828");
+                }
             }
 
             // ── PRODUCTOS ─────────────────────────────────────────────────────────────────
             async function loadProducts() {
                 var res = await fetch(API + "?action=productos");
                 allProducts = await res.json();
+                allProducts.sort(function (a, b) {
+                    return String(a.codigo).localeCompare(
+                        String(b.codigo),
+                        undefined,
+                        { numeric: true },
+                    );
+                });
                 renderStats();
-                renderTable(allProducts);
+                renderTable(getFiltered());
             }
 
             function renderStats() {
@@ -975,20 +1075,21 @@
                 document.getElementById("stCats").textContent = allCats.length;
             }
 
-            function filterTable() {
+            function getFiltered() {
                 var q = document.getElementById("srch").value.toLowerCase();
                 var cat = document.getElementById("filtCat").value;
                 var est = document.getElementById("filtEst").value;
-                renderTable(
-                    allProducts.filter(
-                        (p) =>
-                            (!q ||
-                                p.descripcion.toLowerCase().includes(q) ||
-                                p.codigo.toLowerCase().includes(q)) &&
-                            (!cat || p.categoria === cat) &&
-                            (!est || p.estado === est),
-                    ),
+                return allProducts.filter(
+                    (p) =>
+                        (!q ||
+                            p.descripcion.toLowerCase().includes(q) ||
+                            p.codigo.toLowerCase().includes(q)) &&
+                        (!cat || p.categoria === cat) &&
+                        (!est || p.estado === est),
                 );
+            }
+            function filterTable() {
+                renderTable(getFiltered());
             }
 
             function fmt(v) {
@@ -1007,82 +1108,234 @@
                 var html = "";
                 list.forEach(function (p) {
                     var imgUrl = getImgUrl(p);
-                    html += "<tr>";
+                    html +=
+                        '<tr draggable="' +
+                        editMode +
+                        '" data-id="' +
+                        p.id +
+                        '" data-orden="' +
+                        p.orden +
+                        '">';
+                    // drag handle
+                    html +=
+                        "<td>" +
+                        (editMode
+                            ? '<span class="drag-handle" title="Arrastrá para reordenar">⠿</span>'
+                            : "") +
+                        "</td>";
+                    // img
                     html +=
                         '<td><img class="thumb" src="' +
                         imgUrl +
                         '" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\'"><div class="thumb-ph" style="display:none">📦</div></td>';
-                    html += "<td><code>" + p.codigo + "</code></td>";
-                    html += "<td>" + p.descripcion + "</td>";
-                    html += "<td>" + p.categoria + "</td>";
-                    html += "<td>" + fmt(p.precio_mayorista) + "</td>";
-                    html += "<td>" + fmt(p.pvp) + "</td>";
-                    html +=
-                        '<td><span class="badge-' +
-                        (p.estado === "DISPONIBLE" ? "disp" : "agot") +
-                        '">' +
-                        p.estado +
-                        "</span></td>";
-                    html += '<td><div class="actions">';
-                    html +=
-                        '<button class="btn btn-edit" onclick="editProduct(' +
-                        p.id +
-                        ')">✏ Editar</button>';
-                    html +=
-                        '<button class="btn btn-danger" onclick="deleteProduct(' +
-                        p.id +
-                        ",'" +
-                        p.descripcion.replace(/'/g, "") +
-                        "')\">🗑</button>";
-                    html += "</div></td></tr>";
+                    if (editMode) {
+                        // Inline editable cells
+                        html +=
+                            '<td class="editing"><input class="inline-input" value="' +
+                            esc(p.codigo) +
+                            '" data-field="codigo" data-id="' +
+                            p.id +
+                            '" style="width:90px"></td>';
+                        html +=
+                            '<td class="editing"><input class="inline-input" value="' +
+                            esc(p.descripcion) +
+                            '" data-field="descripcion" data-id="' +
+                            p.id +
+                            '" style="width:200px"></td>';
+                        html +=
+                            '<td class="editing"><select class="inline-select" data-field="categoria" data-id="' +
+                            p.id +
+                            '">' +
+                            allCats
+                                .map(
+                                    (c) =>
+                                        '<option value="' +
+                                        c.nombre +
+                                        '"' +
+                                        (c.nombre === p.categoria
+                                            ? " selected"
+                                            : "") +
+                                        ">" +
+                                        c.nombre +
+                                        "</option>",
+                                )
+                                .join("") +
+                            "</select></td>";
+                        html +=
+                            '<td class="editing"><input class="inline-input" type="number" value="' +
+                            p.precio_mayorista +
+                            '" data-field="precio_mayorista" data-id="' +
+                            p.id +
+                            '" style="width:100px"></td>';
+                        html +=
+                            '<td class="editing"><input class="inline-input" type="number" value="' +
+                            (p.pvp || "") +
+                            '" data-field="pvp" data-id="' +
+                            p.id +
+                            '" style="width:100px"></td>';
+                        html +=
+                            '<td class="editing"><select class="inline-select" data-field="estado" data-id="' +
+                            p.id +
+                            '"><option' +
+                            (p.estado === "DISPONIBLE" ? " selected" : "") +
+                            ">DISPONIBLE</option><option" +
+                            (p.estado === "AGOTADO" ? " selected" : "") +
+                            ">AGOTADO</option></select></td>";
+                        html +=
+                            '<td><button class="inline-save" onclick="saveInline(' +
+                            p.id +
+                            ')">💾 Guardar</button></td>';
+                    } else {
+                        html += "<td><code>" + p.codigo + "</code></td>";
+                        html += "<td>" + p.descripcion + "</td>";
+                        html += "<td>" + p.categoria + "</td>";
+                        html +=
+                            '<td style="font-weight:800;color:var(--blue)">' +
+                            fmt(p.precio_mayorista) +
+                            "</td>";
+                        html += "<td>" + fmt(p.pvp) + "</td>";
+                        html +=
+                            '<td><span class="badge-' +
+                            (p.estado === "DISPONIBLE" ? "disp" : "agot") +
+                            '">' +
+                            p.estado +
+                            "</span></td>";
+                        html += '<td><div class="actions">';
+                        html +=
+                            '<button class="btn btn-edit" onclick="editProduct(' +
+                            p.id +
+                            ')">✏ Editar</button>';
+                        html +=
+                            '<button class="btn btn-danger" onclick="deleteProduct(' +
+                            p.id +
+                            ",'" +
+                            p.descripcion.replace(/'/g, "") +
+                            "')\">🗑</button>";
+                        html += "</div></td>";
+                    }
+                    html += "</tr>";
                 });
                 document.getElementById("tbody").innerHTML =
                     html ||
-                    '<tr><td colspan="8" style="text-align:center;color:#aaa;padding:30px">No hay productos</td></tr>';
+                    '<tr><td colspan="9" style="text-align:center;color:#aaa;padding:30px">No hay productos</td></tr>';
+                if (editMode) initDragDrop();
             }
 
-            // ── VALIDACIÓN CÓDIGO EN TIEMPO REAL ─────────────────────────────────────────
-            function checkCodigo(input) {
-                var codigo = input.value.trim();
-                var hint = document.getElementById("codigoHint");
-                var currentId = document.getElementById("fId").value;
-                clearTimeout(checkTimeout);
-                if (!codigo) {
-                    hint.textContent = "";
-                    hint.className = "field-hint";
-                    input.className = "";
-                    codigoOk = true;
+            function esc(s) {
+                return String(s || "")
+                    .replace(/"/g, "&quot;")
+                    .replace(/</g, "&lt;");
+            }
+
+            // ── INLINE SAVE ───────────────────────────────────────────────────────────────
+            async function saveInline(id) {
+                var p = allProducts.find((p) => p.id === id);
+                if (!p) return;
+                // Collect all inline inputs for this row
+                var row = document.querySelector('tr[data-id="' + id + '"]');
+                if (!row) return;
+                var data = {
+                    _user: authUser,
+                    _pass: authPass,
+                    orden: p.orden || 0,
+                };
+                row.querySelectorAll("[data-field]").forEach(function (el) {
+                    data[el.dataset.field] = el.value;
+                });
+                if (
+                    !data.codigo ||
+                    !data.descripcion ||
+                    !data.categoria ||
+                    !data.precio_mayorista
+                ) {
+                    toast("Completá todos los campos", "#c62828");
                     return;
                 }
-                hint.textContent = "Verificando...";
-                hint.className = "field-hint";
-                checkTimeout = setTimeout(async function () {
-                    var res = await fetch(
-                        API +
-                            "?action=check_codigo&codigo=" +
-                            encodeURIComponent(codigo) +
-                            "&exclude_id=" +
-                            (currentId || 0),
-                    );
-                    var json = await res.json();
-                    if (json.exists) {
-                        hint.textContent = "✗ Este código ya existe";
-                        hint.className = "field-hint err";
-                        input.className = "err";
-                        codigoOk = false;
-                    } else {
-                        hint.textContent = "✓ Código disponible";
-                        hint.className = "field-hint ok";
-                        input.className = "ok";
-                        codigoOk = true;
-                    }
-                }, 400);
+                var res = await fetch(API + "?action=editar&id=" + id, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(data),
+                });
+                var json = await res.json();
+                if (json.ok) {
+                    toast("Guardado");
+                    await loadProducts();
+                } else
+                    toast("Error: " + (json.error || "desconocido"), "#c62828");
+            }
+
+            // ── DRAG & DROP ───────────────────────────────────────────────────────────────
+            function initDragDrop() {
+                var rows = document.querySelectorAll(
+                    '#tbody tr[draggable="true"]',
+                );
+                rows.forEach(function (row) {
+                    row.addEventListener("dragstart", function (e) {
+                        dragSrc = row;
+                        row.classList.add("dragging");
+                        e.dataTransfer.effectAllowed = "move";
+                    });
+                    row.addEventListener("dragend", function () {
+                        row.classList.remove("dragging");
+                        document
+                            .querySelectorAll("#tbody tr")
+                            .forEach((r) => r.classList.remove("drag-over"));
+                    });
+                    row.addEventListener("dragover", function (e) {
+                        e.preventDefault();
+                        e.dataTransfer.dropEffect = "move";
+                        document
+                            .querySelectorAll("#tbody tr")
+                            .forEach((r) => r.classList.remove("drag-over"));
+                        if (row !== dragSrc) row.classList.add("drag-over");
+                    });
+                    row.addEventListener("drop", function (e) {
+                        e.preventDefault();
+                        if (dragSrc && dragSrc !== row) {
+                            var tbody = document.getElementById("tbody");
+                            var rows = Array.from(tbody.querySelectorAll("tr"));
+                            var srcIdx = rows.indexOf(dragSrc);
+                            var dstIdx = rows.indexOf(row);
+                            if (srcIdx < dstIdx)
+                                tbody.insertBefore(dragSrc, row.nextSibling);
+                            else tbody.insertBefore(dragSrc, row);
+                            saveOrder();
+                        }
+                        row.classList.remove("drag-over");
+                    });
+                });
+            }
+
+            async function saveOrder() {
+                var rows = document.querySelectorAll("#tbody tr[data-id]");
+                var order = [];
+                rows.forEach(function (r, i) {
+                    order.push({ id: parseInt(r.dataset.id), orden: i });
+                });
+                // Update local array
+                order.forEach(function (o) {
+                    var p = allProducts.find((p) => p.id === o.id);
+                    if (p) p.orden = o.orden;
+                });
+                // Save to server
+                var res = await fetch(API + "?action=reordenar", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        _user: authUser,
+                        _pass: authPass,
+                        orden: order,
+                    }),
+                });
+                var json = await res.json();
+                if (json.ok) toast("Orden guardado");
+                else toast("Error al guardar orden", "#c62828");
             }
 
             // ── MODAL PRODUCTO ────────────────────────────────────────────────────────────
             function openModal(p) {
                 pendingFile = null;
-                codigoOk = true;
+                codigoOk = !p;
                 document.getElementById("modalTitle").textContent = p
                     ? "Editar producto"
                     : "Nuevo producto";
@@ -1092,8 +1345,9 @@
                     : "";
                 document.getElementById("fCodigo").value = p ? p.codigo : "";
                 document.getElementById("fCodigo").className = "";
-                document.getElementById("codigoHint").textContent = "";
+                document.getElementById("codigoHint").textContent = p ? "" : "";
                 document.getElementById("codigoHint").className = "field-hint";
+                renderCatSelector();
                 document.getElementById("fCategoria").value = p
                     ? p.categoria
                     : "";
@@ -1105,7 +1359,6 @@
                 document.getElementById("fEstado").value = p
                     ? p.estado
                     : "DISPONIBLE";
-                document.getElementById("fOrden").value = p ? p.orden || 0 : 0;
                 document.getElementById("fImagen").value = "";
                 document.getElementById("imgPreview").classList.remove("show");
                 var cur = document.getElementById("imgCurrent");
@@ -1144,6 +1397,44 @@
                 reader.readAsDataURL(pendingFile);
             }
 
+            var checkTimeout = null;
+            function checkCodigo(input) {
+                var codigo = input.value.trim();
+                var hint = document.getElementById("codigoHint");
+                var currentId = document.getElementById("fId").value;
+                clearTimeout(checkTimeout);
+                if (!codigo) {
+                    hint.textContent = "";
+                    hint.className = "field-hint";
+                    input.className = "";
+                    codigoOk = false;
+                    return;
+                }
+                hint.textContent = "Verificando...";
+                hint.className = "field-hint";
+                checkTimeout = setTimeout(async function () {
+                    var res = await fetch(
+                        API +
+                            "?action=check_codigo&codigo=" +
+                            encodeURIComponent(codigo) +
+                            "&exclude_id=" +
+                            (currentId || 0),
+                    );
+                    var json = await res.json();
+                    if (json.exists) {
+                        hint.textContent = "✗ Este código ya existe";
+                        hint.className = "field-hint err";
+                        input.className = "err";
+                        codigoOk = false;
+                    } else {
+                        hint.textContent = "✓ Código disponible";
+                        hint.className = "field-hint ok";
+                        input.className = "ok";
+                        codigoOk = true;
+                    }
+                }, 400);
+            }
+
             async function uploadImage(codigo) {
                 if (!pendingFile) return null;
                 var fd = new FormData();
@@ -1175,15 +1466,17 @@
 
             async function saveProduct() {
                 if (!codigoOk) {
-                    toast("El código ya existe, elegí otro", "#c62828");
+                    toast("El código ya existe o está vacío", "#c62828");
                     return;
                 }
                 var id = document.getElementById("fId").value;
                 var codigo = document.getElementById("fCodigo").value.trim();
                 var descripcion = document.getElementById("fDesc").value.trim();
                 var categoria = document.getElementById("fCategoria").value;
-                if (!codigo || !descripcion || !categoria) {
-                    toast("Completá los campos obligatorios", "#c62828");
+                var may = document.getElementById("fMay").value;
+                var pvp = document.getElementById("fPvp").value;
+                if (!codigo || !descripcion || !categoria || !may || !pvp) {
+                    toast("Todos los campos son obligatorios", "#c62828");
                     return;
                 }
                 var btn = document.getElementById("btnGuardar");
@@ -1201,15 +1494,11 @@
                     codigo,
                     descripcion,
                     categoria,
-                    precio_mayorista:
-                        parseFloat(document.getElementById("fMay").value) || 0,
-                    pvp:
-                        parseFloat(document.getElementById("fPvp").value) ||
-                        null,
+                    precio_mayorista: parseFloat(may) || 0,
+                    pvp: parseFloat(pvp) || null,
                     foto: fotoUrl,
                     estado: document.getElementById("fEstado").value,
-                    orden:
-                        parseInt(document.getElementById("fOrden").value) || 0,
+                    orden: 0,
                 };
                 var res = await fetch(
                     API + "?action=" + (id ? "editar&id=" + id : "producto"),
@@ -1247,7 +1536,7 @@
             async function importarData() {
                 if (
                     !confirm(
-                        "Importar los productos del catálogo original a la base de datos.\n¿Continuar?",
+                        "Importar los productos del catálogo original.\n¿Continuar?",
                     )
                 )
                     return;
