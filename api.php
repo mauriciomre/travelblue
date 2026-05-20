@@ -2,28 +2,28 @@
 header('Content-Type: application/json; charset=utf-8');
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type, Authorization');
+header('Access-Control-Allow-Headers: Content-Type');
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(200); exit; }
 
-require_once 'db.php';
+require_once __DIR__ . '/db.php';
 
-// ── Autenticación admin ──────────────────────────────────────────────────────
 define('ADMIN_USER', 'admin');
-define('ADMIN_PASS', 'cindy2120'); // cambiá esto
+define('ADMIN_PASS', 'travelblue2025');
 
 function checkAuth() {
-    $headers = getallheaders();
-    $auth = $headers['Authorization'] ?? '';
-    if (!$auth) { http_response_code(401); die(json_encode(['error' => 'No autorizado'])); }
-    $token = base64_decode(str_replace('Basic ', '', $auth));
-    [$u, $p] = explode(':', $token, 2);
+    $data = json_decode(file_get_contents('php://input'), true);
+    $u = $data['_user'] ?? ($_POST['_user'] ?? '');
+    $p = $data['_pass'] ?? ($_POST['_pass'] ?? '');
+    // También intentar por GET para simplicidad
+    if (!$u) $u = $_GET['_user'] ?? '';
+    if (!$p) $p = $_GET['_pass'] ?? '';
     if ($u !== ADMIN_USER || $p !== ADMIN_PASS) {
-        http_response_code(401); die(json_encode(['error' => 'Credenciales inválidas']));
+        http_response_code(401);
+        die(json_encode(['error' => 'Credenciales inválidas']));
     }
 }
 
-// ── Setup: crear tabla si no existe ─────────────────────────────────────────
 function setupDB($db) {
     $db->query("CREATE TABLE IF NOT EXISTS productos (
         id INT AUTO_INCREMENT PRIMARY KEY,
@@ -40,14 +40,12 @@ function setupDB($db) {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 }
 
-// ── Router ───────────────────────────────────────────────────────────────────
 $action = $_GET['action'] ?? '';
 $db = getDB();
 setupDB($db);
 
 switch ($action) {
 
-    // GET /api.php?action=productos
     case 'productos':
         $cat = $_GET['categoria'] ?? '';
         $q   = $_GET['q'] ?? '';
@@ -59,11 +57,9 @@ switch ($action) {
         $stmt = $db->prepare($sql);
         if ($params) $stmt->bind_param($types, ...$params);
         $stmt->execute();
-        $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
-        echo json_encode($rows);
+        echo json_encode($stmt->get_result()->fetch_all(MYSQLI_ASSOC));
         break;
 
-    // GET /api.php?action=categorias
     case 'categorias':
         $r = $db->query("SELECT DISTINCT categoria FROM productos ORDER BY categoria");
         $cats = [];
@@ -71,50 +67,50 @@ switch ($action) {
         echo json_encode($cats);
         break;
 
-    // POST /api.php?action=producto (crear)
+    case 'login':
+        $data = json_decode(file_get_contents('php://input'), true);
+        $u = $data['user'] ?? '';
+        $p = $data['pass'] ?? '';
+        if ($u === ADMIN_USER && $p === ADMIN_PASS) {
+            echo json_encode(['ok' => true]);
+        } else {
+            http_response_code(401);
+            echo json_encode(['error' => 'Credenciales inválidas']);
+        }
+        break;
+
     case 'producto':
-        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-            checkAuth();
-            $data = json_decode(file_get_contents('php://input'), true);
-            $stmt = $db->prepare("INSERT INTO productos (codigo,descripcion,categoria,precio_mayorista,pvp,foto,estado,orden) VALUES (?,?,?,?,?,?,?,?)");
-            $stmt->bind_param('sssddssi',
-                $data['codigo'], $data['descripcion'], $data['categoria'],
-                $data['precio_mayorista'], $data['pvp'], $data['foto'],
-                $data['estado'], $data['orden']
-            );
-            if ($stmt->execute()) {
-                echo json_encode(['ok' => true, 'id' => $db->insert_id]);
-            } else {
-                http_response_code(400);
-                echo json_encode(['error' => $db->error]);
-            }
+        $data = json_decode(file_get_contents('php://input'), true);
+        if ($data['_user'] !== ADMIN_USER || $data['_pass'] !== ADMIN_PASS) {
+            http_response_code(401); die(json_encode(['error' => 'No autorizado']));
         }
+        $pvp = isset($data['pvp']) && $data['pvp'] !== '' ? floatval($data['pvp']) : null;
+        $orden = intval($data['orden'] ?? 0);
+        $stmt = $db->prepare("INSERT INTO productos (codigo,descripcion,categoria,precio_mayorista,pvp,foto,estado,orden) VALUES (?,?,?,?,?,?,?,?)");
+        $stmt->bind_param('sssddssi', $data['codigo'], $data['descripcion'], $data['categoria'], $data['precio_mayorista'], $pvp, $data['foto'], $data['estado'], $orden);
+        if ($stmt->execute()) echo json_encode(['ok' => true, 'id' => $db->insert_id]);
+        else { http_response_code(400); echo json_encode(['error' => $db->error]); }
         break;
 
-    // PUT /api.php?action=producto&id=X (editar)
     case 'editar':
-        if ($_SERVER['REQUEST_METHOD'] === 'PUT' || $_SERVER['REQUEST_METHOD'] === 'POST') {
-            checkAuth();
-            $id   = intval($_GET['id'] ?? 0);
-            $data = json_decode(file_get_contents('php://input'), true);
-            $stmt = $db->prepare("UPDATE productos SET codigo=?,descripcion=?,categoria=?,precio_mayorista=?,pvp=?,foto=?,estado=?,orden=? WHERE id=?");
-            $stmt->bind_param('sssddssi i',
-                $data['codigo'], $data['descripcion'], $data['categoria'],
-                $data['precio_mayorista'], $data['pvp'], $data['foto'],
-                $data['estado'], $data['orden'], $id
-            );
-            if ($stmt->execute()) {
-                echo json_encode(['ok' => true]);
-            } else {
-                http_response_code(400);
-                echo json_encode(['error' => $db->error]);
-            }
+        $id = intval($_GET['id'] ?? 0);
+        $data = json_decode(file_get_contents('php://input'), true);
+        if ($data['_user'] !== ADMIN_USER || $data['_pass'] !== ADMIN_PASS) {
+            http_response_code(401); die(json_encode(['error' => 'No autorizado']));
         }
+        $pvp = isset($data['pvp']) && $data['pvp'] !== '' ? floatval($data['pvp']) : null;
+        $orden = intval($data['orden'] ?? 0);
+        $stmt = $db->prepare("UPDATE productos SET codigo=?,descripcion=?,categoria=?,precio_mayorista=?,pvp=?,foto=?,estado=?,orden=? WHERE id=?");
+        $stmt->bind_param('sssddssii', $data['codigo'], $data['descripcion'], $data['categoria'], $data['precio_mayorista'], $pvp, $data['foto'], $data['estado'], $orden, $id);
+        if ($stmt->execute()) echo json_encode(['ok' => true]);
+        else { http_response_code(400); echo json_encode(['error' => $db->error]); }
         break;
 
-    // DELETE /api.php?action=eliminar&id=X
     case 'eliminar':
-        checkAuth();
+        $data = json_decode(file_get_contents('php://input'), true);
+        if ($data['_user'] !== ADMIN_USER || $data['_pass'] !== ADMIN_PASS) {
+            http_response_code(401); die(json_encode(['error' => 'No autorizado']));
+        }
         $id = intval($_GET['id'] ?? 0);
         $stmt = $db->prepare("DELETE FROM productos WHERE id=?");
         $stmt->bind_param('i', $id);
@@ -122,37 +118,30 @@ switch ($action) {
         echo json_encode(['ok' => true, 'affected' => $stmt->affected_rows]);
         break;
 
-    // POST /api.php?action=importar (importa el DATA[] inicial)
     case 'importar':
-        checkAuth();
         $data = json_decode(file_get_contents('php://input'), true);
+        $creds = $data['creds'] ?? [];
+        if (($creds['user'] ?? '') !== ADMIN_USER || ($creds['pass'] ?? '') !== ADMIN_PASS) {
+            http_response_code(401); die(json_encode(['error' => 'No autorizado']));
+        }
+        $productos = $data['productos'] ?? [];
         $imported = 0; $errors = [];
-        foreach ($data as $p) {
+        foreach ($productos as $p) {
             $pvp = isset($p['PVP']) && $p['PVP'] !== '' ? floatval($p['PVP']) : null;
             $foto = $p['FOTO'] ?? null;
             $orden = 0;
-            $stmt = $db->prepare("INSERT IGNORE INTO productos (codigo,descripcion,categoria,precio_mayorista,pvp,foto,estado,orden) VALUES (?,?,?,?,?,?,?,?)");
             $estado = strtoupper($p['ESTADO'] ?? 'DISPONIBLE');
-            $stmt->bind_param('sssddssi',
-                $p['CODIGO'], $p['DESCRIPCION'], $p['CATEGORIA'],
-                $p['PRECIO_MAYORISTA'], $pvp, $foto, $estado, $orden
-            );
+            $stmt = $db->prepare("INSERT IGNORE INTO productos (codigo,descripcion,categoria,precio_mayorista,pvp,foto,estado,orden) VALUES (?,?,?,?,?,?,?,?)");
+            $stmt->bind_param('sssddssi', $p['CODIGO'], $p['DESCRIPCION'], $p['CATEGORIA'], $p['PRECIO_MAYORISTA'], $pvp, $foto, $estado, $orden);
             if ($stmt->execute()) $imported++;
             else $errors[] = $p['CODIGO'];
         }
         echo json_encode(['ok' => true, 'imported' => $imported, 'errors' => $errors]);
         break;
 
-    // GET /api.php?action=login (verificar credenciales)
-    case 'login':
-        checkAuth();
-        echo json_encode(['ok' => true]);
-        break;
-
     default:
         http_response_code(404);
         echo json_encode(['error' => 'Acción no encontrada']);
 }
-
 $db->close();
 ?>
