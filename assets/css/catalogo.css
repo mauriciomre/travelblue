@@ -57,6 +57,16 @@ header {
     gap: 8px
 }
 
+.h-right-top {
+    display: flex;
+    align-items: center;
+    gap: 8px
+}
+
+.h-right-bottom {
+    display: none
+}
+
 .view-btns {
     display: flex;
     gap: 4px
@@ -719,7 +729,7 @@ header {
 
     .h-top {
         margin-bottom: 8px;
-        align-items: stretch
+        align-items: center
     }
 
     .brand img {
@@ -729,7 +739,23 @@ header {
     .h-right {
         flex-direction: column;
         align-items: flex-end;
+        gap: 5px
+    }
+
+    .h-right-top {
+        display: flex;
+        align-items: center;
         gap: 6px
+    }
+
+    .h-right-bottom {
+        display: flex
+    }
+
+    .cart-btn {
+        padding: 6px 10px;
+        font-size: 13px;
+        border-radius: 18px
     }
 
     .admin-btn .admin-txt {
@@ -745,12 +771,6 @@ header {
         width: 28px;
         height: 28px;
         font-size: 14px
-    }
-
-    .cart-btn {
-        padding: 6px 10px;
-        font-size: 13px;
-        border-radius: 18px
     }
 
     .cart-n {

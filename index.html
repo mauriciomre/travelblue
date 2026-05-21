@@ -17,31 +17,35 @@
                     />
                 </div>
                 <div class="h-right">
-                    <a class="admin-btn" href="admin/"
-                        >⚙ <span class="admin-txt">Admin</span></a
-                    >
-                    <div class="view-btns">
-                        <button
-                            class="view-btn on"
-                            id="btnGrid"
-                            onclick="setView('grid')"
-                            title="Vista grilla"
+                    <div class="h-right-top">
+                        <a class="admin-btn" href="admin/"
+                            >⚙ <span class="admin-txt">Admin</span></a
                         >
-                            ⊞
-                        </button>
-                        <button
-                            class="view-btn"
-                            id="btnList"
-                            onclick="setView('list')"
-                            title="Vista lista"
-                        >
-                            ☰
+                        <div class="view-btns">
+                            <button
+                                class="view-btn on"
+                                id="btnGrid"
+                                onclick="setView('grid')"
+                                title="Vista grilla"
+                            >
+                                ⊞
+                            </button>
+                            <button
+                                class="view-btn"
+                                id="btnList"
+                                onclick="setView('list')"
+                                title="Vista lista"
+                            >
+                                ☰
+                            </button>
+                        </div>
+                    </div>
+                    <div class="h-right-bottom">
+                        <button class="cart-btn" onclick="openCart()">
+                            🛒 Mi pedido
+                            <div class="cart-n" id="cartN">0</div>
                         </button>
                     </div>
-                    <button class="cart-btn" onclick="openCart()">
-                        🛒 Mi pedido
-                        <div class="cart-n" id="cartN">0</div>
-                    </button>
                 </div>
             </div>
             <div class="search">
