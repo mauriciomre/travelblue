@@ -33,6 +33,7 @@
                 justify-content: space-between;
                 align-items: center;
                 gap: 16px;
+                flex-wrap: wrap;
             }
             header h1 {
                 font-size: 18px;
@@ -42,6 +43,7 @@
             .nav {
                 display: flex;
                 gap: 6px;
+                flex-wrap: wrap;
             }
             .nav-btn {
                 background: rgba(255, 255, 255, 0.15);
@@ -57,6 +59,28 @@
             .nav-btn.on {
                 background: rgba(255, 255, 255, 0.3);
             }
+            .h-right {
+                display: flex;
+                gap: 8px;
+                align-items: center;
+                margin-left: auto;
+            }
+            .catalog-link {
+                background: rgba(255, 255, 255, 0.15);
+                border: none;
+                color: #fff;
+                padding: 7px 14px;
+                border-radius: 8px;
+                cursor: pointer;
+                font-size: 13px;
+                text-decoration: none;
+                display: flex;
+                align-items: center;
+                gap: 4px;
+            }
+            .catalog-link:hover {
+                background: rgba(255, 255, 255, 0.25);
+            }
             .logout {
                 background: rgba(255, 255, 255, 0.1);
                 border: none;
@@ -65,7 +89,6 @@
                 border-radius: 8px;
                 cursor: pointer;
                 font-size: 13px;
-                margin-left: auto;
             }
             .wrap {
                 max-width: 1200px;
@@ -147,8 +170,6 @@
                 background: var(--blue);
                 color: #fff;
             }
-
-            /* TABLE */
             table {
                 width: 100%;
                 border-collapse: collapse;
@@ -218,8 +239,6 @@
                 gap: 6px;
                 align-items: center;
             }
-
-            /* DRAG & DROP */
             tr.dragging {
                 opacity: 0.4;
                 background: #e8f0fb !important;
@@ -237,8 +256,6 @@
             .drag-handle:active {
                 cursor: grabbing;
             }
-
-            /* INLINE EDIT */
             .inline-input {
                 width: 100%;
                 padding: 5px 8px;
@@ -268,20 +285,9 @@
                 cursor: pointer;
                 white-space: nowrap;
             }
-            .inline-cancel {
-                background: #eee;
-                color: #555;
-                border: none;
-                border-radius: 6px;
-                padding: 5px 8px;
-                font-size: 12px;
-                cursor: pointer;
-            }
             td.editing {
                 background: #f0f8ff !important;
             }
-
-            /* MODAL */
             .modal-bg {
                 display: none;
                 position: fixed;
@@ -433,6 +439,7 @@
                 padding: 36px;
                 width: 340px;
                 box-shadow: 0 4px 24px rgba(0, 48, 135, 0.12);
+                text-align: center;
             }
             .login-box h2 {
                 color: var(--blue);
@@ -453,6 +460,7 @@
                 font-size: 14px;
                 outline: none;
                 margin-bottom: 12px;
+                text-align: left;
             }
             .login-box input:focus {
                 border-color: var(--blue);
@@ -467,9 +475,27 @@
                 font-size: 15px;
                 font-weight: 700;
                 cursor: pointer;
+                margin-bottom: 12px;
             }
             .login-box button:hover {
                 background: var(--blue2);
+            }
+            .login-catalog-link {
+                display: inline-flex;
+                align-items: center;
+                gap: 6px;
+                color: var(--blue);
+                font-size: 13px;
+                font-weight: 600;
+                text-decoration: none;
+                padding: 8px 16px;
+                border: 1.5px solid var(--blue);
+                border-radius: 9px;
+                width: 100%;
+                justify-content: center;
+            }
+            .login-catalog-link:hover {
+                background: var(--pale);
             }
             .lerr {
                 color: var(--red);
@@ -550,9 +576,39 @@
                 align-items: center;
                 gap: 8px;
             }
+            .config-box {
+                background: #fff;
+                border-radius: 12px;
+                padding: 24px;
+                box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+                max-width: 480px;
+            }
+            .config-box h3 {
+                font-size: 15px;
+                font-weight: 800;
+                color: var(--blue);
+                margin-bottom: 16px;
+            }
+            .config-row {
+                display: flex;
+                gap: 10px;
+                align-items: center;
+            }
+            .config-row input {
+                flex: 1;
+                padding: 10px 13px;
+                border: 1.5px solid var(--border);
+                border-radius: 8px;
+                font-size: 14px;
+                outline: none;
+            }
+            .config-row input:focus {
+                border-color: var(--blue);
+            }
         </style>
     </head>
     <body>
+        <!-- LOGIN -->
         <div class="login-wrap" id="loginWrap">
             <div class="login-box">
                 <h2>Travel Blue Admin</h2>
@@ -565,10 +621,12 @@
                     onkeydown="if (event.key === 'Enter') doLogin();"
                 />
                 <button onclick="doLogin()">Ingresar</button>
+                <a class="login-catalog-link" href="../">🛍 Ver catálogo</a>
                 <div class="lerr" id="lerr"></div>
             </div>
         </div>
 
+        <!-- APP -->
         <div id="appWrap" style="display: none">
             <header>
                 <h1>🧳 Travel Blue</h1>
@@ -585,10 +643,21 @@
                     >
                         Categorías
                     </button>
+                    <button
+                        class="nav-btn"
+                        onclick="showSection('configuracion', this)"
+                    >
+                        Configuración
+                    </button>
                 </div>
-                <button class="logout" onclick="doLogout()">
-                    Cerrar sesión
-                </button>
+                <div class="h-right">
+                    <a class="catalog-link" href="../" target="_blank"
+                        >🛍 Ver catálogo</a
+                    >
+                    <button class="logout" onclick="doLogout()">
+                        Cerrar sesión
+                    </button>
+                </div>
             </header>
 
             <!-- PRODUCTOS -->
@@ -641,8 +710,8 @@
                     </button>
                 </div>
                 <div class="edit-mode-bar" id="editModeBar">
-                    ✏ Modo edición activo — hacé clic en cualquier celda para
-                    editar. Arrastrá las filas para reordenar.
+                    ✏ Modo edición activo — editá las celdas y guardá fila por
+                    fila. Arrastrá para reordenar.
                 </div>
                 <table id="mainTable">
                     <thead>
@@ -695,6 +764,43 @@
                     </thead>
                     <tbody id="catTbody"></tbody>
                 </table>
+            </div>
+
+            <!-- CONFIGURACIÓN -->
+            <div class="wrap section" id="secConfiguracion">
+                <h2
+                    style="
+                        font-size: 16px;
+                        font-weight: 800;
+                        color: var(--blue);
+                        margin-bottom: 16px;
+                    "
+                >
+                    Configuración
+                </h2>
+                <div class="config-box">
+                    <h3>📱 Número de WhatsApp</h3>
+                    <p
+                        style="
+                            font-size: 13px;
+                            color: var(--muted);
+                            margin-bottom: 12px;
+                        "
+                    >
+                        Ingresá el número completo con código de país, sin
+                        espacios ni signos. Ej: <code>5493535697188</code>
+                    </p>
+                    <div class="config-row">
+                        <input
+                            type="text"
+                            id="cfgWA"
+                            placeholder="5493535697188"
+                        />
+                        <button class="btn btn-primary" onclick="saveWA()">
+                            Guardar
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -823,8 +929,8 @@
             var pendingFile = null,
                 codigoOk = true,
                 checkTimeout = null;
-            var editMode = false;
-            var dragSrc = null;
+            var editMode = false,
+                dragSrc = null;
 
             // ── AUTH ──────────────────────────────────────────────────────────────────────
             async function doLogin() {
@@ -847,6 +953,7 @@
                     document.getElementById("appWrap").style.display = "block";
                     await loadCats();
                     await loadProducts();
+                    loadConfig();
                 } else
                     document.getElementById("lerr").textContent =
                         "Usuario o contraseña incorrectos";
@@ -872,6 +979,34 @@
                 if (s === "categorias") renderCatTable();
             }
 
+            // ── CONFIGURACIÓN ─────────────────────────────────────────────────────────────
+            async function loadConfig() {
+                var res = await fetch(API + "?action=config_get");
+                var cfg = await res.json();
+                if (cfg.whatsapp)
+                    document.getElementById("cfgWA").value = cfg.whatsapp;
+            }
+            async function saveWA() {
+                var val = document.getElementById("cfgWA").value.trim();
+                if (!val) {
+                    toast("Ingresá un número", "#c62828");
+                    return;
+                }
+                var res = await fetch(API + "?action=config_set", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        _user: authUser,
+                        _pass: authPass,
+                        clave: "whatsapp",
+                        valor: val,
+                    }),
+                });
+                var json = await res.json();
+                if (json.ok) toast("Número de WhatsApp actualizado");
+                else toast("Error al guardar", "#c62828");
+            }
+
             // ── MODO EDICIÓN ──────────────────────────────────────────────────────────────
             function toggleEditMode() {
                 editMode = !editMode;
@@ -891,7 +1026,6 @@
                 renderCatSelector();
                 renderCatFilter();
             }
-
             function renderCatSelector() {
                 var sel = document.getElementById("fCategoria");
                 var cur = sel.value;
@@ -904,7 +1038,6 @@
                 });
                 if (cur) sel.value = cur;
             }
-
             function renderCatFilter() {
                 var sel = document.getElementById("filtCat");
                 var cur = sel.value;
@@ -918,7 +1051,6 @@
                 });
                 if (cur) sel.value = cur;
             }
-
             function renderCatTable() {
                 var html = "";
                 allCats.forEach(function (c) {
@@ -932,9 +1064,8 @@
                         " producto" +
                         (count !== 1 ? "s" : "") +
                         "</td>";
-                    html += '<td><div class="actions">';
                     html +=
-                        '<button class="btn btn-edit" onclick="openCatModal(' +
+                        '<td><div class="actions"><button class="btn btn-edit" onclick="openCatModal(' +
                         c.id +
                         ')">✏ Editar</button>';
                     html +=
@@ -944,14 +1075,12 @@
                         c.nombre +
                         "'," +
                         count +
-                        ')">🗑</button>';
-                    html += "</div></td></tr>";
+                        ')">🗑</button></div></td></tr>';
                 });
                 document.getElementById("catTbody").innerHTML =
                     html ||
                     '<tr><td colspan="3" style="text-align:center;color:#aaa;padding:20px">No hay categorías</td></tr>';
             }
-
             async function crearCategoria() {
                 var nombre = document
                     .getElementById("newCatNombre")
@@ -980,7 +1109,6 @@
                 } else
                     toast("Error: " + (json.error || "ya existe"), "#c62828");
             }
-
             function openCatModal(id) {
                 var cat = allCats.find((c) => c.id === id);
                 if (!cat) return;
@@ -991,7 +1119,6 @@
             function closeCatModal() {
                 document.getElementById("catModalBg").classList.remove("open");
             }
-
             async function guardarCategoria() {
                 var id = document.getElementById("catEditId").value;
                 var nombre = document
@@ -1021,7 +1148,6 @@
                 } else
                     toast("Error: " + (json.error || "desconocido"), "#c62828");
             }
-
             async function eliminarCategoria(id, nombre, count) {
                 if (count > 0) {
                     toast(
@@ -1054,17 +1180,9 @@
             async function loadProducts() {
                 var res = await fetch(API + "?action=productos");
                 allProducts = await res.json();
-                allProducts.sort(function (a, b) {
-                    return String(a.codigo).localeCompare(
-                        String(b.codigo),
-                        undefined,
-                        { numeric: true },
-                    );
-                });
                 renderStats();
                 renderTable(getFiltered());
             }
-
             function renderStats() {
                 document.getElementById("stTotal").textContent =
                     allProducts.length;
@@ -1074,7 +1192,6 @@
                     allProducts.filter((p) => p.estado === "AGOTADO").length;
                 document.getElementById("stCats").textContent = allCats.length;
             }
-
             function getFiltered() {
                 var q = document.getElementById("srch").value.toLowerCase();
                 var cat = document.getElementById("filtCat").value;
@@ -1091,17 +1208,20 @@
             function filterTable() {
                 renderTable(getFiltered());
             }
-
             function fmt(v) {
                 return v
                     ? "$ " + Math.round(parseFloat(v)).toLocaleString("es-AR")
                     : "—";
             }
-
             function getImgUrl(p) {
                 if (p.foto && p.foto.startsWith("http")) return p.foto;
                 if (p.foto) return "../" + p.foto;
                 return "../imgs/" + p.codigo.replace(/\//g, "_") + ".jpeg";
+            }
+            function esc(s) {
+                return String(s || "")
+                    .replace(/"/g, "&quot;")
+                    .replace(/</g, "&lt;");
             }
 
             function renderTable(list) {
@@ -1114,22 +1234,19 @@
                         '" data-id="' +
                         p.id +
                         '" data-orden="' +
-                        p.orden +
+                        (p.orden || 0) +
                         '">';
-                    // drag handle
                     html +=
                         "<td>" +
                         (editMode
                             ? '<span class="drag-handle" title="Arrastrá para reordenar">⠿</span>'
                             : "") +
                         "</td>";
-                    // img
                     html +=
                         '<td><img class="thumb" src="' +
                         imgUrl +
                         '" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\'"><div class="thumb-ph" style="display:none">📦</div></td>';
                     if (editMode) {
-                        // Inline editable cells
                         html +=
                             '<td class="editing"><input class="inline-input" value="' +
                             esc(p.codigo) +
@@ -1200,9 +1317,8 @@
                             '">' +
                             p.estado +
                             "</span></td>";
-                        html += '<td><div class="actions">';
                         html +=
-                            '<button class="btn btn-edit" onclick="editProduct(' +
+                            '<td><div class="actions"><button class="btn btn-edit" onclick="editProduct(' +
                             p.id +
                             ')">✏ Editar</button>';
                         html +=
@@ -1210,8 +1326,7 @@
                             p.id +
                             ",'" +
                             p.descripcion.replace(/'/g, "") +
-                            "')\">🗑</button>";
-                        html += "</div></td>";
+                            "')\">🗑</button></div></td>";
                     }
                     html += "</tr>";
                 });
@@ -1221,17 +1336,10 @@
                 if (editMode) initDragDrop();
             }
 
-            function esc(s) {
-                return String(s || "")
-                    .replace(/"/g, "&quot;")
-                    .replace(/</g, "&lt;");
-            }
-
             // ── INLINE SAVE ───────────────────────────────────────────────────────────────
             async function saveInline(id) {
                 var p = allProducts.find((p) => p.id === id);
                 if (!p) return;
-                // Collect all inline inputs for this row
                 var row = document.querySelector('tr[data-id="' + id + '"]');
                 if (!row) return;
                 var data = {
@@ -1294,9 +1402,9 @@
                         if (dragSrc && dragSrc !== row) {
                             var tbody = document.getElementById("tbody");
                             var rows = Array.from(tbody.querySelectorAll("tr"));
-                            var srcIdx = rows.indexOf(dragSrc);
-                            var dstIdx = rows.indexOf(row);
-                            if (srcIdx < dstIdx)
+                            var si = rows.indexOf(dragSrc),
+                                di = rows.indexOf(row);
+                            if (si < di)
                                 tbody.insertBefore(dragSrc, row.nextSibling);
                             else tbody.insertBefore(dragSrc, row);
                             saveOrder();
@@ -1305,19 +1413,16 @@
                     });
                 });
             }
-
             async function saveOrder() {
                 var rows = document.querySelectorAll("#tbody tr[data-id]");
                 var order = [];
                 rows.forEach(function (r, i) {
                     order.push({ id: parseInt(r.dataset.id), orden: i });
                 });
-                // Update local array
                 order.forEach(function (o) {
                     var p = allProducts.find((p) => p.id === o.id);
                     if (p) p.orden = o.orden;
                 });
-                // Save to server
                 var res = await fetch(API + "?action=reordenar", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
@@ -1329,13 +1434,13 @@
                 });
                 var json = await res.json();
                 if (json.ok) toast("Orden guardado");
-                else toast("Error al guardar orden", "#c62828");
             }
 
             // ── MODAL PRODUCTO ────────────────────────────────────────────────────────────
             function openModal(p) {
                 pendingFile = null;
-                codigoOk = !p;
+                // Si es nuevo: codigoOk=false hasta que se verifique; si es editar: true
+                codigoOk = !!p;
                 document.getElementById("modalTitle").textContent = p
                     ? "Editar producto"
                     : "Nuevo producto";
@@ -1345,12 +1450,18 @@
                     : "";
                 document.getElementById("fCodigo").value = p ? p.codigo : "";
                 document.getElementById("fCodigo").className = "";
-                document.getElementById("codigoHint").textContent = p ? "" : "";
-                document.getElementById("codigoHint").className = "field-hint";
-                renderCatSelector();
-                document.getElementById("fCategoria").value = p
-                    ? p.categoria
+                document.getElementById("codigoHint").textContent = p
+                    ? "✓ Código existente"
                     : "";
+                document.getElementById("codigoHint").className = p
+                    ? "field-hint ok"
+                    : "field-hint";
+                renderCatSelector();
+                setTimeout(function () {
+                    document.getElementById("fCategoria").value = p
+                        ? p.categoria
+                        : "";
+                }, 0);
                 document.getElementById("fDesc").value = p ? p.descripcion : "";
                 document.getElementById("fMay").value = p
                     ? p.precio_mayorista
@@ -1397,11 +1508,21 @@
                 reader.readAsDataURL(pendingFile);
             }
 
-            var checkTimeout = null;
             function checkCodigo(input) {
                 var codigo = input.value.trim();
                 var hint = document.getElementById("codigoHint");
                 var currentId = document.getElementById("fId").value;
+                // Si es edición y el código no cambió, siempre ok
+                var editingProduct = currentId
+                    ? allProducts.find((p) => p.id == currentId)
+                    : null;
+                if (editingProduct && editingProduct.codigo === codigo) {
+                    hint.textContent = "✓ Código existente";
+                    hint.className = "field-hint ok";
+                    input.className = "ok";
+                    codigoOk = true;
+                    return;
+                }
                 clearTimeout(checkTimeout);
                 if (!codigo) {
                     hint.textContent = "";
@@ -1466,7 +1587,7 @@
 
             async function saveProduct() {
                 if (!codigoOk) {
-                    toast("El código ya existe o está vacío", "#c62828");
+                    toast("Verificá el código del producto", "#c62828");
                     return;
                 }
                 var id = document.getElementById("fId").value;
@@ -1487,6 +1608,10 @@
                 if (pendingFile) {
                     var up = await uploadImage(codigo);
                     if (up) fotoUrl = up;
+                }
+                // Si es producto nuevo y no subió imagen, guardar la ruta automática
+                if (!fotoUrl && !id) {
+                    fotoUrl = "imgs/" + codigo.replace(/\//g, "_") + ".jpeg";
                 }
                 var data = {
                     _user: authUser,

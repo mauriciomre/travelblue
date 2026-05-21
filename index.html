@@ -82,6 +82,23 @@
             .view-btn.on {
                 background: rgba(255, 255, 255, 0.35);
             }
+            .admin-btn {
+                background: rgba(255, 255, 255, 0.15);
+                border: none;
+                color: #fff;
+                padding: 7px 12px;
+                border-radius: 8px;
+                cursor: pointer;
+                font-size: 12px;
+                font-weight: 600;
+                text-decoration: none;
+                display: flex;
+                align-items: center;
+                gap: 4px;
+            }
+            .admin-btn:hover {
+                background: rgba(255, 255, 255, 0.25);
+            }
             .cart-btn {
                 background: #fff;
                 color: var(--blue);
@@ -622,13 +639,16 @@
         <header>
             <div class="h-top">
                 <div class="brand">
-                    <img
-                        src="imgs/logo_tb.png"
-                        alt="Travel Blue Argentina"
-                        style="height: 44px; filter: brightness(0) invert(1)"
-                    /><small>CATÁLOGO MAYORISTA</small>
+                    Travel Blue <span>Argentina</span
+                    ><small>CATÁLOGO MAYORISTA</small>
                 </div>
                 <div class="h-right">
+                    <a
+                        class="admin-btn"
+                        href="admin/"
+                        title="Panel administrador"
+                        >⚙ Admin</a
+                    >
                     <div class="view-btns">
                         <button
                             class="view-btn on"
@@ -706,6 +726,14 @@
                 query = "",
                 viewMode = "grid";
 
+            // Cargar número WA desde config
+            fetch(API_URL + "?action=config_get")
+                .then((r) => r.json())
+                .then(function (cfg) {
+                    if (cfg.whatsapp) WA_NUM = cfg.whatsapp;
+                })
+                .catch(function () {});
+
             var lazyObs = null;
             if (window.IntersectionObserver) {
                 lazyObs = new IntersectionObserver(
@@ -773,13 +801,6 @@
                                 ESTADO: p.estado,
                                 ORDEN: p.orden,
                             };
-                        });
-                        products.sort(function (a, b) {
-                            return String(a.CODIGO).localeCompare(
-                                String(b.CODIGO),
-                                undefined,
-                                { numeric: true },
-                            );
                         });
                         render();
                     })
@@ -928,9 +949,7 @@
                             html +=
                                 '<button class="qb" onclick="chgQty(\'' +
                                 p.CODIGO +
-                                "',-1," +
-                                (inCart ? "true" : "false") +
-                                ')">−</button>';
+                                "',-1)\">−</button>";
                             html +=
                                 '<span class="qn" id="qn_' +
                                 id +
@@ -940,15 +959,13 @@
                             html +=
                                 '<button class="qb" onclick="chgQty(\'' +
                                 p.CODIGO +
-                                "',1," +
-                                (inCart ? "true" : "false") +
-                                ')">+</button></div>';
+                                "',1)\">+</button></div>";
                             html +=
                                 '<button class="add' +
                                 (inCart ? " on" : "") +
                                 '" id="ab_' +
                                 id +
-                                '" onclick="addCart(\'' +
+                                '" onclick="addOrUpdate(\'' +
                                 p.CODIGO +
                                 "')\">" +
                                 (inCart ? "✓ En pedido" : "+ Agregar") +
@@ -1025,9 +1042,7 @@
                             html +=
                                 '<button class="qb" onclick="chgQty(\'' +
                                 p.CODIGO +
-                                "',-1," +
-                                (inCart ? "true" : "false") +
-                                ')">−</button>';
+                                "',-1)\">−</button>";
                             html +=
                                 '<span class="qn" id="qn_' +
                                 id +
@@ -1037,16 +1052,14 @@
                             html +=
                                 '<button class="qb" onclick="chgQty(\'' +
                                 p.CODIGO +
-                                "',1," +
-                                (inCart ? "true" : "false") +
-                                ')">+</button>';
+                                "',1)\">+</button>";
                             html += "</div></td>";
                             html +=
                                 '<td><button class="list-add' +
                                 (inCart ? " on" : "") +
                                 '" id="ab_' +
                                 id +
-                                '" onclick="addCart(\'' +
+                                '" onclick="addOrUpdate(\'' +
                                 p.CODIGO +
                                 "')\">" +
                                 (inCart ? "✓ En pedido" : "+ Agregar") +
@@ -1060,20 +1073,21 @@
                 setTimeout(activateLazy, 30);
             }
 
-            function chgQty(code, delta, inCart) {
+            function chgQty(code, delta) {
                 var id = sid(code);
                 var el = document.getElementById("qn_" + id);
                 if (!el) return;
                 var cur = parseInt(el.textContent) || 1;
                 var next = Math.max(1, cur + delta);
                 el.textContent = next;
-                if (inCart && cart[code]) {
+                // Si ya está en carrito, actualizar instantáneamente
+                if (cart[code]) {
                     cart[code].qty = next;
                     updateCart();
                 }
             }
 
-            function addCart(code) {
+            function addOrUpdate(code) {
                 var p = null;
                 for (var i = 0; i < products.length; i++) {
                     if (products[i].CODIGO === code) {
@@ -1085,8 +1099,9 @@
                 var id = sid(code);
                 var qEl = document.getElementById("qn_" + id);
                 var qty = qEl ? parseInt(qEl.textContent) || 1 : 1;
+                var wasInCart = !!cart[code];
                 cart[code] = { p: p, qty: qty };
-                // update grid card
+                // Actualizar card grid
                 var card = document.getElementById(id);
                 if (card) {
                     card.classList.add("picked");
@@ -1096,7 +1111,7 @@
                         btn.classList.add("on");
                     }
                 }
-                // update list row
+                // Actualizar fila lista
                 var row = document.getElementById("lr_" + id);
                 if (row) {
                     row.classList.add("picked-row");
@@ -1111,9 +1126,31 @@
 
             function rmCart(code) {
                 delete cart[code];
+                // resetear qty en card/lista a 1
+                var id = sid(code);
+                var qEl = document.getElementById("qn_" + id);
+                if (qEl) qEl.textContent = "1";
+                var card = document.getElementById(id);
+                if (card) {
+                    card.classList.remove("picked");
+                    var btn = document.getElementById("ab_" + id);
+                    if (btn) {
+                        btn.textContent = "+ Agregar";
+                        btn.classList.remove("on");
+                    }
+                }
+                var row = document.getElementById("lr_" + id);
+                if (row) {
+                    row.classList.remove("picked-row");
+                    var lbtn = document.getElementById("ab_" + id);
+                    if (lbtn) {
+                        lbtn.textContent = "+ Agregar";
+                        lbtn.classList.remove("on");
+                    }
+                }
                 updateCart();
-                renderProds();
             }
+
             function setCartQty(code, qty) {
                 if (qty < 1) {
                     rmCart(code);
@@ -1121,6 +1158,10 @@
                 }
                 if (cart[code]) {
                     cart[code].qty = qty;
+                    // Sincronizar qty en card/lista
+                    var id = sid(code);
+                    var qEl = document.getElementById("qn_" + id);
+                    if (qEl) qEl.textContent = qty;
                     updateCart();
                 }
             }

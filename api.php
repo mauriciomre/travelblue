@@ -41,6 +41,13 @@ function setupDB($db) {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+    $db->query("CREATE TABLE IF NOT EXISTS config (
+        clave VARCHAR(50) PRIMARY KEY,
+        valor VARCHAR(255) NOT NULL
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+    $db->query("INSERT IGNORE INTO config (clave, valor) VALUES ('whatsapp', '5493535697188')");
 }
 
 $action = $_GET['action'] ?? '';
@@ -49,8 +56,6 @@ setupDB($db);
 
 switch ($action) {
 
-    // ── PRODUCTOS ─────────────────────────────────────────────────────────────
-
     case 'productos':
         $cat = $_GET['categoria'] ?? '';
         $q   = $_GET['q'] ?? '';
@@ -58,7 +63,7 @@ switch ($action) {
         $params = []; $types = '';
         if ($cat) { $sql .= " AND categoria = ?"; $params[] = $cat; $types .= 's'; }
         if ($q)   { $sql .= " AND (descripcion LIKE ? OR codigo LIKE ?)"; $like = "%$q%"; $params[] = $like; $params[] = $like; $types .= 'ss'; }
-        $sql .= " ORDER BY categoria, orden, descripcion";
+        $sql .= " ORDER BY orden, codigo";
         $stmt = $db->prepare($sql);
         if ($params) $stmt->bind_param($types, ...$params);
         $stmt->execute();
@@ -138,28 +143,25 @@ switch ($action) {
         }
         $productos = $data['productos'] ?? [];
         $imported = 0; $errors = [];
-        // También importar categorías únicas
         $cats = array_unique(array_column($productos, 'CATEGORIA'));
         foreach ($cats as $cat) {
-            $orden = 0;
+            $o = 0;
             $stmt = $db->prepare("INSERT IGNORE INTO categorias (nombre, orden) VALUES (?, ?)");
-            $stmt->bind_param('si', $cat, $orden);
+            $stmt->bind_param('si', $cat, $o);
             $stmt->execute();
         }
         foreach ($productos as $p) {
             $pvp = isset($p['PVP']) && $p['PVP'] !== '' ? floatval($p['PVP']) : null;
             $foto = $p['FOTO'] ?? null;
-            $orden = 0;
+            $o = 0;
             $estado = strtoupper($p['ESTADO'] ?? 'DISPONIBLE');
             $stmt = $db->prepare("INSERT IGNORE INTO productos (codigo,descripcion,categoria,precio_mayorista,pvp,foto,estado,orden) VALUES (?,?,?,?,?,?,?,?)");
-            $stmt->bind_param('sssddssi', $p['CODIGO'], $p['DESCRIPCION'], $p['CATEGORIA'], $p['PRECIO_MAYORISTA'], $pvp, $foto, $estado, $orden);
+            $stmt->bind_param('sssddssi', $p['CODIGO'], $p['DESCRIPCION'], $p['CATEGORIA'], $p['PRECIO_MAYORISTA'], $pvp, $foto, $estado, $o);
             if ($stmt->execute()) $imported++;
             else $errors[] = $p['CODIGO'];
         }
         echo json_encode(['ok' => true, 'imported' => $imported, 'errors' => $errors]);
         break;
-
-    // ── CATEGORÍAS ────────────────────────────────────────────────────────────
 
     case 'categorias':
         $r = $db->query("SELECT * FROM categorias ORDER BY orden, nombre");
@@ -184,7 +186,6 @@ switch ($action) {
         checkAuth($data);
         $nombre = strtoupper(trim($data['nombre'] ?? ''));
         $orden = intval($data['orden'] ?? 0);
-        // Actualizar también productos que tengan la categoría vieja
         $oldStmt = $db->prepare("SELECT nombre FROM categorias WHERE id=?");
         $oldStmt->bind_param('i', $id);
         $oldStmt->execute();
@@ -204,7 +205,6 @@ switch ($action) {
         $data = json_decode(file_get_contents('php://input'), true);
         checkAuth($data);
         $id = intval($_GET['id'] ?? 0);
-        // Verificar que no tenga productos
         $check = $db->prepare("SELECT COUNT(*) as n FROM productos p JOIN categorias c ON p.categoria=c.nombre WHERE c.id=?");
         $check->bind_param('i', $id);
         $check->execute();
@@ -216,6 +216,25 @@ switch ($action) {
         }
         $stmt = $db->prepare("DELETE FROM categorias WHERE id=?");
         $stmt->bind_param('i', $id);
+        $stmt->execute();
+        echo json_encode(['ok' => true]);
+        break;
+
+    case 'config_get':
+        $r = $db->query("SELECT clave, valor FROM config");
+        $cfg = [];
+        while ($row = $r->fetch_assoc()) $cfg[$row['clave']] = $row['valor'];
+        echo json_encode($cfg);
+        break;
+
+    case 'config_set':
+        $data = json_decode(file_get_contents('php://input'), true);
+        checkAuth($data);
+        $clave = $data['clave'] ?? '';
+        $valor = $data['valor'] ?? '';
+        if (!$clave) { http_response_code(400); die(json_encode(['error' => 'Clave requerida'])); }
+        $stmt = $db->prepare("INSERT INTO config (clave, valor) VALUES (?,?) ON DUPLICATE KEY UPDATE valor=?");
+        $stmt->bind_param('sss', $clave, $valor, $valor);
         $stmt->execute();
         echo json_encode(['ok' => true]);
         break;
