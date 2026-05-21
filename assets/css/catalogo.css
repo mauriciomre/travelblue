@@ -41,22 +41,14 @@ header {
 }
 
 .brand {
-    font-size: 20px;
-    font-weight: 800;
+    display: flex;
+    align-items: center;
     flex: 1
 }
 
-.brand span {
-    color: #90caf9
-}
-
-.brand small {
-    display: block;
-    font-size: 11px;
-    font-weight: 400;
-    opacity: .75;
-    letter-spacing: .5px;
-    margin-top: 1px
+.brand img {
+    height: 40px;
+    display: block
 }
 
 .h-right {
@@ -727,16 +719,11 @@ header {
 
     .h-top {
         margin-bottom: 8px;
-        align-items: flex-start
+        align-items: stretch
     }
 
-    .brand {
-        font-size: 15px;
-        flex: 1
-    }
-
-    .brand small {
-        font-size: 10px
+    .brand img {
+        height: 32px
     }
 
     .h-right {
@@ -758,11 +745,6 @@ header {
         width: 28px;
         height: 28px;
         font-size: 14px
-    }
-
-    .view-btns {
-        display: flex;
-        gap: 4px
     }
 
     .cart-btn {
