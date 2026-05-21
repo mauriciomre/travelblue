@@ -115,10 +115,33 @@ switch ($action) {
         $data = json_decode(file_get_contents('php://input'), true);
         checkAuth($data);
         $id = intval($_GET['id'] ?? 0);
+        // Obtener foto antes de eliminar
+        $stmtFoto = $db->prepare("SELECT foto, codigo FROM productos WHERE id=?");
+        $stmtFoto->bind_param('i', $id);
+        $stmtFoto->execute();
+        $prod = $stmtFoto->get_result()->fetch_assoc();
+        // Eliminar producto
         $stmt = $db->prepare("DELETE FROM productos WHERE id=?");
         $stmt->bind_param('i', $id);
         $stmt->execute();
-        echo json_encode(['ok' => true, 'affected' => $stmt->affected_rows]);
+        // Eliminar imagen si existe
+        $deleted_img = false;
+        if ($prod) {
+            $imgPath = null;
+            if (!empty($prod['foto']) && strpos($prod['foto'], 'http') === false) {
+                // Ruta relativa guardada en BD (ej: imgs/33020.jpeg)
+                $imgPath = __DIR__ . '/' . $prod['foto'];
+            } else {
+                // Fallback: ruta por código
+                $codigo = str_replace('/', '_', $prod['codigo'] ?? '');
+                $imgPath = __DIR__ . '/imgs/' . $codigo . '.jpeg';
+            }
+            if ($imgPath && file_exists($imgPath)) {
+                unlink($imgPath);
+                $deleted_img = true;
+            }
+        }
+        echo json_encode(['ok' => true, 'affected' => $stmt->affected_rows, 'deleted_img' => $deleted_img]);
         break;
 
     case 'reordenar':
