@@ -38,9 +38,13 @@ function setupDB($db) {
         foto VARCHAR(500) DEFAULT NULL,
         estado ENUM('DISPONIBLE','AGOTADO') NOT NULL DEFAULT 'DISPONIBLE',
         orden INT DEFAULT 0,
+        multiplo INT DEFAULT 1,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+    // Agregar columna multiplo si no existe (para BDs existentes)
+    $db->query("ALTER TABLE productos ADD COLUMN IF NOT EXISTS multiplo INT DEFAULT 1");
 
     $db->query("CREATE TABLE IF NOT EXISTS config (
         clave VARCHAR(50) PRIMARY KEY,
@@ -59,11 +63,11 @@ switch ($action) {
     case 'productos':
         $cat = $_GET['categoria'] ?? '';
         $q   = $_GET['q'] ?? '';
-        $sql = "SELECT * FROM productos WHERE 1=1";
+        $sql = "SELECT p.*, COALESCE(c.orden, 0) as cat_orden FROM productos p LEFT JOIN categorias c ON p.categoria = c.nombre WHERE 1=1";
         $params = []; $types = '';
-        if ($cat) { $sql .= " AND categoria = ?"; $params[] = $cat; $types .= 's'; }
-        if ($q)   { $sql .= " AND (descripcion LIKE ? OR codigo LIKE ?)"; $like = "%$q%"; $params[] = $like; $params[] = $like; $types .= 'ss'; }
-        $sql .= " ORDER BY orden, codigo";
+        if ($cat) { $sql .= " AND p.categoria = ?"; $params[] = $cat; $types .= 's'; }
+        if ($q)   { $sql .= " AND (p.descripcion LIKE ? OR p.codigo LIKE ?)"; $like = "%$q%"; $params[] = $like; $params[] = $like; $types .= 'ss'; }
+        $sql .= " ORDER BY COALESCE(c.orden, 0), p.orden, p.codigo";
         $stmt = $db->prepare($sql);
         if ($params) $stmt->bind_param($types, ...$params);
         $stmt->execute();
@@ -93,8 +97,9 @@ switch ($action) {
         checkAuth($data);
         $pvp = isset($data['pvp']) && $data['pvp'] !== '' ? floatval($data['pvp']) : null;
         $orden = intval($data['orden'] ?? 0);
-        $stmt = $db->prepare("INSERT INTO productos (codigo,descripcion,categoria,precio_mayorista,pvp,foto,estado,orden) VALUES (?,?,?,?,?,?,?,?)");
-        $stmt->bind_param('sssddssi', $data['codigo'], $data['descripcion'], $data['categoria'], $data['precio_mayorista'], $pvp, $data['foto'], $data['estado'], $orden);
+        $multiplo = max(1, intval($data['multiplo'] ?? 1));
+        $stmt = $db->prepare("INSERT INTO productos (codigo,descripcion,categoria,precio_mayorista,pvp,foto,estado,orden,multiplo) VALUES (?,?,?,?,?,?,?,?,?)");
+        $stmt->bind_param('sssddssi i', $data['codigo'], $data['descripcion'], $data['categoria'], $data['precio_mayorista'], $pvp, $data['foto'], $data['estado'], $orden, $multiplo);
         if ($stmt->execute()) echo json_encode(['ok' => true, 'id' => $db->insert_id]);
         else { http_response_code(400); echo json_encode(['error' => $db->error]); }
         break;
@@ -105,8 +110,9 @@ switch ($action) {
         checkAuth($data);
         $pvp = isset($data['pvp']) && $data['pvp'] !== '' ? floatval($data['pvp']) : null;
         $orden = intval($data['orden'] ?? 0);
-        $stmt = $db->prepare("UPDATE productos SET codigo=?,descripcion=?,categoria=?,precio_mayorista=?,pvp=?,foto=?,estado=?,orden=? WHERE id=?");
-        $stmt->bind_param('sssddssii', $data['codigo'], $data['descripcion'], $data['categoria'], $data['precio_mayorista'], $pvp, $data['foto'], $data['estado'], $orden, $id);
+        $multiplo = max(1, intval($data['multiplo'] ?? 1));
+        $stmt = $db->prepare("UPDATE productos SET codigo=?,descripcion=?,categoria=?,precio_mayorista=?,pvp=?,foto=?,estado=?,orden=?,multiplo=? WHERE id=?");
+        $stmt->bind_param('sssddssii i', $data['codigo'], $data['descripcion'], $data['categoria'], $data['precio_mayorista'], $pvp, $data['foto'], $data['estado'], $orden, $multiplo, $id);
         if ($stmt->execute()) echo json_encode(['ok' => true]);
         else { http_response_code(400); echo json_encode(['error' => $db->error]); }
         break;
@@ -142,6 +148,20 @@ switch ($action) {
             }
         }
         echo json_encode(['ok' => true, 'affected' => $stmt->affected_rows, 'deleted_img' => $deleted_img]);
+        break;
+
+    case 'reordenar_categorias':
+        $data = json_decode(file_get_contents('php://input'), true);
+        checkAuth($data);
+        $orden = $data['orden'] ?? [];
+        foreach ($orden as $item) {
+            $id = intval($item['id']);
+            $o  = intval($item['orden']);
+            $stmt = $db->prepare("UPDATE categorias SET orden=? WHERE id=?");
+            $stmt->bind_param('ii', $o, $id);
+            $stmt->execute();
+        }
+        echo json_encode(['ok' => true]);
         break;
 
     case 'reordenar':

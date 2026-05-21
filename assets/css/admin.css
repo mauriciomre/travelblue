@@ -175,8 +175,7 @@ header h1 {
 
 .btn-import {
     background: #ff6f00;
-    color: #fff;
-    display: none;
+    color: #fff
 }
 
 .btn-toggle {
@@ -654,6 +653,16 @@ td.editing {
 
 .cat-inline input:focus {
     border-color: var(--blue)
+}
+
+/* SORT TOOLBAR */
+.sort-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 0;
+    flex-wrap: wrap;
+    margin-bottom: 8px
 }
 
 /* EDIT MODE BAR */

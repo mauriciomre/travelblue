@@ -43,12 +43,23 @@ header {
 .brand {
     display: flex;
     align-items: center;
-    flex: 1
+    flex: 1;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 3px
 }
 
 .brand img {
     height: 40px;
     display: block
+}
+
+.brand small {
+    font-size: 10px;
+    font-weight: 600;
+    opacity: .75;
+    letter-spacing: .8px;
+    color: #fff
 }
 
 .h-right {
@@ -64,7 +75,7 @@ header {
 }
 
 .h-right-bottom {
-    display: none
+    display: flex
 }
 
 .view-btns {
@@ -693,6 +704,51 @@ header {
 
 .wa:hover {
     background: #128C7E
+}
+
+/* SORT BAR */
+.sort-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 0 14px;
+    flex-wrap: wrap
+}
+
+.sort-lbl {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--muted)
+}
+
+.sort-btn {
+    background: #fff;
+    border: 1.5px solid var(--border);
+    color: var(--muted);
+    padding: 5px 12px;
+    border-radius: 16px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all .15s
+}
+
+.sort-btn:hover {
+    border-color: var(--blue);
+    color: var(--blue)
+}
+
+.sort-btn.on {
+    background: var(--blue);
+    color: #fff;
+    border-color: var(--blue)
+}
+
+.multiplo-hint {
+    font-size: 10px;
+    color: var(--muted);
+    text-align: center;
+    margin-top: 2px
 }
 
 /* LOADING */
