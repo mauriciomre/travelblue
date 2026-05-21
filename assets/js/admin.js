@@ -1,0 +1,340 @@
+var API = '../api.php';
+var UPLOAD = '../upload.php';
+var authUser = '', authPass = '';
+var allProducts = [], allCats = [];
+var pendingFile = null, codigoOk = true, checkTimeout = null;
+var editMode = false, dragSrc = null;
+
+// ── AUTH ──────────────────────────────────────────────────────────────────────
+async function doLogin() {
+  var u = document.getElementById('luser').value.trim();
+  var p = document.getElementById('lpass').value.trim();
+  if (!u || !p) { document.getElementById('lerr').textContent = 'Completá los campos'; return; }
+  var res = await fetch(API + '?action=login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ user: u, pass: p }) });
+  if (res.ok) {
+    authUser = u; authPass = p;
+    document.getElementById('loginWrap').style.display = 'none';
+    document.getElementById('appWrap').style.display = 'block';
+    await loadCats(); await loadProducts(); loadConfig();
+  } else {
+    document.getElementById('lerr').textContent = 'Usuario o contraseña incorrectos';
+  }
+}
+function doLogout() { location.reload(); }
+
+// ── NAVEGACIÓN ────────────────────────────────────────────────────────────────
+function showSection(s, btn) {
+  document.querySelectorAll('.section').forEach(el => el.classList.remove('on'));
+  document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('on'));
+  document.getElementById('sec' + s.charAt(0).toUpperCase() + s.slice(1)).classList.add('on');
+  btn.classList.add('on');
+  if (s === 'categorias') renderCatTable();
+}
+
+// ── CONFIGURACIÓN ─────────────────────────────────────────────────────────────
+async function loadConfig() {
+  var res = await fetch(API + '?action=config_get');
+  var cfg = await res.json();
+  if (cfg.whatsapp) document.getElementById('cfgWA').value = cfg.whatsapp;
+}
+async function saveWA() {
+  var val = document.getElementById('cfgWA').value.trim();
+  if (!val) { toast('Ingresá un número', '#c62828'); return; }
+  var res = await fetch(API + '?action=config_set', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ _user: authUser, _pass: authPass, clave: 'whatsapp', valor: val }) });
+  var json = await res.json();
+  if (json.ok) toast('Número de WhatsApp actualizado');
+  else toast('Error al guardar', '#c62828');
+}
+
+// ── MODO EDICIÓN ──────────────────────────────────────────────────────────────
+function toggleEditMode() {
+  editMode = !editMode;
+  document.getElementById('btnEditMode').classList.toggle('on', editMode);
+  document.getElementById('editModeBar').classList.toggle('on', editMode);
+  renderTable(getFiltered());
+}
+
+// ── CATEGORÍAS ────────────────────────────────────────────────────────────────
+async function loadCats() {
+  var res = await fetch(API + '?action=categorias');
+  allCats = await res.json();
+  renderCatSelector(); renderCatFilter();
+}
+function renderCatSelector() {
+  var sel = document.getElementById('fCategoria');
+  var cur = sel.value;
+  sel.innerHTML = '<option value="">— Seleccioná —</option>';
+  allCats.forEach(function(c) { var o = document.createElement('option'); o.value = c.nombre; o.textContent = c.nombre; sel.appendChild(o); });
+  if (cur) sel.value = cur;
+}
+function renderCatFilter() {
+  var sel = document.getElementById('filtCat');
+  var cur = sel.value;
+  sel.innerHTML = '<option value="">Todas las categorías</option>';
+  allCats.forEach(function(c) { var o = document.createElement('option'); o.value = c.nombre; o.textContent = c.nombre; sel.appendChild(o); });
+  if (cur) sel.value = cur;
+}
+function renderCatTable() {
+  var html = '';
+  allCats.forEach(function(c) {
+    var count = allProducts.filter(p => p.categoria === c.nombre).length;
+    html += '<tr><td><strong>' + c.nombre + '</strong></td><td>' + count + ' producto' + (count !== 1 ? 's' : '') + '</td>';
+    html += '<td><div class="actions"><button class="btn btn-edit" onclick="openCatModal(' + c.id + ')">✏ Editar</button>';
+    html += '<button class="btn btn-danger" onclick="eliminarCategoria(' + c.id + ',\'' + c.nombre + '\',' + count + ')">🗑</button></div></td></tr>';
+  });
+  document.getElementById('catTbody').innerHTML = html || '<tr><td colspan="3" style="text-align:center;color:#aaa;padding:20px">No hay categorías</td></tr>';
+}
+async function crearCategoria() {
+  var nombre = document.getElementById('newCatNombre').value.trim().toUpperCase();
+  if (!nombre) { toast('Ingresá un nombre', '#c62828'); return; }
+  var res = await fetch(API + '?action=categoria_crear', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ _user: authUser, _pass: authPass, nombre, orden: 0 }) });
+  var json = await res.json();
+  if (json.ok) { document.getElementById('newCatNombre').value = ''; toast('Categoría creada'); await loadCats(); renderCatTable(); }
+  else toast('Error: ' + (json.error || 'ya existe'), '#c62828');
+}
+function openCatModal(id) {
+  var cat = allCats.find(c => c.id === id); if (!cat) return;
+  document.getElementById('catEditId').value = cat.id;
+  document.getElementById('catEditNombre').value = cat.nombre;
+  document.getElementById('catModalBg').classList.add('open');
+}
+function closeCatModal() { document.getElementById('catModalBg').classList.remove('open'); }
+async function guardarCategoria() {
+  var id = document.getElementById('catEditId').value;
+  var nombre = document.getElementById('catEditNombre').value.trim().toUpperCase();
+  var res = await fetch(API + '?action=categoria_editar&id=' + id, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ _user: authUser, _pass: authPass, nombre, orden: 0 }) });
+  var json = await res.json();
+  if (json.ok) { toast('Categoría actualizada'); closeCatModal(); await loadCats(); await loadProducts(); renderCatTable(); }
+  else toast('Error: ' + (json.error || 'desconocido'), '#c62828');
+}
+async function eliminarCategoria(id, nombre, count) {
+  if (count > 0) { toast('No se puede eliminar: tiene ' + count + ' productos', '#c62828'); return; }
+  if (!confirm('¿Eliminar "' + nombre + '"?')) return;
+  var res = await fetch(API + '?action=categoria_eliminar&id=' + id, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ _user: authUser, _pass: authPass }) });
+  var json = await res.json();
+  if (json.ok) { toast('Categoría eliminada'); await loadCats(); renderCatTable(); }
+}
+
+// ── PRODUCTOS ─────────────────────────────────────────────────────────────────
+async function loadProducts() {
+  var res = await fetch(API + '?action=productos');
+  allProducts = await res.json();
+  renderStats(); renderTable(getFiltered());
+}
+function renderStats() {
+  document.getElementById('stTotal').textContent = allProducts.length;
+  document.getElementById('stDisp').textContent = allProducts.filter(p => p.estado === 'DISPONIBLE').length;
+  document.getElementById('stAgot').textContent = allProducts.filter(p => p.estado === 'AGOTADO').length;
+  document.getElementById('stCats').textContent = allCats.length;
+}
+function getFiltered() {
+  var q = document.getElementById('srch').value.toLowerCase();
+  var cat = document.getElementById('filtCat').value;
+  var est = document.getElementById('filtEst').value;
+  return allProducts.filter(p =>
+    (!q || p.descripcion.toLowerCase().includes(q) || p.codigo.toLowerCase().includes(q)) &&
+    (!cat || p.categoria === cat) && (!est || p.estado === est)
+  );
+}
+function filterTable() { renderTable(getFiltered()); }
+function fmt(v) { return v ? '$ ' + Math.round(parseFloat(v)).toLocaleString('es-AR') : '—'; }
+function getImgUrl(p) {
+  if (p.foto && p.foto.startsWith('http')) return p.foto;
+  if (p.foto) return '../' + p.foto;
+  return '../imgs/' + p.codigo.replace(/\//g, '_') + '.jpeg';
+}
+function esc(s) { return String(s || '').replace(/"/g, '&quot;').replace(/</g, '&lt;'); }
+
+function renderTable(list) {
+  var html = '';
+  list.forEach(function(p) {
+    var imgUrl = getImgUrl(p);
+    html += '<tr draggable="' + editMode + '" data-id="' + p.id + '" data-orden="' + (p.orden || 0) + '">';
+    html += '<td>' + (editMode ? '<span class="drag-handle" title="Arrastrá para reordenar">⠿</span>' : '') + '</td>';
+    html += '<td><img class="thumb" src="' + imgUrl + '" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\'"><div class="thumb-ph" style="display:none">📦</div></td>';
+    if (editMode) {
+      html += '<td class="editing"><input class="inline-input" value="' + esc(p.codigo) + '" data-field="codigo" data-id="' + p.id + '" style="width:90px"></td>';
+      html += '<td class="editing"><input class="inline-input" value="' + esc(p.descripcion) + '" data-field="descripcion" data-id="' + p.id + '" style="width:200px"></td>';
+      html += '<td class="editing"><select class="inline-select" data-field="categoria" data-id="' + p.id + '">' + allCats.map(c => '<option value="' + c.nombre + '"' + (c.nombre === p.categoria ? ' selected' : '') + '>' + c.nombre + '</option>').join('') + '</select></td>';
+      html += '<td class="editing"><input class="inline-input" type="number" value="' + p.precio_mayorista + '" data-field="precio_mayorista" data-id="' + p.id + '" style="width:100px"></td>';
+      html += '<td class="editing"><input class="inline-input" type="number" value="' + (p.pvp || '') + '" data-field="pvp" data-id="' + p.id + '" style="width:100px"></td>';
+      html += '<td class="editing"><select class="inline-select" data-field="estado" data-id="' + p.id + '"><option' + (p.estado === 'DISPONIBLE' ? ' selected' : '') + '>DISPONIBLE</option><option' + (p.estado === 'AGOTADO' ? ' selected' : '') + '>AGOTADO</option></select></td>';
+      html += '<td><button class="inline-save" onclick="saveInline(' + p.id + ')">💾 Guardar</button></td>';
+    } else {
+      html += '<td><code>' + p.codigo + '</code></td>';
+      html += '<td>' + p.descripcion + '</td>';
+      html += '<td>' + p.categoria + '</td>';
+      html += '<td style="font-weight:800;color:var(--blue)">' + fmt(p.precio_mayorista) + '</td>';
+      html += '<td>' + fmt(p.pvp) + '</td>';
+      html += '<td><span class="badge-' + (p.estado === 'DISPONIBLE' ? 'disp' : 'agot') + '">' + p.estado + '</span></td>';
+      html += '<td><div class="actions"><button class="btn btn-edit" onclick="editProduct(' + p.id + ')">✏ Editar</button>';
+      html += '<button class="btn btn-danger" onclick="deleteProduct(' + p.id + ',\'' + p.descripcion.replace(/'/g, '') + '\')">🗑</button></div></td>';
+    }
+    html += '</tr>';
+  });
+  document.getElementById('tbody').innerHTML = html || '<tr><td colspan="9" style="text-align:center;color:#aaa;padding:30px">No hay productos</td></tr>';
+  if (editMode) initDragDrop();
+}
+
+// ── INLINE SAVE ───────────────────────────────────────────────────────────────
+async function saveInline(id) {
+  var p = allProducts.find(p => p.id === id); if (!p) return;
+  var row = document.querySelector('tr[data-id="' + id + '"]'); if (!row) return;
+  var data = { _user: authUser, _pass: authPass, orden: p.orden || 0 };
+  row.querySelectorAll('[data-field]').forEach(function(el) { data[el.dataset.field] = el.value; });
+  if (!data.codigo || !data.descripcion || !data.categoria || !data.precio_mayorista) { toast('Completá todos los campos', '#c62828'); return; }
+  var res = await fetch(API + '?action=editar&id=' + id, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+  var json = await res.json();
+  if (json.ok) { toast('Guardado'); await loadProducts(); }
+  else toast('Error: ' + (json.error || 'desconocido'), '#c62828');
+}
+
+// ── DRAG & DROP ───────────────────────────────────────────────────────────────
+function initDragDrop() {
+  var rows = document.querySelectorAll('#tbody tr[draggable="true"]');
+  rows.forEach(function(row) {
+    row.addEventListener('dragstart', function(e) { dragSrc = row; row.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; });
+    row.addEventListener('dragend', function() { row.classList.remove('dragging'); document.querySelectorAll('#tbody tr').forEach(r => r.classList.remove('drag-over')); });
+    row.addEventListener('dragover', function(e) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; document.querySelectorAll('#tbody tr').forEach(r => r.classList.remove('drag-over')); if (row !== dragSrc) row.classList.add('drag-over'); });
+    row.addEventListener('drop', function(e) {
+      e.preventDefault();
+      if (dragSrc && dragSrc !== row) {
+        var tbody = document.getElementById('tbody');
+        var rows = Array.from(tbody.querySelectorAll('tr'));
+        var si = rows.indexOf(dragSrc), di = rows.indexOf(row);
+        if (si < di) tbody.insertBefore(dragSrc, row.nextSibling);
+        else tbody.insertBefore(dragSrc, row);
+        saveOrder();
+      }
+      row.classList.remove('drag-over');
+    });
+  });
+}
+async function saveOrder() {
+  var rows = document.querySelectorAll('#tbody tr[data-id]');
+  var order = [];
+  rows.forEach(function(r, i) { order.push({ id: parseInt(r.dataset.id), orden: i }); });
+  order.forEach(function(o) { var p = allProducts.find(p => p.id === o.id); if (p) p.orden = o.orden; });
+  var res = await fetch(API + '?action=reordenar', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ _user: authUser, _pass: authPass, orden: order }) });
+  var json = await res.json();
+  if (json.ok) toast('Orden guardado');
+}
+
+// ── MODAL PRODUCTO ────────────────────────────────────────────────────────────
+function openModal(p) {
+  pendingFile = null;
+  codigoOk = !!p;
+  document.getElementById('modalTitle').textContent = p ? 'Editar producto' : 'Nuevo producto';
+  document.getElementById('fId').value = p ? p.id : '';
+  document.getElementById('fFotoActual').value = p ? (p.foto || '') : '';
+  document.getElementById('fCodigo').value = p ? p.codigo : '';
+  document.getElementById('fCodigo').className = '';
+  document.getElementById('codigoHint').textContent = p ? '✓ Código existente' : '';
+  document.getElementById('codigoHint').className = p ? 'field-hint ok' : 'field-hint';
+  renderCatSelector();
+  setTimeout(function() { document.getElementById('fCategoria').value = p ? p.categoria : ''; }, 0);
+  document.getElementById('fDesc').value = p ? p.descripcion : '';
+  document.getElementById('fMay').value = p ? p.precio_mayorista : '';
+  document.getElementById('fPvp').value = p ? (p.pvp || '') : '';
+  document.getElementById('fEstado').value = p ? p.estado : 'DISPONIBLE';
+  document.getElementById('fImagen').value = '';
+  document.getElementById('imgPreview').classList.remove('show');
+  var cur = document.getElementById('imgCurrent');
+  if (p) { cur.src = getImgUrl(p); cur.style.display = 'block'; document.getElementById('imgLabelText').innerHTML = '📷 Cambiar imagen<br><small>JPG, PNG o WebP — máx. 5MB</small>'; }
+  else { cur.style.display = 'none'; document.getElementById('imgLabelText').innerHTML = '📷 Hacé clic o arrastrá una imagen<br><small>JPG, PNG o WebP — máx. 5MB</small>'; }
+  document.getElementById('modalBg').classList.add('open');
+}
+function closeModal() { document.getElementById('modalBg').classList.remove('open'); }
+function editProduct(id) { openModal(allProducts.find(p => p.id === id)); }
+
+function previewImg(input) {
+  if (!input.files || !input.files[0]) return;
+  pendingFile = input.files[0];
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    var prev = document.getElementById('imgPreview');
+    prev.src = e.target.result; prev.classList.add('show');
+    document.getElementById('imgLabelText').textContent = '✓ ' + pendingFile.name;
+    document.getElementById('imgCurrent').style.display = 'none';
+  };
+  reader.readAsDataURL(pendingFile);
+}
+
+function checkCodigo(input) {
+  var codigo = input.value.trim();
+  var hint = document.getElementById('codigoHint');
+  var currentId = document.getElementById('fId').value;
+  var editingProduct = currentId ? allProducts.find(p => p.id == currentId) : null;
+  if (editingProduct && editingProduct.codigo === codigo) {
+    hint.textContent = '✓ Código existente'; hint.className = 'field-hint ok'; input.className = 'ok'; codigoOk = true; return;
+  }
+  clearTimeout(checkTimeout);
+  if (!codigo) { hint.textContent = ''; hint.className = 'field-hint'; input.className = ''; codigoOk = false; return; }
+  hint.textContent = 'Verificando...'; hint.className = 'field-hint';
+  checkTimeout = setTimeout(async function() {
+    var res = await fetch(API + '?action=check_codigo&codigo=' + encodeURIComponent(codigo) + '&exclude_id=' + (currentId || 0));
+    var json = await res.json();
+    if (json.exists) { hint.textContent = '✗ Este código ya existe'; hint.className = 'field-hint err'; input.className = 'err'; codigoOk = false; }
+    else { hint.textContent = '✓ Código disponible'; hint.className = 'field-hint ok'; input.className = 'ok'; codigoOk = true; }
+  }, 400);
+}
+
+async function uploadImage(codigo) {
+  if (!pendingFile) return null;
+  var fd = new FormData();
+  fd.append('imagen', pendingFile); fd.append('codigo', codigo);
+  fd.append('_user', authUser); fd.append('_pass', authPass);
+  document.getElementById('uploadProgress').style.display = 'block';
+  document.getElementById('uploadBar').style.width = '40%';
+  try {
+    var res = await fetch(UPLOAD, { method: 'POST', body: fd });
+    document.getElementById('uploadBar').style.width = '100%';
+    var json = await res.json();
+    setTimeout(() => { document.getElementById('uploadProgress').style.display = 'none'; document.getElementById('uploadBar').style.width = '0'; }, 400);
+    if (json.ok) return json.url;
+    toast('Error al subir imagen: ' + json.error, '#c62828'); return null;
+  } catch (e) { toast('Error al subir imagen', '#c62828'); return null; }
+}
+
+async function saveProduct() {
+  if (!codigoOk) { toast('Verificá el código del producto', '#c62828'); return; }
+  var id = document.getElementById('fId').value;
+  var codigo = document.getElementById('fCodigo').value.trim();
+  var descripcion = document.getElementById('fDesc').value.trim();
+  var categoria = document.getElementById('fCategoria').value;
+  var may = document.getElementById('fMay').value;
+  var pvp = document.getElementById('fPvp').value;
+  if (!codigo || !descripcion || !categoria || !may || !pvp) { toast('Todos los campos son obligatorios', '#c62828'); return; }
+  var btn = document.getElementById('btnGuardar');
+  btn.disabled = true; btn.textContent = 'Guardando...';
+  var fotoUrl = document.getElementById('fFotoActual').value || null;
+  if (pendingFile) { var up = await uploadImage(codigo); if (up) fotoUrl = up; }
+  if (!fotoUrl && !id) { fotoUrl = 'imgs/' + codigo.replace(/\//g, '_') + '.jpeg'; }
+  var data = { _user: authUser, _pass: authPass, codigo, descripcion, categoria, precio_mayorista: parseFloat(may) || 0, pvp: parseFloat(pvp) || null, foto: fotoUrl, estado: document.getElementById('fEstado').value, orden: 0 };
+  var res = await fetch(API + '?action=' + (id ? 'editar&id=' + id : 'producto'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+  var json = await res.json();
+  btn.disabled = false; btn.textContent = 'Guardar';
+  if (json.ok) { toast(id ? 'Producto actualizado' : 'Producto creado'); closeModal(); await loadProducts(); }
+  else toast('Error: ' + (json.error || 'desconocido'), '#c62828');
+}
+
+async function deleteProduct(id, name) {
+  if (!confirm('¿Eliminar "' + name + '"?')) return;
+  var res = await fetch(API + '?action=eliminar&id=' + id, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ _user: authUser, _pass: authPass }) });
+  var json = await res.json();
+  if (json.ok) { toast('Producto eliminado'); await loadProducts(); }
+}
+
+async function importarData() {
+  if (!confirm('Importar los productos del catálogo original.\n¿Continuar?')) return;
+  var res = await fetch(API + '?action=importar', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ creds: { user: authUser, pass: authPass }, productos: DATA_INICIAL }) });
+  var json = await res.json();
+  toast('Importados: ' + json.imported + ' productos');
+  await loadCats(); await loadProducts();
+}
+
+function toast(msg, bg) {
+  var t = document.getElementById('toast');
+  t.textContent = msg; t.style.background = bg || '#2e7d32';
+  t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 3000);
+}
