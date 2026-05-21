@@ -43,7 +43,11 @@ function setupDB($db) {
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
-    $db->query("ALTER TABLE productos ADD COLUMN IF NOT EXISTS multiplo INT DEFAULT 1");
+    // Agregar columna multiplo si no existe
+    $colCheck = $db->query("SHOW COLUMNS FROM productos LIKE 'multiplo'");
+    if ($colCheck && $colCheck->num_rows === 0) {
+        $db->query("ALTER TABLE productos ADD COLUMN multiplo INT DEFAULT 1");
+    }
 
     $db->query("CREATE TABLE IF NOT EXISTS config (
         clave VARCHAR(50) PRIMARY KEY,
