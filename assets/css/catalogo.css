@@ -790,9 +790,15 @@ header {
         font-size: 10px
     }
 
+    .foot {
+        flex-direction: row;
+        align-items: center
+    }
+
     .add {
-        font-size: 12px;
-        padding: 6px 8px
+        font-size: 11px;
+        padding: 6px 6px;
+        text-align: center
     }
 
     .qb {
