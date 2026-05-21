@@ -716,7 +716,7 @@ header {
     }
 }
 
-@media(max-width:580px) {
+@media(max-width:640px) {
     .grid {
         grid-template-columns: 1fr 1fr
     }
