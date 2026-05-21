@@ -1,46 +1,93 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="es">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Travel Blue Argentina — Catálogo Mayorista</title>
-<link rel="stylesheet" href="assets/css/catalogo.css">
-</head>
-<body>
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Travel Blue Argentina — Catálogo Mayorista</title>
+        <link rel="stylesheet" href="assets/css/catalogo.css" />
+    </head>
+    <body>
+        <header>
+            <div class="h-top">
+                <div class="brand">
+                    Travel Blue <span>Argentina</span
+                    ><small>CATÁLOGO MAYORISTA</small>
+                </div>
+                <div class="h-right">
+                    <a class="admin-btn" href="admin/"
+                        >⚙ <span class="admin-txt">Admin</span></a
+                    >
+                    <div class="view-btns">
+                        <button
+                            class="view-btn on"
+                            id="btnGrid"
+                            onclick="setView('grid')"
+                            title="Vista grilla"
+                        >
+                            ⊞
+                        </button>
+                        <button
+                            class="view-btn"
+                            id="btnList"
+                            onclick="setView('list')"
+                            title="Vista lista"
+                        >
+                            ☰
+                        </button>
+                    </div>
+                    <button class="cart-btn" onclick="openCart()">
+                        🛒 Mi pedido
+                        <div class="cart-n" id="cartN">0</div>
+                    </button>
+                </div>
+            </div>
+            <div class="search">
+                <input
+                    type="text"
+                    id="srch"
+                    placeholder="🔍  Buscar por nombre o código..."
+                    oninput="doSearch()"
+                />
+            </div>
+        </header>
 
-<header>
-  <div class="h-top">
-    <div class="brand">Travel Blue <span>Argentina</span><small>CATÁLOGO MAYORISTA</small></div>
-    <div class="h-right">
-      <a class="admin-btn" href="admin/">⚙ Admin</a>
-      <div class="view-btns">
-        <button class="view-btn on" id="btnGrid" onclick="setView('grid')" title="Vista grilla">⊞</button>
-        <button class="view-btn" id="btnList" onclick="setView('list')" title="Vista lista">☰</button>
-      </div>
-      <button class="cart-btn" onclick="openCart()">🛒 Mi pedido <div class="cart-n" id="cartN">0</div></button>
-    </div>
-  </div>
-  <div class="search"><input type="text" id="srch" placeholder="🔍  Buscar por nombre o código..." oninput="doSearch()"></div>
-</header>
+        <div class="tabs" id="tabs"></div>
+        <div class="body" id="prods">
+            <div class="loading">
+                <div class="spin"></div>
+                Cargando catálogo...
+            </div>
+        </div>
 
-<div class="tabs" id="tabs"></div>
-<div class="body" id="prods"><div class="loading"><div class="spin"></div>Cargando catálogo...</div></div>
+        <div class="overlay" id="overlay" onclick="bgClose(event)">
+            <div class="panel">
+                <div class="p-head">
+                    <h2>📋 Mi pedido</h2>
+                    <button class="cls" onclick="closeCart()">×</button>
+                </div>
+                <div class="p-items" id="pitems"></div>
+                <div class="p-foot">
+                    <div class="total-row">
+                        <span class="total-lbl">Total mayorista:</span
+                        ><span class="total-val" id="ptotal">$ 0</span>
+                    </div>
+                    <div class="fields">
+                        <input
+                            id="cname"
+                            placeholder="Tu nombre / razón social"
+                        />
+                        <input
+                            id="cphone"
+                            placeholder="Tu teléfono (opcional)"
+                        />
+                    </div>
+                    <button class="wa" onclick="sendWA()">
+                        📱 Enviar pedido por WhatsApp
+                    </button>
+                </div>
+            </div>
+        </div>
 
-<div class="overlay" id="overlay" onclick="bgClose(event)">
-  <div class="panel">
-    <div class="p-head"><h2>📋 Mi pedido</h2><button class="cls" onclick="closeCart()">×</button></div>
-    <div class="p-items" id="pitems"></div>
-    <div class="p-foot">
-      <div class="total-row"><span class="total-lbl">Total mayorista:</span><span class="total-val" id="ptotal">$ 0</span></div>
-      <div class="fields">
-        <input id="cname" placeholder="Tu nombre / razón social">
-        <input id="cphone" placeholder="Tu teléfono (opcional)">
-      </div>
-      <button class="wa" onclick="sendWA()">📱 Enviar pedido por WhatsApp</button>
-    </div>
-  </div>
-</div>
-
-<script src="assets/js/catalogo.js"></script>
-</body>
+        <script src="assets/js/catalogo.js"></script>
+    </body>
 </html>

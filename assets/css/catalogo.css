@@ -726,20 +726,32 @@ header {
     }
 
     .h-top {
-        margin-bottom: 8px
+        margin-bottom: 8px;
+        flex-wrap: wrap
     }
 
     .brand {
-        font-size: 15px
+        font-size: 15px;
+        flex: 1
     }
 
     .brand small {
         font-size: 10px
     }
 
+    .h-right {
+        flex-wrap: wrap;
+        justify-content: flex-end;
+        gap: 6px
+    }
+
+    .admin-btn .admin-txt {
+        display: none
+    }
+
     .admin-btn {
         padding: 5px 8px;
-        font-size: 11px
+        font-size: 16px
     }
 
     .view-btn {
@@ -749,9 +761,16 @@ header {
     }
 
     .cart-btn {
-        padding: 6px 10px;
+        width: 100%;
+        justify-content: center;
+        padding: 7px 12px;
         font-size: 13px;
-        border-radius: 18px
+        border-radius: 18px;
+        order: 1
+    }
+
+    .view-btns {
+        order: 0
     }
 
     .cart-n {
