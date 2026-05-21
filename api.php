@@ -43,7 +43,6 @@ function setupDB($db) {
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
-    // Agregar columna multiplo si no existe (para BDs existentes)
     $db->query("ALTER TABLE productos ADD COLUMN IF NOT EXISTS multiplo INT DEFAULT 1");
 
     $db->query("CREATE TABLE IF NOT EXISTS config (
@@ -80,8 +79,7 @@ switch ($action) {
         $stmt = $db->prepare("SELECT id FROM productos WHERE codigo = ? AND id != ?");
         $stmt->bind_param('si', $codigo, $excludeId);
         $stmt->execute();
-        $exists = $stmt->get_result()->num_rows > 0;
-        echo json_encode(['exists' => $exists]);
+        echo json_encode(['exists' => $stmt->get_result()->num_rows > 0]);
         break;
 
     case 'login':
@@ -99,7 +97,7 @@ switch ($action) {
         $orden = intval($data['orden'] ?? 0);
         $multiplo = max(1, intval($data['multiplo'] ?? 1));
         $stmt = $db->prepare("INSERT INTO productos (codigo,descripcion,categoria,precio_mayorista,pvp,foto,estado,orden,multiplo) VALUES (?,?,?,?,?,?,?,?,?)");
-        $stmt->bind_param('sssddssi i', $data['codigo'], $data['descripcion'], $data['categoria'], $data['precio_mayorista'], $pvp, $data['foto'], $data['estado'], $orden, $multiplo);
+        $stmt->bind_param('sssddssii', $data['codigo'], $data['descripcion'], $data['categoria'], $data['precio_mayorista'], $pvp, $data['foto'], $data['estado'], $orden, $multiplo);
         if ($stmt->execute()) echo json_encode(['ok' => true, 'id' => $db->insert_id]);
         else { http_response_code(400); echo json_encode(['error' => $db->error]); }
         break;
@@ -112,7 +110,7 @@ switch ($action) {
         $orden = intval($data['orden'] ?? 0);
         $multiplo = max(1, intval($data['multiplo'] ?? 1));
         $stmt = $db->prepare("UPDATE productos SET codigo=?,descripcion=?,categoria=?,precio_mayorista=?,pvp=?,foto=?,estado=?,orden=?,multiplo=? WHERE id=?");
-        $stmt->bind_param('sssddssii i', $data['codigo'], $data['descripcion'], $data['categoria'], $data['precio_mayorista'], $pvp, $data['foto'], $data['estado'], $orden, $multiplo, $id);
+        $stmt->bind_param('sssddssiii', $data['codigo'], $data['descripcion'], $data['categoria'], $data['precio_mayorista'], $pvp, $data['foto'], $data['estado'], $orden, $multiplo, $id);
         if ($stmt->execute()) echo json_encode(['ok' => true]);
         else { http_response_code(400); echo json_encode(['error' => $db->error]); }
         break;
@@ -121,57 +119,45 @@ switch ($action) {
         $data = json_decode(file_get_contents('php://input'), true);
         checkAuth($data);
         $id = intval($_GET['id'] ?? 0);
-        // Obtener foto antes de eliminar
         $stmtFoto = $db->prepare("SELECT foto, codigo FROM productos WHERE id=?");
         $stmtFoto->bind_param('i', $id);
         $stmtFoto->execute();
         $prod = $stmtFoto->get_result()->fetch_assoc();
-        // Eliminar producto
         $stmt = $db->prepare("DELETE FROM productos WHERE id=?");
         $stmt->bind_param('i', $id);
         $stmt->execute();
-        // Eliminar imagen si existe
         $deleted_img = false;
         if ($prod) {
             $imgPath = null;
             if (!empty($prod['foto']) && strpos($prod['foto'], 'http') === false) {
-                // Ruta relativa guardada en BD (ej: imgs/33020.jpeg)
                 $imgPath = __DIR__ . '/' . $prod['foto'];
             } else {
-                // Fallback: ruta por código
                 $codigo = str_replace('/', '_', $prod['codigo'] ?? '');
                 $imgPath = __DIR__ . '/imgs/' . $codigo . '.jpeg';
             }
-            if ($imgPath && file_exists($imgPath)) {
-                unlink($imgPath);
-                $deleted_img = true;
-            }
+            if ($imgPath && file_exists($imgPath)) { unlink($imgPath); $deleted_img = true; }
         }
         echo json_encode(['ok' => true, 'affected' => $stmt->affected_rows, 'deleted_img' => $deleted_img]);
         break;
 
-    case 'reordenar_categorias':
+    case 'reordenar':
         $data = json_decode(file_get_contents('php://input'), true);
         checkAuth($data);
-        $orden = $data['orden'] ?? [];
-        foreach ($orden as $item) {
-            $id = intval($item['id']);
-            $o  = intval($item['orden']);
-            $stmt = $db->prepare("UPDATE categorias SET orden=? WHERE id=?");
+        foreach ($data['orden'] ?? [] as $item) {
+            $id = intval($item['id']); $o = intval($item['orden']);
+            $stmt = $db->prepare("UPDATE productos SET orden=? WHERE id=?");
             $stmt->bind_param('ii', $o, $id);
             $stmt->execute();
         }
         echo json_encode(['ok' => true]);
         break;
 
-    case 'reordenar':
+    case 'reordenar_categorias':
         $data = json_decode(file_get_contents('php://input'), true);
         checkAuth($data);
-        $orden = $data['orden'] ?? [];
-        foreach ($orden as $item) {
-            $id = intval($item['id']);
-            $o  = intval($item['orden']);
-            $stmt = $db->prepare("UPDATE productos SET orden=? WHERE id=?");
+        foreach ($data['orden'] ?? [] as $item) {
+            $id = intval($item['id']); $o = intval($item['orden']);
+            $stmt = $db->prepare("UPDATE categorias SET orden=? WHERE id=?");
             $stmt->bind_param('ii', $o, $id);
             $stmt->execute();
         }
@@ -187,19 +173,17 @@ switch ($action) {
         $productos = $data['productos'] ?? [];
         $imported = 0; $errors = [];
         $cats = array_unique(array_column($productos, 'CATEGORIA'));
-        foreach ($cats as $cat) {
-            $o = 0;
+        foreach ($cats as $i => $cat) {
             $stmt = $db->prepare("INSERT IGNORE INTO categorias (nombre, orden) VALUES (?, ?)");
-            $stmt->bind_param('si', $cat, $o);
+            $stmt->bind_param('si', $cat, $i);
             $stmt->execute();
         }
         foreach ($productos as $p) {
             $pvp = isset($p['PVP']) && $p['PVP'] !== '' ? floatval($p['PVP']) : null;
-            $foto = $p['FOTO'] ?? null;
-            $o = 0;
+            $foto = $p['FOTO'] ?? null; $o = 0; $multiplo = 1;
             $estado = strtoupper($p['ESTADO'] ?? 'DISPONIBLE');
-            $stmt = $db->prepare("INSERT IGNORE INTO productos (codigo,descripcion,categoria,precio_mayorista,pvp,foto,estado,orden) VALUES (?,?,?,?,?,?,?,?)");
-            $stmt->bind_param('sssddssi', $p['CODIGO'], $p['DESCRIPCION'], $p['CATEGORIA'], $p['PRECIO_MAYORISTA'], $pvp, $foto, $estado, $o);
+            $stmt = $db->prepare("INSERT IGNORE INTO productos (codigo,descripcion,categoria,precio_mayorista,pvp,foto,estado,orden,multiplo) VALUES (?,?,?,?,?,?,?,?,?)");
+            $stmt->bind_param('sssddssii', $p['CODIGO'], $p['DESCRIPCION'], $p['CATEGORIA'], $p['PRECIO_MAYORISTA'], $pvp, $foto, $estado, $o, $multiplo);
             if ($stmt->execute()) $imported++;
             else $errors[] = $p['CODIGO'];
         }
@@ -230,16 +214,13 @@ switch ($action) {
         $nombre = strtoupper(trim($data['nombre'] ?? ''));
         $orden = intval($data['orden'] ?? 0);
         $oldStmt = $db->prepare("SELECT nombre FROM categorias WHERE id=?");
-        $oldStmt->bind_param('i', $id);
-        $oldStmt->execute();
+        $oldStmt->bind_param('i', $id); $oldStmt->execute();
         $old = $oldStmt->get_result()->fetch_assoc();
         if ($old) {
             $stmt = $db->prepare("UPDATE categorias SET nombre=?, orden=? WHERE id=?");
-            $stmt->bind_param('sii', $nombre, $orden, $id);
-            $stmt->execute();
+            $stmt->bind_param('sii', $nombre, $orden, $id); $stmt->execute();
             $stmt2 = $db->prepare("UPDATE productos SET categoria=? WHERE categoria=?");
-            $stmt2->bind_param('ss', $nombre, $old['nombre']);
-            $stmt2->execute();
+            $stmt2->bind_param('ss', $nombre, $old['nombre']); $stmt2->execute();
         }
         echo json_encode(['ok' => true]);
         break;
@@ -249,17 +230,11 @@ switch ($action) {
         checkAuth($data);
         $id = intval($_GET['id'] ?? 0);
         $check = $db->prepare("SELECT COUNT(*) as n FROM productos p JOIN categorias c ON p.categoria=c.nombre WHERE c.id=?");
-        $check->bind_param('i', $id);
-        $check->execute();
+        $check->bind_param('i', $id); $check->execute();
         $row = $check->get_result()->fetch_assoc();
-        if ($row['n'] > 0) {
-            http_response_code(400);
-            echo json_encode(['error' => 'No se puede eliminar: tiene ' . $row['n'] . ' producto(s) asociados']);
-            break;
-        }
+        if ($row['n'] > 0) { http_response_code(400); echo json_encode(['error' => 'No se puede eliminar: tiene ' . $row['n'] . ' producto(s)']); break; }
         $stmt = $db->prepare("DELETE FROM categorias WHERE id=?");
-        $stmt->bind_param('i', $id);
-        $stmt->execute();
+        $stmt->bind_param('i', $id); $stmt->execute();
         echo json_encode(['ok' => true]);
         break;
 
@@ -273,12 +248,10 @@ switch ($action) {
     case 'config_set':
         $data = json_decode(file_get_contents('php://input'), true);
         checkAuth($data);
-        $clave = $data['clave'] ?? '';
-        $valor = $data['valor'] ?? '';
+        $clave = $data['clave'] ?? ''; $valor = $data['valor'] ?? '';
         if (!$clave) { http_response_code(400); die(json_encode(['error' => 'Clave requerida'])); }
         $stmt = $db->prepare("INSERT INTO config (clave, valor) VALUES (?,?) ON DUPLICATE KEY UPDATE valor=?");
-        $stmt->bind_param('sss', $clave, $valor, $valor);
-        $stmt->execute();
+        $stmt->bind_param('sss', $clave, $valor, $valor); $stmt->execute();
         echo json_encode(['ok' => true]);
         break;
 
