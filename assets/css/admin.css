@@ -174,9 +174,9 @@ header h1 {
 }
 
 .btn-import {
+    display: none;
     background: #ff6f00;
     color: #fff;
-    display: none;
 }
 
 .btn-toggle {
