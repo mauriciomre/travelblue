@@ -225,10 +225,10 @@ function renderProds() {
         '" data-sort="alpha" onclick="setSort(\'alpha\')">A → Z</button>' +
         '<button class="sort-btn' +
         (sortMode === "price_asc" ? " on" : "") +
-        '" data-sort="price_asc" onclick="setSort(\'price_asc\')">Precio ↑</button>' +
+        '" data-sort="price_asc" onclick="setSort(\'price_asc\')">$ ↑</button>' +
         '<button class="sort-btn' +
         (sortMode === "price_desc" ? " on" : "") +
-        '" data-sort="price_desc" onclick="setSort(\'price_desc\')">Precio ↓</button>' +
+        '" data-sort="price_desc" onclick="setSort(\'price_desc\')">$ ↓</button>' +
         "</div>";
 
     if (viewMode === "grid") renderGrid(list, el, sortBar);
