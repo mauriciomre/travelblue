@@ -12,9 +12,13 @@ define('ADMIN_USER', 'admin');
 define('ADMIN_PASS', 'travelblue2025');
 
 function checkAuth($data) {
+    global $db;
     $u = $data['_user'] ?? '';
     $p = $data['_pass'] ?? '';
-    if ($u !== ADMIN_USER || $p !== ADMIN_PASS) {
+    $r = $db->query("SELECT valor FROM config WHERE clave='admin_pass' LIMIT 1");
+    $row = $r ? $r->fetch_assoc() : null;
+    $validPass = $row ? $row['valor'] : ADMIN_PASS;
+    if ($u !== ADMIN_USER || $p !== $validPass) {
         http_response_code(401);
         die(json_encode(['error' => 'No autorizado']));
     }
@@ -86,11 +90,26 @@ switch ($action) {
         echo json_encode(['exists' => $stmt->get_result()->num_rows > 0]);
         break;
 
+    case 'cambiar_password':
+        $data = json_decode(file_get_contents('php://input'), true);
+        checkAuth($data);
+        $nueva = trim($data['nueva'] ?? '');
+        if (strlen($nueva) < 6) { http_response_code(400); die(json_encode(['error' => 'Contraseña muy corta'])); }
+        $stmt = $db->prepare("INSERT INTO config (clave, valor) VALUES ('admin_pass', ?) ON DUPLICATE KEY UPDATE valor=?");
+        $stmt->bind_param('ss', $nueva, $nueva);
+        $stmt->execute();
+        echo json_encode(['ok' => true]);
+        break;
+
     case 'login':
         $data = json_decode(file_get_contents('php://input'), true);
         $u = $data['user'] ?? '';
         $p = $data['pass'] ?? '';
-        if ($u === ADMIN_USER && $p === ADMIN_PASS) echo json_encode(['ok' => true]);
+        // Verificar si hay contraseña personalizada en config
+        $r = $db->query("SELECT valor FROM config WHERE clave='admin_pass' LIMIT 1");
+        $row = $r ? $r->fetch_assoc() : null;
+        $validPass = $row ? $row['valor'] : ADMIN_PASS;
+        if ($u === ADMIN_USER && $p === $validPass) echo json_encode(['ok' => true]);
         else { http_response_code(401); echo json_encode(['error' => 'Credenciales inválidas']); }
         break;
 

@@ -159,8 +159,19 @@
                     </button>
                 </div>
                 <div class="edit-mode-bar" id="editModeBar">
-                    ✏ Modo edición activo — editá las celdas y guardá fila por
-                    fila. Arrastrá para reordenar.
+                    ✏ Modo edición activo — editá las celdas. Arrastrá para
+                    reordenar.
+                    <button
+                        class="btn btn-primary"
+                        style="
+                            margin-left: 12px;
+                            padding: 5px 14px;
+                            font-size: 13px;
+                        "
+                        onclick="saveAllInline()"
+                    >
+                        💾 Guardar todo
+                    </button>
                 </div>
                 <table id="mainTable">
                     <thead>
@@ -239,7 +250,7 @@
                 >
                     Configuración
                 </h2>
-                <div class="config-box">
+                <div class="config-box" style="margin-bottom: 16px">
                     <h3>📱 Número de WhatsApp</h3>
                     <p
                         style="
@@ -261,6 +272,36 @@
                             Guardar
                         </button>
                     </div>
+                </div>
+                <div class="config-box">
+                    <h3>🔒 Cambiar contraseña</h3>
+                    <div class="field" style="margin-top: 12px">
+                        <label>Contraseña actual</label
+                        ><input
+                            type="password"
+                            id="cfgPassActual"
+                            placeholder="••••••••"
+                        />
+                    </div>
+                    <div class="field">
+                        <label>Nueva contraseña</label
+                        ><input
+                            type="password"
+                            id="cfgPassNueva"
+                            placeholder="••••••••"
+                        />
+                    </div>
+                    <div class="field">
+                        <label>Confirmar nueva contraseña</label
+                        ><input
+                            type="password"
+                            id="cfgPassConfirma"
+                            placeholder="••••••••"
+                        />
+                    </div>
+                    <button class="btn btn-primary" onclick="savePassword()">
+                        Cambiar contraseña
+                    </button>
                 </div>
             </div>
         </div>

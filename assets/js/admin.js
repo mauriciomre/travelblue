@@ -19,22 +19,36 @@ async function doLogin() {
         document.getElementById("lerr").textContent = "Completá los campos";
         return;
     }
-    var res = await fetch(API + "?action=login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ user: u, pass: p }),
-    });
-    if (res.ok) {
-        authUser = u;
-        authPass = p;
-        document.getElementById("loginWrap").style.display = "none";
-        document.getElementById("appWrap").style.display = "block";
-        await loadCats();
-        await loadProducts();
-        loadConfig();
-    } else
-        document.getElementById("lerr").textContent =
-            "Usuario o contraseña incorrectos";
+    var btn = document.querySelector("#loginWrap button");
+    btn.disabled = true;
+    btn.textContent = "Ingresando...";
+    document.getElementById("lerr").textContent = "";
+    try {
+        var res = await fetch(API + "?action=login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ user: u, pass: p }),
+        });
+        if (res.ok) {
+            authUser = u;
+            authPass = p;
+            btn.textContent = "Cargando datos...";
+            await loadCats();
+            await loadProducts();
+            loadConfig();
+            document.getElementById("loginWrap").style.display = "none";
+            document.getElementById("appWrap").style.display = "block";
+        } else {
+            document.getElementById("lerr").textContent =
+                "Usuario o contraseña incorrectos";
+            btn.disabled = false;
+            btn.textContent = "Ingresar";
+        }
+    } catch (e) {
+        document.getElementById("lerr").textContent = "Error de conexión";
+        btn.disabled = false;
+        btn.textContent = "Ingresar";
+    }
 }
 function doLogout() {
     location.reload();
@@ -80,6 +94,40 @@ async function saveWA() {
     var json = await res.json();
     if (json.ok) toast("Número de WhatsApp actualizado");
     else toast("Error al guardar", "#c62828");
+}
+async function savePassword() {
+    var actual = document.getElementById("cfgPassActual").value.trim();
+    var nueva = document.getElementById("cfgPassNueva").value.trim();
+    var confirma = document.getElementById("cfgPassConfirma").value.trim();
+    if (!actual || !nueva || !confirma) {
+        toast("Completá todos los campos", "#c62828");
+        return;
+    }
+    if (actual !== authPass) {
+        toast("La contraseña actual es incorrecta", "#c62828");
+        return;
+    }
+    if (nueva !== confirma) {
+        toast("Las contraseñas nuevas no coinciden", "#c62828");
+        return;
+    }
+    if (nueva.length < 6) {
+        toast("La contraseña debe tener al menos 6 caracteres", "#c62828");
+        return;
+    }
+    var res = await fetch(API + "?action=cambiar_password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ _user: authUser, _pass: authPass, nueva }),
+    });
+    var json = await res.json();
+    if (json.ok) {
+        authPass = nueva;
+        toast("Contraseña actualizada");
+        document.getElementById("cfgPassActual").value = "";
+        document.getElementById("cfgPassNueva").value = "";
+        document.getElementById("cfgPassConfirma").value = "";
+    } else toast("Error al cambiar contraseña", "#c62828");
 }
 
 // ── MODO EDICIÓN ──────────────────────────────────────────────────────────────
@@ -307,7 +355,7 @@ async function crearCategoria() {
     } else toast("Error: " + (json.error || "ya existe"), "#c62828");
 }
 function openCatModal(id) {
-    var cat = allCats.find((c) => c.id === id);
+    var cat = allCats.find((c) => parseInt(c.id) === parseInt(id));
     if (!cat) return;
     document.getElementById("catEditId").value = cat.id;
     document.getElementById("catEditNombre").value = cat.nombre;
@@ -529,6 +577,47 @@ function renderTableFromList(list) {
         html ||
         '<tr><td colspan="10" style="text-align:center;color:#aaa;padding:30px">No hay productos</td></tr>';
     if (editMode) initDragDrop();
+}
+
+// ── GUARDAR TODO ──────────────────────────────────────────────────────────────
+async function saveAllInline() {
+    var rows = document.querySelectorAll("#tbody tr[data-id]");
+    if (!rows.length) return;
+    var btn = document.querySelector("#editModeBar .btn-primary");
+    btn.disabled = true;
+    btn.textContent = "Guardando...";
+    var errors = 0;
+    for (var row of rows) {
+        var id = parseInt(row.dataset.id);
+        var p = allProducts.find((p) => p.id === id);
+        if (!p) continue;
+        var data = { _user: authUser, _pass: authPass, orden: p.orden || 0 };
+        row.querySelectorAll("[data-field]").forEach(function (el) {
+            data[el.dataset.field] = el.value;
+        });
+        if (
+            !data.codigo ||
+            !data.descripcion ||
+            !data.categoria ||
+            !data.precio_mayorista
+        ) {
+            errors++;
+            continue;
+        }
+        var res = await fetch(API + "?action=editar&id=" + id, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(data),
+        });
+        var json = await res.json();
+        if (!json.ok) errors++;
+    }
+    btn.disabled = false;
+    btn.textContent = "💾 Guardar todo";
+    if (errors === 0) {
+        toast("Todos los cambios guardados");
+        await loadProducts();
+    } else toast(errors + " error(s) al guardar", "#c62828");
 }
 
 // ── INLINE SAVE ───────────────────────────────────────────────────────────────

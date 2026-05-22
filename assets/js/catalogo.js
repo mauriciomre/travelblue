@@ -354,10 +354,47 @@ function cardHTML(p) {
 
 function renderList(list, el, sortBar) {
     var useGroups = activeCat === "TODOS" && sortMode === "default";
+    var isMobile = window.innerWidth <= 640;
+
+    if (isMobile) {
+        // Vista mobile: cards compactas en grilla 2 columnas
+        var html = sortBar;
+        if (useGroups) {
+            var bycat = {},
+                order = [];
+            list.forEach(function (p) {
+                if (!bycat[p.CATEGORIA]) {
+                    bycat[p.CATEGORIA] = [];
+                    order.push(p.CATEGORIA);
+                }
+                bycat[p.CATEGORIA].push(p);
+            });
+            order.forEach(function (cat) {
+                html +=
+                    '<div class="cat-title">' +
+                    cat +
+                    '</div><div class="list-card">';
+                bycat[cat].forEach(function (p) {
+                    html += listCardHTML(p);
+                });
+                html += "</div>";
+            });
+        } else {
+            html += '<div class="list-card">';
+            list.forEach(function (p) {
+                html += listCardHTML(p);
+            });
+            html += "</div>";
+        }
+        el.innerHTML = html;
+        setTimeout(activateLazy, 30);
+        return;
+    }
+
+    // Vista desktop: tabla
     var html = sortBar + '<div class="list-wrap"><table class="list-table">';
     html +=
         "<thead><tr><th>Img</th><th>Código</th><th>Descripción</th><th>Precio May.</th><th>PVP</th><th>Cantidad</th><th></th></tr></thead><tbody>";
-
     if (useGroups) {
         var bycat = {},
             order = [];
@@ -382,10 +419,75 @@ function renderList(list, el, sortBar) {
             html += listRowHTML(p);
         });
     }
-
     html += "</tbody></table></div>";
     el.innerHTML = html;
     setTimeout(activateLazy, 30);
+}
+
+function listCardHTML(p) {
+    var sold = (p.ESTADO || "").toUpperCase() === "AGOTADO";
+    var inCart = !!cart[p.CODIGO];
+    var qty = getQty(p.CODIGO);
+    var multiplo = p.MULTIPLO || 1;
+    var id = sid(p.CODIGO);
+    var src = getImgSrc(p);
+    var html =
+        '<div class="lc' +
+        (sold ? " sold-row" : "") +
+        (inCart ? " picked-row" : "") +
+        '" id="lr_' +
+        id +
+        '">';
+    html += '<div class="lc-top">';
+    html +=
+        '<img class="lc-img" data-src="' +
+        src +
+        '" alt="" onerror="this.style.display=\'none\'">';
+    html +=
+        '<div class="lc-info"><div class="lc-name">' +
+        p.DESCRIPCION +
+        '</div><div class="lc-code">' +
+        p.CODIGO +
+        (sold ? ' <span class="badge">AGOTADO</span>' : "") +
+        "</div></div>";
+    html += "</div>";
+    html += '<div class="lc-price">' + fmt(p.PRECIO_MAYORISTA) + "</div>";
+    if (sold) {
+        html += '<div style="color:#aaa;font-size:11px">No disponible</div>';
+    } else {
+        html += '<div class="lc-foot">';
+        html +=
+            '<div class="list-qty"><button class="qb" onclick="chgQty(\'' +
+            p.CODIGO +
+            '\',-1)">−</button><input class="qn" type="number" id="qn_' +
+            id +
+            '" value="' +
+            qty +
+            '" min="' +
+            multiplo +
+            '" step="' +
+            multiplo +
+            '" onchange="manualQty(\'' +
+            p.CODIGO +
+            "',this.value)\" onblur=\"manualQty('" +
+            p.CODIGO +
+            '\',this.value)" style="width:36px"><button class="qb" onclick="chgQty(\'' +
+            p.CODIGO +
+            "',1)\">+</button></div>";
+        html +=
+            '<button class="list-add' +
+            (inCart ? " on" : "") +
+            '" id="ab_' +
+            id +
+            '" onclick="addOrUpdate(\'' +
+            p.CODIGO +
+            "')\">" +
+            (inCart ? "✓" : "+ Agregar") +
+            "</button>";
+        html += "</div>";
+    }
+    html += "</div>";
+    return html;
 }
 
 function listRowHTML(p) {
