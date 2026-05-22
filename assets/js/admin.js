@@ -445,6 +445,9 @@ function filterTable() {
 function fmt(v) {
     return v ? "$ " + Math.round(parseFloat(v)).toLocaleString("es-AR") : "—";
 }
+function fmtInput(v) {
+    return v ? Math.round(parseFloat(v)) : "";
+}
 function getImgUrl(p) {
     if (p.foto && p.foto.startsWith("http")) return p.foto;
     if (p.foto) return "../" + p.foto;
@@ -513,13 +516,13 @@ function renderTableFromList(list) {
                 "</select></td>";
             html +=
                 '<td class="editing"><input class="inline-input" type="number" value="' +
-                p.precio_mayorista +
+                fmtInput(p.precio_mayorista) +
                 '" data-field="precio_mayorista" data-id="' +
                 p.id +
                 '" style="width:90px"></td>';
             html +=
                 '<td class="editing"><input class="inline-input" type="number" value="' +
-                (p.pvp || "") +
+                fmtInput(p.pvp) +
                 '" data-field="pvp" data-id="' +
                 p.id +
                 '" style="width:90px"></td>';
@@ -655,6 +658,18 @@ async function saveInline(id) {
 function initDragDrop() {
     var rows = document.querySelectorAll('#tbody tr[draggable="true"]');
     rows.forEach(function (row) {
+        // Solo arrastrar desde el handle (primera celda)
+        var handle = row.querySelector(".drag-handle");
+        if (handle) {
+            handle.addEventListener("mousedown", function () {
+                row.draggable = true;
+            });
+            row.addEventListener("dragend", function () {
+                row.draggable = false;
+            });
+        }
+        row.draggable = false; // deshabilitado por defecto, se activa solo desde el handle
+
         row.addEventListener("dragstart", function (e) {
             dragSrc = row;
             row.classList.add("dragging");
@@ -687,6 +702,19 @@ function initDragDrop() {
             row.classList.remove("drag-over");
         });
     });
+
+    // Deshabilitar scroll del mouse en inputs numéricos
+    document
+        .querySelectorAll('#tbody input[type="number"]')
+        .forEach(function (inp) {
+            inp.addEventListener(
+                "wheel",
+                function (e) {
+                    e.preventDefault();
+                },
+                { passive: false },
+            );
+        });
 }
 async function saveOrder() {
     var rows = document.querySelectorAll("#tbody tr[data-id]");
@@ -733,8 +761,14 @@ function openModal(p) {
         document.getElementById("fCategoria").value = p ? p.categoria : "";
     }, 0);
     document.getElementById("fDesc").value = p ? p.descripcion : "";
-    document.getElementById("fMay").value = p ? p.precio_mayorista : "";
-    document.getElementById("fPvp").value = p ? p.pvp || "" : "";
+    document.getElementById("fMay").value = p
+        ? Math.round(p.precio_mayorista)
+        : "";
+    document.getElementById("fPvp").value = p
+        ? p.pvp
+            ? Math.round(p.pvp)
+            : ""
+        : "";
     document.getElementById("fEstado").value = p ? p.estado : "DISPONIBLE";
     document.getElementById("fMultiplo").value = p ? p.multiplo || 1 : 1;
     document.getElementById("fImagen").value = "";

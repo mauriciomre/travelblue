@@ -878,12 +878,18 @@ header {
     }
 
     .foot {
-        gap: 4px
+        gap: 4px;
+        flex-direction: column;
+        align-items: stretch
+    }
+
+    .qty {
+        justify-content: center
     }
 
     .add {
-        font-size: 10px;
-        padding: 6px 4px;
+        font-size: 11px;
+        padding: 7px 4px;
         text-align: center
     }
 
