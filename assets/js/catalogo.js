@@ -354,44 +354,6 @@ function cardHTML(p) {
 
 function renderList(list, el, sortBar) {
     var useGroups = activeCat === "TODOS" && sortMode === "default";
-    var isMobile = window.innerWidth <= 640;
-
-    if (isMobile) {
-        // Vista mobile: cards compactas en grilla 2 columnas
-        var html = sortBar;
-        if (useGroups) {
-            var bycat = {},
-                order = [];
-            list.forEach(function (p) {
-                if (!bycat[p.CATEGORIA]) {
-                    bycat[p.CATEGORIA] = [];
-                    order.push(p.CATEGORIA);
-                }
-                bycat[p.CATEGORIA].push(p);
-            });
-            order.forEach(function (cat) {
-                html +=
-                    '<div class="cat-title">' +
-                    cat +
-                    '</div><div class="list-card">';
-                bycat[cat].forEach(function (p) {
-                    html += listCardHTML(p);
-                });
-                html += "</div>";
-            });
-        } else {
-            html += '<div class="list-card">';
-            list.forEach(function (p) {
-                html += listCardHTML(p);
-            });
-            html += "</div>";
-        }
-        el.innerHTML = html;
-        setTimeout(activateLazy, 30);
-        return;
-    }
-
-    // Vista desktop: tabla
     var html = sortBar + '<div class="list-wrap"><table class="list-table">';
     html +=
         "<thead><tr><th>Img</th><th>Código</th><th>Descripción</th><th>Precio May.</th><th>PVP</th><th>Cantidad</th><th></th></tr></thead><tbody>";
