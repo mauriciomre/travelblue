@@ -904,97 +904,17 @@ header {
         font-size: 13px
     }
 
-    /* Lista mobile: ocultar tabla, mostrar cards compactas */
+    /* Lista mobile: scroll horizontal */
     .list-wrap {
-        overflow-x: unset
+        overflow-x: auto
     }
 
     .list-table {
-        display: none
+        display: table;
+        min-width: 600px
     }
 
     .list-card {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 8px
-    }
-
-    .lc {
-        background: #fff;
-        border-radius: 10px;
-        padding: 10px;
-        box-shadow: 0 1px 4px rgba(0, 0, 0, .08);
-        display: flex;
-        flex-direction: column;
-        gap: 6px;
-        border: 1.5px solid transparent
-    }
-
-    .lc.picked-row {
-        border-color: var(--blue)
-    }
-
-    .lc.sold-row {
-        opacity: .5
-    }
-
-    .lc-top {
-        display: flex;
-        align-items: center;
-        gap: 8px
-    }
-
-    .lc-img {
-        width: 44px;
-        height: 44px;
-        object-fit: contain;
-        border-radius: 6px;
-        background: #f8f9fb;
-        border: 1px solid var(--border);
-        flex-shrink: 0
-    }
-
-    .lc-info {
-        flex: 1;
-        min-width: 0
-    }
-
-    .lc-name {
-        font-size: 11px;
-        font-weight: 600;
-        line-height: 1.3;
-        overflow: hidden;
-        display: -webkit-box;
-        -webkit-line-clamp: 2;
-        -webkit-box-orient: vertical
-    }
-
-    .lc-code {
-        font-size: 10px;
-        color: var(--muted);
-        font-family: monospace
-    }
-
-    .lc-price {
-        font-size: 14px;
-        font-weight: 800;
-        color: var(--blue)
-    }
-
-    .lc-foot {
-        display: flex;
-        align-items: center;
-        gap: 4px
-    }
-
-    .lc-foot .list-qty {
-        flex: 1
-    }
-
-    .lc-foot .list-add {
-        flex: 1;
-        text-align: center;
-        padding: 5px 4px;
-        font-size: 11px
+        display: none
     }
 }
