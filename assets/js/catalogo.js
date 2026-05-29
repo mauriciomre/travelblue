@@ -50,8 +50,14 @@ function activateLazy() {
 
 function getImgSrc(p) {
     if (p.FOTO && p.FOTO.indexOf("http") === 0) return p.FOTO;
-    if (p.FOTO) return p.FOTO;
-    return "imgs/" + (p.CODIGO || "").replace(/\//g, "_") + ".jpeg";
+    if (p.FOTO) return p.FOTO + "?v=" + (p.UPDATED_AT || Date.now());
+    return (
+        "imgs/" +
+        (p.CODIGO || "").replace(/\//g, "_") +
+        ".jpeg" +
+        "?v=" +
+        (p.UPDATED_AT || Date.now())
+    );
 }
 
 function setView(v) {
@@ -88,6 +94,9 @@ function start() {
                     ORDEN: p.orden,
                     MULTIPLO: parseInt(p.multiplo) || 1,
                     CAT_ORDEN: p.cat_orden || 0,
+                    UPDATED_AT: p.updated_at
+                        ? new Date(p.updated_at).getTime()
+                        : Date.now(),
                 };
             });
             render();
