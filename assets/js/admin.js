@@ -449,7 +449,7 @@ function fmtInput(v) {
     return v ? Math.round(parseFloat(v)) : "";
 }
 function getImgUrl(p) {
-    var v = p.updated_at ? new Date(p.updated_at).getTime() : Date.now();
+    var v = Date.now();
     if (p.foto && p.foto.startsWith("http")) return p.foto + "?v=" + v;
     if (p.foto) return "../" + p.foto + "?v=" + v;
     return "../imgs/" + p.codigo.replace(/\//g, "_") + ".jpeg" + "?v=" + v;
