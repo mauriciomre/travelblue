@@ -718,6 +718,29 @@ header {
     background: #128C7E
 }
 
+/* COLOR DOTS */
+.color-dots {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    flex-wrap: wrap
+}
+
+.color-lbl {
+    font-size: 10px;
+    color: var(--muted);
+    font-weight: 600
+}
+
+.color-dot {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    border: 1.5px solid rgba(0, 0, 0, .15);
+    display: inline-block;
+    flex-shrink: 0
+}
+
 /* SORT BAR */
 .sort-bar {
     display: flex;
