@@ -688,8 +688,8 @@ td.editing {
 .color-selector-list {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-    gap: 4px;
-    padding: 10px;
+    gap: 2px;
+    padding: 8px;
     background: #f8f9fb;
     border: 1.5px solid var(--border);
     border-radius: 8px;
@@ -700,31 +700,43 @@ td.editing {
 
 .color-option {
     display: flex;
+    flex-direction: row;
     align-items: center;
     gap: 8px;
     font-size: 13px;
     cursor: pointer;
-    padding: 6px 10px;
+    padding: 5px 8px;
     border-radius: 6px;
-    transition: background .15s
+    transition: background .15s;
+    line-height: 1
 }
 
 .color-option:hover {
     background: #e8f0fb
 }
 
-.color-option input {
+.color-option input[type=checkbox] {
     cursor: pointer;
-    flex-shrink: 0
+    flex-shrink: 0;
+    width: 15px;
+    height: 15px;
+    margin: 0;
+    accent-color: var(--blue)
 }
 
 .color-dot-admin {
-    width: 18px;
-    height: 18px;
+    width: 16px;
+    height: 16px;
     border-radius: 50%;
     border: 1.5px solid rgba(0, 0, 0, .15);
     display: inline-block;
     flex-shrink: 0
+}
+
+.color-option span:last-child {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis
 }
 
 /* CONFIG */

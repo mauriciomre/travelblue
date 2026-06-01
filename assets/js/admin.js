@@ -278,8 +278,9 @@ function renderColorSelector(filter) {
             c.id +
             '"> <span class="color-dot-admin" style="background:' +
             c.hex +
-            '"></span> ' +
-            c.nombre;
+            '"></span> <span>' +
+            c.nombre +
+            "</span>";
         el.appendChild(item);
     });
 }
