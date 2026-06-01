@@ -51,6 +51,7 @@
       <option value="DISPONIBLE">Disponible</option>
       <option value="AGOTADO">Agotado</option>
     </select>
+    <button class="btn" style="background:#fff;border:1.5px solid var(--border);color:#333" onclick="openColModal()">⚙ Columnas</button>
     <button class="btn-toggle" id="btnEditMode" onclick="toggleEditMode()">✏ Modo edición</button>
     <button class="btn btn-primary" onclick="openModal()">+ Nuevo producto</button>
     <button class="btn btn-import" onclick="importarData()">⬆ Importar</button>
@@ -110,17 +111,22 @@
 
 <!-- COLORES -->
 <div class="wrap section" id="secColores">
-  <h2 style="font-size:16px;font-weight:800;color:var(--blue);margin-bottom:8px">Colores de productos</h2>
-  <p style="font-size:13px;color:var(--muted);margin-bottom:16px">Paleta global de colores para asignar a los productos del catálogo.</p>
-  <div class="cat-inline" style="margin-bottom:16px">
-    <input type="text" id="newColorNombre" placeholder="Nombre del color (ej: Rojo)" style="flex:1">
-    <input type="color" id="newColorHex" value="#000000" style="width:44px;height:38px;padding:2px;border:1.5px solid var(--border);border-radius:8px;cursor:pointer">
-    <button class="btn btn-primary" onclick="crearColor()">+ Agregar</button>
+  <div style="max-width:700px">
+    <h2 style="font-size:16px;font-weight:800;color:var(--blue);margin-bottom:8px">Colores de productos</h2>
+    <p style="font-size:13px;color:var(--muted);margin-bottom:16px">Paleta global de colores para asignar a los productos del catálogo.</p>
+    <div class="cat-inline" style="margin-bottom:12px">
+      <input type="text" id="newColorNombre" placeholder="Nombre del color (ej: ROJO)" style="flex:1" oninput="this.value=this.value.toUpperCase()">
+      <input type="color" id="newColorHex" value="#000000" style="width:44px;height:38px;padding:2px;border:1.5px solid var(--border);border-radius:8px;cursor:pointer">
+      <button class="btn btn-primary" onclick="crearColor()">+ Agregar</button>
+    </div>
+    <div style="margin-bottom:12px">
+      <input type="text" placeholder="🔍 Buscar color..." style="width:100%;padding:9px 13px;border:1.5px solid var(--border);border-radius:8px;font-size:14px;outline:none" oninput="renderColoresTable(this.value)">
+    </div>
+    <table>
+      <thead><tr><th>Color</th><th>Nombre</th><th>Hex</th><th>Acciones</th></tr></thead>
+      <tbody id="coloresTbody"></tbody>
+    </table>
   </div>
-  <table>
-    <thead><tr><th>Color</th><th>Nombre</th><th>Hex</th><th>Acciones</th></tr></thead>
-    <tbody id="coloresTbody"></tbody>
-  </table>
 </div>
 
 <!-- MODAL PRODUCTO -->
@@ -167,8 +173,18 @@
     </div>
     <div class="field">
       <label>Colores disponibles</label>
-      <div id="fColores" class="color-selector"></div>
-      <div style="font-size:11px;color:var(--muted);margin-top:4px">Seleccioná los colores disponibles para este producto</div>
+      <div style="display:flex;gap:8px;margin-bottom:8px">
+        <input type="text" placeholder="🔍 Buscar color..." style="flex:1;padding:7px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px" oninput="renderColorSelector(this.value)">
+      </div>
+      <div id="fColores" class="color-selector-list"></div>
+      <div style="background:#f8f9fb;border:1.5px dashed var(--border);border-radius:8px;padding:10px;margin-top:8px">
+        <div style="font-size:12px;font-weight:700;color:var(--muted);margin-bottom:8px">+ Crear nuevo color</div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <input type="text" id="quickColorNombre" placeholder="Nombre" style="flex:1;padding:7px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px" oninput="this.value=this.value.toUpperCase()">
+          <input type="color" id="quickColorHex" value="#000000" style="width:44px;height:36px;padding:2px;border:1.5px solid var(--border);border-radius:8px;cursor:pointer">
+          <button class="btn btn-primary" style="padding:7px 12px;font-size:12px" onclick="crearColorDesdeModal()">Agregar</button>
+        </div>
+      </div>
     </div>
     <div class="modal-foot">
       <button class="btn" style="background:#eee" onclick="closeModal()">Cancelar</button>
@@ -198,6 +214,18 @@
     <div class="modal-foot">
       <button class="btn" style="background:#eee" onclick="closeCatModal()">Cancelar</button>
       <button class="btn btn-primary" onclick="guardarCategoria()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL COLUMNAS -->
+<div class="modal-bg" id="colModalBg">
+  <div class="modal" style="max-width:340px">
+    <h2>Columnas visibles</h2>
+    <div id="colModalBody" style="margin:16px 0"></div>
+    <div class="modal-foot">
+      <button class="btn" style="background:#eee" onclick="closeColModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="applyColModal()">Aplicar</button>
     </div>
   </div>
 </div>

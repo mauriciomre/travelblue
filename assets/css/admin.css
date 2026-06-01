@@ -685,24 +685,26 @@ td.editing {
 }
 
 /* COLOR SELECTOR */
-.color-selector {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
+.color-selector-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 4px;
     padding: 10px;
     background: #f8f9fb;
     border: 1.5px solid var(--border);
     border-radius: 8px;
-    min-height: 48px
+    min-height: 60px;
+    max-height: 220px;
+    overflow-y: auto
 }
 
 .color-option {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 8px;
     font-size: 13px;
     cursor: pointer;
-    padding: 4px 8px;
+    padding: 6px 10px;
     border-radius: 6px;
     transition: background .15s
 }
@@ -712,7 +714,8 @@ td.editing {
 }
 
 .color-option input {
-    cursor: pointer
+    cursor: pointer;
+    flex-shrink: 0
 }
 
 .color-dot-admin {

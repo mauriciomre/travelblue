@@ -12,6 +12,64 @@ var editMode = false,
     dragSrc = null;
 var sortedProducts = null;
 
+// Columnas visibles — persistidas en localStorage
+var COLS = [
+    { key: "handle", label: "Orden", default: true },
+    { key: "img", label: "Imagen", default: true },
+    { key: "codigo", label: "Código", default: true },
+    { key: "desc", label: "Descripción", default: true },
+    { key: "cat", label: "Categoría", default: true },
+    { key: "may", label: "Mayorista", default: true },
+    { key: "pvp", label: "PVP", default: true },
+    { key: "estado", label: "Estado", default: true },
+    { key: "multiplo", label: "Múltiplo", default: true },
+    { key: "colores", label: "Colores", default: true },
+    { key: "acciones", label: "Acciones", default: true },
+];
+var visibleCols = {};
+function loadColPrefs() {
+    try {
+        var saved = JSON.parse(localStorage.getItem("tb_cols") || "{}");
+        COLS.forEach(function (c) {
+            visibleCols[c.key] =
+                saved[c.key] !== undefined ? saved[c.key] : c.default;
+        });
+    } catch (e) {
+        COLS.forEach(function (c) {
+            visibleCols[c.key] = c.default;
+        });
+    }
+}
+function saveColPrefs() {
+    localStorage.setItem("tb_cols", JSON.stringify(visibleCols));
+}
+function openColModal() {
+    var html = "";
+    COLS.forEach(function (c) {
+        html +=
+            '<label style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);cursor:pointer">';
+        html +=
+            '<input type="checkbox" ' +
+            (visibleCols[c.key] ? "checked" : "") +
+            " onchange=\"visibleCols['" +
+            c.key +
+            "']=this.checked\"> " +
+            c.label;
+        html += "</label>";
+    });
+    document.getElementById("colModalBody").innerHTML = html;
+    document.getElementById("colModalBg").classList.add("open");
+}
+function closeColModal() {
+    document.getElementById("colModalBg").classList.remove("open");
+}
+function applyColModal() {
+    saveColPrefs();
+    closeColModal();
+    renderTable(getFiltered());
+}
+loadColPrefs();
+
 // ── AUTH ──────────────────────────────────────────────────────────────────────
 async function doLogin() {
     var u = document.getElementById("luser").value.trim();
@@ -170,11 +228,16 @@ async function loadColores() {
     renderColoresTable();
     renderColorSelector();
 }
-function renderColoresTable() {
+function renderColoresTable(filter) {
     var el = document.getElementById("coloresTbody");
     if (!el) return;
+    var list = allColores;
+    if (filter)
+        list = list.filter(function (c) {
+            return c.nombre.toLowerCase().includes(filter.toLowerCase());
+        });
     var html = "";
-    allColores.forEach(function (c) {
+    list.forEach(function (c) {
         html += "<tr>";
         html +=
             '<td><span style="display:inline-block;width:24px;height:24px;border-radius:50%;background:' +
@@ -198,11 +261,16 @@ function renderColoresTable() {
         html ||
         '<tr><td colspan="4" style="text-align:center;color:#aaa;padding:20px">No hay colores</td></tr>';
 }
-function renderColorSelector() {
+function renderColorSelector(filter) {
     var el = document.getElementById("fColores");
     if (!el) return;
     el.innerHTML = "";
-    allColores.forEach(function (c) {
+    var list = allColores;
+    if (filter)
+        list = list.filter(function (c) {
+            return c.nombre.toLowerCase().includes(filter.toLowerCase());
+        });
+    list.forEach(function (c) {
         var item = document.createElement("label");
         item.className = "color-option";
         item.innerHTML =
@@ -215,8 +283,47 @@ function renderColorSelector() {
         el.appendChild(item);
     });
 }
+async function crearColorDesdeModal() {
+    var nombre = document
+        .getElementById("quickColorNombre")
+        .value.trim()
+        .toUpperCase();
+    var hex = document.getElementById("quickColorHex").value.trim();
+    if (!nombre || !hex) {
+        toast("Ingresá nombre y color", "#c62828");
+        return;
+    }
+    // Guardar checks actuales
+    var checked = [];
+    document
+        .querySelectorAll("#fColores input[type=checkbox]:checked")
+        .forEach(function (cb) {
+            checked.push(parseInt(cb.value));
+        });
+    var res = await fetch(API + "?action=color_crear", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ _user: authUser, _pass: authPass, nombre, hex }),
+    });
+    var json = await res.json();
+    if (json.ok) {
+        document.getElementById("quickColorNombre").value = "";
+        toast("Color creado");
+        await loadColores();
+        // Restaurar checks + seleccionar el nuevo
+        checked.push(json.id);
+        document
+            .querySelectorAll("#fColores input[type=checkbox]")
+            .forEach(function (cb) {
+                cb.checked = checked.indexOf(parseInt(cb.value)) >= 0;
+            });
+    } else toast("Error: " + (json.error || "ya existe"), "#c62828");
+}
 async function crearColor() {
-    var nombre = document.getElementById("newColorNombre").value.trim();
+    var nombre = document
+        .getElementById("newColorNombre")
+        .value.trim()
+        .toUpperCase();
     var hex = document.getElementById("newColorHex").value.trim();
     if (!nombre || !hex) {
         toast("Ingresá nombre y color", "#c62828");
@@ -235,7 +342,7 @@ async function crearColor() {
     } else toast("Error: " + (json.error || "ya existe"), "#c62828");
 }
 function openColorModal(id) {
-    var c = allColores.find((x) => x.id === id);
+    var c = allColores.find((x) => parseInt(x.id) === parseInt(id));
     if (!c) return;
     document.getElementById("colorEditId").value = c.id;
     document.getElementById("colorEditNombre").value = c.nombre;
@@ -608,122 +715,198 @@ function renderTable(list) {
     renderTableFromList(list);
 }
 
+function col(key) {
+    return visibleCols[key] !== false;
+}
+
+function renderTableHeader() {
+    var h = "<thead><tr>";
+    if (col("handle")) h += "<th></th>";
+    if (col("img")) h += "<th>Img</th>";
+    if (col("codigo")) h += "<th>Código</th>";
+    if (col("desc")) h += "<th>Descripción</th>";
+    if (col("cat")) h += "<th>Categoría</th>";
+    if (col("may")) h += "<th>Mayorista</th>";
+    if (col("pvp")) h += "<th>PVP</th>";
+    if (col("estado")) h += "<th>Estado</th>";
+    if (col("multiplo")) h += "<th>Múltiplo</th>";
+    if (col("colores")) h += "<th>Colores</th>";
+    if (col("acciones")) h += "<th>Acciones</th>";
+    h += "</tr></thead>";
+    document.querySelector("#mainTable thead") &&
+        (document.querySelector("#mainTable thead").outerHTML = h);
+}
+
 function renderTableFromList(list) {
+    renderTableHeader();
     var html = "";
     list.forEach(function (p) {
         var imgUrl = getImgUrl(p);
         var multiplo = p.multiplo || 1;
+        var colores = p.colores || [];
+        var colspan = COLS.filter(function (c) {
+            return visibleCols[c.key] !== false;
+        }).length;
         html +=
             '<tr draggable="' +
-            editMode +
+            (editMode ? "true" : "false") +
             '" data-id="' +
             p.id +
             '" data-orden="' +
             (p.orden || 0) +
             '">';
-        html +=
-            "<td>" +
-            (editMode ? '<span class="drag-handle">⠿</span>' : "") +
-            "</td>";
-        html +=
-            '<td><img class="thumb" src="' +
-            imgUrl +
-            '" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\'"><div class="thumb-ph" style="display:none">📦</div></td>';
+        if (col("handle"))
+            html +=
+                "<td>" +
+                (editMode ? '<span class="drag-handle">⠿</span>' : "") +
+                "</td>";
+        if (col("img"))
+            html +=
+                '<td><img class="thumb" src="' +
+                imgUrl +
+                '" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\'"><div class="thumb-ph" style="display:none">📦</div></td>';
         if (editMode) {
-            html +=
-                '<td class="editing"><input class="inline-input" value="' +
-                esc(p.codigo) +
-                '" data-field="codigo" data-id="' +
-                p.id +
-                '" style="width:90px"></td>';
-            html +=
-                '<td class="editing"><input class="inline-input" value="' +
-                esc(p.descripcion) +
-                '" data-field="descripcion" data-id="' +
-                p.id +
-                '" style="width:180px"></td>';
-            html +=
-                '<td class="editing"><select class="inline-select" data-field="categoria" data-id="' +
-                p.id +
-                '">' +
-                allCats
-                    .map(
-                        (c) =>
-                            '<option value="' +
-                            c.nombre +
-                            '"' +
-                            (c.nombre === p.categoria ? " selected" : "") +
-                            ">" +
-                            c.nombre +
-                            "</option>",
-                    )
-                    .join("") +
-                "</select></td>";
-            html +=
-                '<td class="editing"><input class="inline-input" type="number" value="' +
-                fmtInput(p.precio_mayorista) +
-                '" data-field="precio_mayorista" data-id="' +
-                p.id +
-                '" style="width:90px"></td>';
-            html +=
-                '<td class="editing"><input class="inline-input" type="number" value="' +
-                fmtInput(p.pvp) +
-                '" data-field="pvp" data-id="' +
-                p.id +
-                '" style="width:90px"></td>';
-            html +=
-                '<td class="editing"><select class="inline-select" data-field="estado" data-id="' +
-                p.id +
-                '"><option' +
-                (p.estado === "DISPONIBLE" ? " selected" : "") +
-                ">DISPONIBLE</option><option" +
-                (p.estado === "AGOTADO" ? " selected" : "") +
-                ">AGOTADO</option></select></td>";
-            html +=
-                '<td class="editing"><input class="inline-input" type="number" value="' +
-                multiplo +
-                '" data-field="multiplo" data-id="' +
-                p.id +
-                '" style="width:60px" min="1" title="Múltiplo"></td>';
-            html +=
-                '<td><button class="inline-save" onclick="saveInline(' +
-                p.id +
-                ')">💾</button></td>';
+            if (col("codigo"))
+                html +=
+                    '<td class="editing"><input class="inline-input" value="' +
+                    esc(p.codigo) +
+                    '" data-field="codigo" data-id="' +
+                    p.id +
+                    '" style="width:90px"></td>';
+            if (col("desc"))
+                html +=
+                    '<td class="editing"><input class="inline-input" value="' +
+                    esc(p.descripcion) +
+                    '" data-field="descripcion" data-id="' +
+                    p.id +
+                    '" style="width:180px"></td>';
+            if (col("cat"))
+                html +=
+                    '<td class="editing"><select class="inline-select" data-field="categoria" data-id="' +
+                    p.id +
+                    '">' +
+                    allCats
+                        .map(
+                            (c) =>
+                                '<option value="' +
+                                c.nombre +
+                                '"' +
+                                (c.nombre === p.categoria ? " selected" : "") +
+                                ">" +
+                                c.nombre +
+                                "</option>",
+                        )
+                        .join("") +
+                    "</select></td>";
+            if (col("may"))
+                html +=
+                    '<td class="editing"><input class="inline-input" type="number" value="' +
+                    fmtInput(p.precio_mayorista) +
+                    '" data-field="precio_mayorista" data-id="' +
+                    p.id +
+                    '" style="width:90px"></td>';
+            if (col("pvp"))
+                html +=
+                    '<td class="editing"><input class="inline-input" type="number" value="' +
+                    fmtInput(p.pvp) +
+                    '" data-field="pvp" data-id="' +
+                    p.id +
+                    '" style="width:90px"></td>';
+            if (col("estado"))
+                html +=
+                    '<td class="editing"><select class="inline-select" data-field="estado" data-id="' +
+                    p.id +
+                    '"><option' +
+                    (p.estado === "DISPONIBLE" ? " selected" : "") +
+                    ">DISPONIBLE</option><option" +
+                    (p.estado === "AGOTADO" ? " selected" : "") +
+                    ">AGOTADO</option></select></td>";
+            if (col("multiplo"))
+                html +=
+                    '<td class="editing"><input class="inline-input" type="number" value="' +
+                    multiplo +
+                    '" data-field="multiplo" data-id="' +
+                    p.id +
+                    '" style="width:60px" min="1"></td>';
+            if (col("colores"))
+                html +=
+                    '<td style="color:var(--muted);font-size:11px">' +
+                    (colores.length
+                        ? colores
+                              .map(function (c) {
+                                  return (
+                                      '<span style="display:inline-block;width:16px;height:16px;border-radius:50%;background:' +
+                                      c.hex +
+                                      ';border:1px solid rgba(0,0,0,.15);margin-right:2px" title="' +
+                                      c.nombre +
+                                      '"></span>'
+                                  );
+                              })
+                              .join("")
+                        : "—") +
+                    "</td>";
+            if (col("acciones"))
+                html +=
+                    '<td><button class="inline-save" onclick="saveInline(' +
+                    p.id +
+                    ')">💾</button></td>';
         } else {
-            html += "<td><code>" + p.codigo + "</code></td>";
-            html += "<td>" + p.descripcion + "</td>";
-            html += "<td>" + p.categoria + "</td>";
-            html +=
-                '<td style="font-weight:800;color:var(--blue)">' +
-                fmt(p.precio_mayorista) +
-                "</td>";
-            html += "<td>" + fmt(p.pvp) + "</td>";
-            html +=
-                '<td><span class="badge-' +
-                (p.estado === "DISPONIBLE" ? "disp" : "agot") +
-                '">' +
-                p.estado +
-                "</span></td>";
-            html +=
-                '<td style="color:var(--muted);font-size:12px">×' +
-                multiplo +
-                "</td>";
-            html +=
-                '<td><div class="actions"><button class="btn btn-edit" onclick="editProduct(' +
-                p.id +
-                ')">✏ Editar</button>';
-            html +=
-                '<button class="btn btn-danger" onclick="deleteProduct(' +
-                p.id +
-                ",'" +
-                p.descripcion.replace(/'/g, "") +
-                "')\">🗑</button></div></td>";
+            if (col("codigo")) html += "<td><code>" + p.codigo + "</code></td>";
+            if (col("desc")) html += "<td>" + p.descripcion + "</td>";
+            if (col("cat")) html += "<td>" + p.categoria + "</td>";
+            if (col("may"))
+                html +=
+                    '<td style="font-weight:800;color:var(--blue)">' +
+                    fmt(p.precio_mayorista) +
+                    "</td>";
+            if (col("pvp")) html += "<td>" + fmt(p.pvp) + "</td>";
+            if (col("estado"))
+                html +=
+                    '<td><span class="badge-' +
+                    (p.estado === "DISPONIBLE" ? "disp" : "agot") +
+                    '">' +
+                    p.estado +
+                    "</span></td>";
+            if (col("multiplo"))
+                html +=
+                    '<td style="color:var(--muted);font-size:12px">×' +
+                    multiplo +
+                    "</td>";
+            if (col("colores"))
+                html +=
+                    "<td>" +
+                    (colores.length
+                        ? colores
+                              .map(function (c) {
+                                  return (
+                                      '<span style="display:inline-block;width:16px;height:16px;border-radius:50%;background:' +
+                                      c.hex +
+                                      ';border:1px solid rgba(0,0,0,.15);margin-right:2px" title="' +
+                                      c.nombre +
+                                      '"></span>'
+                                  );
+                              })
+                              .join("")
+                        : '<span style="color:#ccc">—</span>') +
+                    "</td>";
+            if (col("acciones")) {
+                html +=
+                    '<td><div class="actions"><button class="btn btn-edit" onclick="editProduct(' +
+                    p.id +
+                    ')">✏ Editar</button>';
+                html +=
+                    '<button class="btn btn-danger" onclick="deleteProduct(' +
+                    p.id +
+                    ",'" +
+                    p.descripcion.replace(/'/g, "") +
+                    "')\">🗑</button></div></td>";
+            }
         }
         html += "</tr>";
     });
     document.getElementById("tbody").innerHTML =
         html ||
-        '<tr><td colspan="10" style="text-align:center;color:#aaa;padding:30px">No hay productos</td></tr>';
+        '<tr><td colspan="11" style="text-align:center;color:#aaa;padding:30px">No hay productos</td></tr>';
     if (editMode) initDragDrop();
 }
 
