@@ -142,7 +142,9 @@ async function tryAutoLogin() {
         }
     } catch (e) {}
 }
-tryAutoLogin();
+document.addEventListener("DOMContentLoaded", function () {
+    tryAutoLogin();
+});
 
 // ── NAVEGACIÓN ────────────────────────────────────────────────────────────────
 function showSection(s, btn) {
