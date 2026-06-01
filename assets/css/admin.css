@@ -174,9 +174,8 @@ header h1 {
 }
 
 .btn-import {
-    display: none;
     background: #ff6f00;
-    color: #fff;
+    color: #fff
 }
 
 .btn-toggle {
@@ -683,6 +682,46 @@ td.editing {
     display: flex;
     align-items: center;
     gap: 8px
+}
+
+/* COLOR SELECTOR */
+.color-selector {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 10px;
+    background: #f8f9fb;
+    border: 1.5px solid var(--border);
+    border-radius: 8px;
+    min-height: 48px
+}
+
+.color-option {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 6px;
+    transition: background .15s
+}
+
+.color-option:hover {
+    background: #e8f0fb
+}
+
+.color-option input {
+    cursor: pointer
+}
+
+.color-dot-admin {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    border: 1.5px solid rgba(0, 0, 0, .15);
+    display: inline-block;
+    flex-shrink: 0
 }
 
 /* CONFIG */

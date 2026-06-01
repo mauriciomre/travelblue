@@ -47,7 +47,6 @@ function setupDB($db) {
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
-    // Agregar columna multiplo si no existe
     $colCheck = $db->query("SHOW COLUMNS FROM productos LIKE 'multiplo'");
     if ($colCheck && $colCheck->num_rows === 0) {
         $db->query("ALTER TABLE productos ADD COLUMN multiplo INT DEFAULT 1");
@@ -56,6 +55,21 @@ function setupDB($db) {
     $db->query("CREATE TABLE IF NOT EXISTS config (
         clave VARCHAR(50) PRIMARY KEY,
         valor VARCHAR(255) NOT NULL
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+    $db->query("CREATE TABLE IF NOT EXISTS colores (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        nombre VARCHAR(100) NOT NULL UNIQUE,
+        hex VARCHAR(7) NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+    $db->query("CREATE TABLE IF NOT EXISTS producto_colores (
+        producto_id INT NOT NULL,
+        color_id INT NOT NULL,
+        PRIMARY KEY (producto_id, color_id),
+        FOREIGN KEY (producto_id) REFERENCES productos(id) ON DELETE CASCADE,
+        FOREIGN KEY (color_id) REFERENCES colores(id) ON DELETE CASCADE
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
     $db->query("INSERT IGNORE INTO config (clave, valor) VALUES ('whatsapp', '5493535697188')");
@@ -78,7 +92,15 @@ switch ($action) {
         $stmt = $db->prepare($sql);
         if ($params) $stmt->bind_param($types, ...$params);
         $stmt->execute();
-        echo json_encode($stmt->get_result()->fetch_all(MYSQLI_ASSOC));
+        $productos = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+        // Agregar colores a cada producto
+        foreach ($productos as &$prod) {
+            $cstmt = $db->prepare("SELECT c.id, c.nombre, c.hex FROM colores c JOIN producto_colores pc ON c.id = pc.color_id WHERE pc.producto_id = ? ORDER BY c.nombre");
+            $cstmt->bind_param('i', $prod['id']);
+            $cstmt->execute();
+            $prod['colores'] = $cstmt->get_result()->fetch_all(MYSQLI_ASSOC);
+        }
+        echo json_encode($productos);
         break;
 
     case 'check_codigo':
@@ -105,7 +127,6 @@ switch ($action) {
         $data = json_decode(file_get_contents('php://input'), true);
         $u = $data['user'] ?? '';
         $p = $data['pass'] ?? '';
-        // Verificar si hay contraseña personalizada en config
         $r = $db->query("SELECT valor FROM config WHERE clave='admin_pass' LIMIT 1");
         $row = $r ? $r->fetch_assoc() : null;
         $validPass = $row ? $row['valor'] : ADMIN_PASS;
@@ -121,8 +142,18 @@ switch ($action) {
         $multiplo = max(1, intval($data['multiplo'] ?? 1));
         $stmt = $db->prepare("INSERT INTO productos (codigo,descripcion,categoria,precio_mayorista,pvp,foto,estado,orden,multiplo) VALUES (?,?,?,?,?,?,?,?,?)");
         $stmt->bind_param('sssddssii', $data['codigo'], $data['descripcion'], $data['categoria'], $data['precio_mayorista'], $pvp, $data['foto'], $data['estado'], $orden, $multiplo);
-        if ($stmt->execute()) echo json_encode(['ok' => true, 'id' => $db->insert_id]);
-        else { http_response_code(400); echo json_encode(['error' => $db->error]); }
+        if ($stmt->execute()) {
+            $newId = $db->insert_id;
+            // Guardar colores
+            $colores = $data['colores'] ?? [];
+            foreach ($colores as $cid) {
+                $cid = intval($cid);
+                $cs = $db->prepare("INSERT IGNORE INTO producto_colores (producto_id, color_id) VALUES (?,?)");
+                $cs->bind_param('ii', $newId, $cid);
+                $cs->execute();
+            }
+            echo json_encode(['ok' => true, 'id' => $newId]);
+        } else { http_response_code(400); echo json_encode(['error' => $db->error]); }
         break;
 
     case 'editar':
@@ -134,8 +165,20 @@ switch ($action) {
         $multiplo = max(1, intval($data['multiplo'] ?? 1));
         $stmt = $db->prepare("UPDATE productos SET codigo=?,descripcion=?,categoria=?,precio_mayorista=?,pvp=?,foto=?,estado=?,orden=?,multiplo=? WHERE id=?");
         $stmt->bind_param('sssddssiii', $data['codigo'], $data['descripcion'], $data['categoria'], $data['precio_mayorista'], $pvp, $data['foto'], $data['estado'], $orden, $multiplo, $id);
-        if ($stmt->execute()) echo json_encode(['ok' => true]);
-        else { http_response_code(400); echo json_encode(['error' => $db->error]); }
+        if ($stmt->execute()) {
+            // Actualizar colores: borrar los actuales y reemplazar
+            $delStmt = $db->prepare("DELETE FROM producto_colores WHERE producto_id=?");
+            $delStmt->bind_param('i', $id);
+            $delStmt->execute();
+            $colores = $data['colores'] ?? [];
+            foreach ($colores as $cid) {
+                $cid = intval($cid);
+                $cs = $db->prepare("INSERT IGNORE INTO producto_colores (producto_id, color_id) VALUES (?,?)");
+                $cs->bind_param('ii', $id, $cid);
+                $cs->execute();
+            }
+            echo json_encode(['ok' => true]);
+        } else { http_response_code(400); echo json_encode(['error' => $db->error]); }
         break;
 
     case 'eliminar':
@@ -258,6 +301,46 @@ switch ($action) {
         if ($row['n'] > 0) { http_response_code(400); echo json_encode(['error' => 'No se puede eliminar: tiene ' . $row['n'] . ' producto(s)']); break; }
         $stmt = $db->prepare("DELETE FROM categorias WHERE id=?");
         $stmt->bind_param('i', $id); $stmt->execute();
+        echo json_encode(['ok' => true]);
+        break;
+
+    // ── COLORES ───────────────────────────────────────────────────────────────
+    case 'colores':
+        $r = $db->query("SELECT * FROM colores ORDER BY nombre");
+        echo json_encode($r->fetch_all(MYSQLI_ASSOC));
+        break;
+
+    case 'color_crear':
+        $data = json_decode(file_get_contents('php://input'), true);
+        checkAuth($data);
+        $nombre = trim($data['nombre'] ?? '');
+        $hex = trim($data['hex'] ?? '');
+        if (!$nombre || !$hex) { http_response_code(400); die(json_encode(['error' => 'Nombre y hex requeridos'])); }
+        $stmt = $db->prepare("INSERT INTO colores (nombre, hex) VALUES (?, ?)");
+        $stmt->bind_param('ss', $nombre, $hex);
+        if ($stmt->execute()) echo json_encode(['ok' => true, 'id' => $db->insert_id]);
+        else { http_response_code(400); echo json_encode(['error' => 'Ya existe ese color']); }
+        break;
+
+    case 'color_editar':
+        $id = intval($_GET['id'] ?? 0);
+        $data = json_decode(file_get_contents('php://input'), true);
+        checkAuth($data);
+        $nombre = trim($data['nombre'] ?? '');
+        $hex = trim($data['hex'] ?? '');
+        $stmt = $db->prepare("UPDATE colores SET nombre=?, hex=? WHERE id=?");
+        $stmt->bind_param('ssi', $nombre, $hex, $id);
+        $stmt->execute();
+        echo json_encode(['ok' => true]);
+        break;
+
+    case 'color_eliminar':
+        $data = json_decode(file_get_contents('php://input'), true);
+        checkAuth($data);
+        $id = intval($_GET['id'] ?? 0);
+        $stmt = $db->prepare("DELETE FROM colores WHERE id=?");
+        $stmt->bind_param('i', $id);
+        $stmt->execute();
         echo json_encode(['ok' => true]);
         break;
 

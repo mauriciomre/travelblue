@@ -49,15 +49,10 @@ function activateLazy() {
 }
 
 function getImgSrc(p) {
-    if (p.FOTO && p.FOTO.indexOf("http") === 0) return p.FOTO;
-    if (p.FOTO) return p.FOTO + "?v=" + (p.UPDATED_AT || Date.now());
-    return (
-        "imgs/" +
-        (p.CODIGO || "").replace(/\//g, "_") +
-        ".jpeg" +
-        "?v=" +
-        (p.UPDATED_AT || Date.now())
-    );
+    var v = p.UPDATED_AT || Date.now();
+    if (p.FOTO && p.FOTO.indexOf("http") === 0) return p.FOTO + "?v=" + v;
+    if (p.FOTO) return p.FOTO + "?v=" + v;
+    return "imgs/" + (p.CODIGO || "").replace(/\//g, "_") + ".jpeg" + "?v=" + v;
 }
 
 function setView(v) {
@@ -97,6 +92,7 @@ function start() {
                     UPDATED_AT: p.updated_at
                         ? new Date(p.updated_at).getTime()
                         : Date.now(),
+                    COLORES: p.colores || [],
                 };
             });
             render();
@@ -307,6 +303,19 @@ function cardHTML(p) {
         (sold ? '<span class="badge">AGOTADO</span>' : "") +
         "</div>";
     html += '<div class="name">' + p.DESCRIPCION + "</div>";
+    // Círculos de colores
+    if (p.COLORES && p.COLORES.length > 0) {
+        html += '<div class="color-dots"><span class="color-lbl">Color</span>';
+        p.COLORES.forEach(function (c) {
+            html +=
+                '<span class="color-dot" style="background:' +
+                c.hex +
+                '" title="' +
+                c.nombre +
+                '"></span>';
+        });
+        html += "</div>";
+    }
     html +=
         '<div class="prices"><div class="price">' +
         fmt(p.PRECIO_MAYORISTA) +

@@ -273,7 +273,7 @@
                         </button>
                     </div>
                 </div>
-                <div class="config-box">
+                <div class="config-box" style="margin-bottom: 16px">
                     <h3>🔒 Cambiar contraseña</h3>
                     <div class="field" style="margin-top: 12px">
                         <label>Contraseña actual</label
@@ -302,6 +302,54 @@
                     <button class="btn btn-primary" onclick="savePassword()">
                         Cambiar contraseña
                     </button>
+                </div>
+                <div class="config-box">
+                    <h3>🎨 Colores de productos</h3>
+                    <p
+                        style="
+                            font-size: 13px;
+                            color: var(--muted);
+                            margin-bottom: 12px;
+                        "
+                    >
+                        Creá la paleta de colores disponibles para asignar a los
+                        productos.
+                    </p>
+                    <div class="cat-inline" style="margin-bottom: 16px">
+                        <input
+                            type="text"
+                            id="newColorNombre"
+                            placeholder="Nombre del color (ej: Rojo)"
+                            style="flex: 1"
+                        />
+                        <input
+                            type="color"
+                            id="newColorHex"
+                            value="#000000"
+                            style="
+                                width: 44px;
+                                height: 38px;
+                                padding: 2px;
+                                border: 1.5px solid var(--border);
+                                border-radius: 8px;
+                                cursor: pointer;
+                            "
+                        />
+                        <button class="btn btn-primary" onclick="crearColor()">
+                            + Agregar
+                        </button>
+                    </div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Color</th>
+                                <th>Nombre</th>
+                                <th>Hex</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="coloresTbody"></tbody>
+                    </table>
                 </div>
             </div>
         </div>
@@ -389,6 +437,19 @@
                         </div>
                     </div>
                 </div>
+                <div class="field">
+                    <label>Colores disponibles</label>
+                    <div id="fColores" class="color-selector"></div>
+                    <div
+                        style="
+                            font-size: 11px;
+                            color: var(--muted);
+                            margin-top: 4px;
+                        "
+                    >
+                        Seleccioná los colores disponibles para este producto
+                    </div>
+                </div>
                 <div class="modal-foot">
                     <button
                         class="btn"
@@ -407,8 +468,44 @@
                 </div>
             </div>
         </div>
+        <!-- MODAL EDITAR COLOR -->
+        <div class="modal-bg" id="colorModalBg">
+            <div class="modal" style="max-width: 360px">
+                <h2>Editar color</h2>
+                <input type="hidden" id="colorEditId" />
+                <div class="field">
+                    <label>Nombre</label><input id="colorEditNombre" />
+                </div>
+                <div class="field">
+                    <label>Color</label
+                    ><input
+                        type="color"
+                        id="colorEditHex"
+                        style="
+                            width: 60px;
+                            height: 38px;
+                            padding: 2px;
+                            border: 1.5px solid var(--border);
+                            border-radius: 8px;
+                            cursor: pointer;
+                        "
+                    />
+                </div>
+                <div class="modal-foot">
+                    <button
+                        class="btn"
+                        style="background: #eee"
+                        onclick="closeColorModal()"
+                    >
+                        Cancelar
+                    </button>
+                    <button class="btn btn-primary" onclick="guardarColor()">
+                        Guardar
+                    </button>
+                </div>
+            </div>
+        </div>
 
-        <!-- MODAL EDITAR CATEGORÍA -->
         <div class="modal-bg" id="catModalBg">
             <div class="modal" style="max-width: 360px">
                 <h2>Editar categoría</h2>

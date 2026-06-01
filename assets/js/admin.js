@@ -3,13 +3,14 @@ var UPLOAD = "../upload.php";
 var authUser = "",
     authPass = "";
 var allProducts = [],
-    allCats = [];
+    allCats = [],
+    allColores = [];
 var pendingFile = null,
     codigoOk = true,
     checkTimeout = null;
 var editMode = false,
     dragSrc = null;
-var sortedProducts = null; // para ordenamiento temporal
+var sortedProducts = null;
 
 // ── AUTH ──────────────────────────────────────────────────────────────────────
 async function doLogin() {
@@ -34,6 +35,7 @@ async function doLogin() {
             authPass = p;
             btn.textContent = "Cargando datos...";
             await loadCats();
+            await loadColores();
             await loadProducts();
             loadConfig();
             document.getElementById("loginWrap").style.display = "none";
@@ -128,6 +130,118 @@ async function savePassword() {
         document.getElementById("cfgPassNueva").value = "";
         document.getElementById("cfgPassConfirma").value = "";
     } else toast("Error al cambiar contraseña", "#c62828");
+}
+
+// ── COLORES ───────────────────────────────────────────────────────────────────
+async function loadColores() {
+    var res = await fetch(API + "?action=colores");
+    allColores = await res.json();
+    renderColoresTable();
+    renderColorSelector();
+}
+function renderColoresTable() {
+    var el = document.getElementById("coloresTbody");
+    if (!el) return;
+    var html = "";
+    allColores.forEach(function (c) {
+        html += "<tr>";
+        html +=
+            '<td><span style="display:inline-block;width:24px;height:24px;border-radius:50%;background:' +
+            c.hex +
+            ';border:1.5px solid rgba(0,0,0,.15);vertical-align:middle"></span></td>';
+        html += "<td><strong>" + c.nombre + "</strong></td>";
+        html += "<td><code>" + c.hex + "</code></td>";
+        html +=
+            '<td><div class="actions"><button class="btn btn-edit" onclick="openColorModal(' +
+            c.id +
+            ')">✏ Editar</button>';
+        html +=
+            '<button class="btn btn-danger" onclick="eliminarColor(' +
+            c.id +
+            ",'" +
+            c.nombre +
+            "')\">🗑</button></div></td>";
+        html += "</tr>";
+    });
+    el.innerHTML =
+        html ||
+        '<tr><td colspan="4" style="text-align:center;color:#aaa;padding:20px">No hay colores</td></tr>';
+}
+function renderColorSelector() {
+    var el = document.getElementById("fColores");
+    if (!el) return;
+    el.innerHTML = "";
+    allColores.forEach(function (c) {
+        var item = document.createElement("label");
+        item.className = "color-option";
+        item.innerHTML =
+            '<input type="checkbox" value="' +
+            c.id +
+            '"> <span class="color-dot-admin" style="background:' +
+            c.hex +
+            '"></span> ' +
+            c.nombre;
+        el.appendChild(item);
+    });
+}
+async function crearColor() {
+    var nombre = document.getElementById("newColorNombre").value.trim();
+    var hex = document.getElementById("newColorHex").value.trim();
+    if (!nombre || !hex) {
+        toast("Ingresá nombre y color", "#c62828");
+        return;
+    }
+    var res = await fetch(API + "?action=color_crear", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ _user: authUser, _pass: authPass, nombre, hex }),
+    });
+    var json = await res.json();
+    if (json.ok) {
+        document.getElementById("newColorNombre").value = "";
+        toast("Color creado");
+        await loadColores();
+    } else toast("Error: " + (json.error || "ya existe"), "#c62828");
+}
+function openColorModal(id) {
+    var c = allColores.find((x) => x.id === id);
+    if (!c) return;
+    document.getElementById("colorEditId").value = c.id;
+    document.getElementById("colorEditNombre").value = c.nombre;
+    document.getElementById("colorEditHex").value = c.hex;
+    document.getElementById("colorModalBg").classList.add("open");
+}
+function closeColorModal() {
+    document.getElementById("colorModalBg").classList.remove("open");
+}
+async function guardarColor() {
+    var id = document.getElementById("colorEditId").value;
+    var nombre = document.getElementById("colorEditNombre").value.trim();
+    var hex = document.getElementById("colorEditHex").value.trim();
+    var res = await fetch(API + "?action=color_editar&id=" + id, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ _user: authUser, _pass: authPass, nombre, hex }),
+    });
+    var json = await res.json();
+    if (json.ok) {
+        toast("Color actualizado");
+        closeColorModal();
+        await loadColores();
+    } else toast("Error", "#c62828");
+}
+async function eliminarColor(id, nombre) {
+    if (!confirm('¿Eliminar "' + nombre + '"?')) return;
+    var res = await fetch(API + "?action=color_eliminar&id=" + id, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ _user: authUser, _pass: authPass }),
+    });
+    var json = await res.json();
+    if (json.ok) {
+        toast("Color eliminado");
+        await loadColores();
+    }
 }
 
 // ── MODO EDICIÓN ──────────────────────────────────────────────────────────────
@@ -449,10 +563,9 @@ function fmtInput(v) {
     return v ? Math.round(parseFloat(v)) : "";
 }
 function getImgUrl(p) {
-    var v = Date.now();
-    if (p.foto && p.foto.startsWith("http")) return p.foto + "?v=" + v;
-    if (p.foto) return "../" + p.foto + "?v=" + v;
-    return "../imgs/" + p.codigo.replace(/\//g, "_") + ".jpeg" + "?v=" + v;
+    if (p.foto && p.foto.startsWith("http")) return p.foto;
+    if (p.foto) return "../" + p.foto;
+    return "../imgs/" + p.codigo.replace(/\//g, "_") + ".jpeg";
 }
 function esc(s) {
     return String(s || "")
@@ -772,6 +885,20 @@ function openModal(p) {
         : "";
     document.getElementById("fEstado").value = p ? p.estado : "DISPONIBLE";
     document.getElementById("fMultiplo").value = p ? p.multiplo || 1 : 1;
+    // Colores
+    renderColorSelector();
+    var productColores = p
+        ? (p.colores || []).map(function (c) {
+              return c.id;
+          })
+        : [];
+    setTimeout(function () {
+        document
+            .querySelectorAll("#fColores input[type=checkbox]")
+            .forEach(function (cb) {
+                cb.checked = productColores.indexOf(parseInt(cb.value)) >= 0;
+            });
+    }, 0);
     document.getElementById("fImagen").value = "";
     document.getElementById("imgPreview").classList.remove("show");
     var cur = document.getElementById("imgCurrent");
@@ -901,6 +1028,13 @@ async function saveProduct() {
         toast("Todos los campos son obligatorios", "#c62828");
         return;
     }
+    // Colores seleccionados
+    var colores = [];
+    document
+        .querySelectorAll("#fColores input[type=checkbox]:checked")
+        .forEach(function (cb) {
+            colores.push(parseInt(cb.value));
+        });
     var btn = document.getElementById("btnGuardar");
     btn.disabled = true;
     btn.textContent = "Guardando...";
@@ -924,6 +1058,7 @@ async function saveProduct() {
         estado: document.getElementById("fEstado").value,
         orden: 0,
         multiplo,
+        colores,
     };
     var res = await fetch(
         API + "?action=" + (id ? "editar&id=" + id : "producto"),
