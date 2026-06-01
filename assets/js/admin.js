@@ -33,6 +33,8 @@ async function doLogin() {
         if (res.ok) {
             authUser = u;
             authPass = p;
+            localStorage.setItem("tb_admin_user", u);
+            localStorage.setItem("tb_admin_pass", p);
             btn.textContent = "Cargando datos...";
             await loadCats();
             await loadColores();
@@ -53,8 +55,36 @@ async function doLogin() {
     }
 }
 function doLogout() {
+    localStorage.removeItem("tb_admin_user");
+    localStorage.removeItem("tb_admin_pass");
     location.reload();
 }
+async function tryAutoLogin() {
+    var u = localStorage.getItem("tb_admin_user");
+    var p = localStorage.getItem("tb_admin_pass");
+    if (!u || !p) return;
+    try {
+        var res = await fetch(API + "?action=login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ user: u, pass: p }),
+        });
+        if (res.ok) {
+            authUser = u;
+            authPass = p;
+            await loadCats();
+            await loadColores();
+            await loadProducts();
+            loadConfig();
+            document.getElementById("loginWrap").style.display = "none";
+            document.getElementById("appWrap").style.display = "block";
+        } else {
+            localStorage.removeItem("tb_admin_user");
+            localStorage.removeItem("tb_admin_pass");
+        }
+    } catch (e) {}
+}
+tryAutoLogin();
 
 // ── NAVEGACIÓN ────────────────────────────────────────────────────────────────
 function showSection(s, btn) {
