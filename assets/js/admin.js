@@ -69,6 +69,7 @@ function showSection(s, btn) {
         .classList.add("on");
     btn.classList.add("on");
     if (s === "categorias") renderCatTable();
+    if (s === "colores") renderColoresTable();
 }
 
 // ── CONFIGURACIÓN ─────────────────────────────────────────────────────────────
