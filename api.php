@@ -67,9 +67,7 @@ function setupDB($db) {
     $db->query("CREATE TABLE IF NOT EXISTS producto_colores (
         producto_id INT NOT NULL,
         color_id INT NOT NULL,
-        PRIMARY KEY (producto_id, color_id),
-        FOREIGN KEY (producto_id) REFERENCES productos(id) ON DELETE CASCADE,
-        FOREIGN KEY (color_id) REFERENCES colores(id) ON DELETE CASCADE
+        PRIMARY KEY (producto_id, color_id)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
     $db->query("INSERT IGNORE INTO config (clave, valor) VALUES ('whatsapp', '5493535697188')");
