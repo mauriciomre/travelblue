@@ -1263,6 +1263,13 @@ async function saveProduct() {
     if (!fotoUrl && !id) {
         fotoUrl = "imgs/" + codigo.replace(/\//g, "_") + ".jpeg";
     }
+    var orden = id
+        ? (
+              allProducts.find(function (p) {
+                  return p.id == id;
+              }) || {}
+          ).orden || 0
+        : 0;
     var data = {
         _user: authUser,
         _pass: authPass,
@@ -1273,7 +1280,7 @@ async function saveProduct() {
         pvp: parseFloat(pvp) || null,
         foto: fotoUrl,
         estado: document.getElementById("fEstado").value,
-        orden: 0,
+        orden: orden,
         multiplo,
         colores,
     };
