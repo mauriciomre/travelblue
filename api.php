@@ -166,16 +166,17 @@ switch ($action) {
         $stmt = $db->prepare("UPDATE productos SET codigo=?,descripcion=?,categoria=?,precio_mayorista=?,pvp=?,foto=?,estado=?,orden=?,multiplo=? WHERE id=?");
         $stmt->bind_param('sssddssiii', $data['codigo'], $data['descripcion'], $data['categoria'], $data['precio_mayorista'], $pvp, $data['foto'], $data['estado'], $orden, $multiplo, $id);
         if ($stmt->execute()) {
-            // Actualizar colores: borrar los actuales y reemplazar
-            $delStmt = $db->prepare("DELETE FROM producto_colores WHERE producto_id=?");
-            $delStmt->bind_param('i', $id);
-            $delStmt->execute();
-            $colores = $data['colores'] ?? [];
-            foreach ($colores as $cid) {
-                $cid = intval($cid);
-                $cs = $db->prepare("INSERT IGNORE INTO producto_colores (producto_id, color_id) VALUES (?,?)");
-                $cs->bind_param('ii', $id, $cid);
-                $cs->execute();
+            // Solo actualizar colores si el campo viene en el request
+            if (isset($data['colores'])) {
+                $delStmt = $db->prepare("DELETE FROM producto_colores WHERE producto_id=?");
+                $delStmt->bind_param('i', $id);
+                $delStmt->execute();
+                foreach ($data['colores'] as $cid) {
+                    $cid = intval($cid);
+                    $cs = $db->prepare("INSERT IGNORE INTO producto_colores (producto_id, color_id) VALUES (?,?)");
+                    $cs->bind_param('ii', $id, $cid);
+                    $cs->execute();
+                }
             }
             echo json_encode(['ok' => true]);
         } else { http_response_code(400); echo json_encode(['error' => $db->error]); }
