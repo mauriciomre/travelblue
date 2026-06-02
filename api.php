@@ -159,8 +159,10 @@ switch ($action) {
         $data = json_decode(file_get_contents('php://input'), true);
         checkAuth($data);
         $pvp = isset($data['pvp']) && $data['pvp'] !== '' ? floatval($data['pvp']) : null;
-        $orden = intval($data['orden'] ?? 0);
         $multiplo = max(1, intval($data['multiplo'] ?? 1));
+        // Mantener el orden actual si no se pasa uno
+        $ordenActual = $db->query("SELECT orden FROM productos WHERE id=$id")->fetch_assoc();
+        $orden = isset($data['orden']) && $data['orden'] !== '' ? intval($data['orden']) : ($ordenActual['orden'] ?? 0);
         $stmt = $db->prepare("UPDATE productos SET codigo=?,descripcion=?,categoria=?,precio_mayorista=?,pvp=?,foto=?,estado=?,orden=?,multiplo=? WHERE id=?");
         $stmt->bind_param('sssddssiii', $data['codigo'], $data['descripcion'], $data['categoria'], $data['precio_mayorista'], $pvp, $data['foto'], $data['estado'], $orden, $multiplo, $id);
         if ($stmt->execute()) {
