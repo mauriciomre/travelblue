@@ -63,6 +63,20 @@
         </header>
 
         <div class="tabs" id="tabs"></div>
+        <div
+            class="cat-dropdown-wrap"
+            id="catDropdownWrap"
+            style="display: none"
+        >
+            <button
+                class="cat-dropdown-btn"
+                id="catDropdownBtn"
+                onclick="toggleCatDropdown()"
+            >
+                <span id="catDropdownLabel">TODOS</span> ▾
+            </button>
+            <div class="cat-dropdown-menu" id="catDropdownMenu"></div>
+        </div>
         <div class="body" id="prods">
             <div class="loading">
                 <div class="spin"></div>

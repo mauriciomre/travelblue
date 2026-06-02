@@ -129,7 +129,9 @@ function render() {
 }
 
 function renderTabs() {
-    document.getElementById("tabs").innerHTML = getCats()
+    var cats = getCats();
+    // Tabs desktop
+    document.getElementById("tabs").innerHTML = cats
         .map(function (c) {
             return (
                 '<button class="tab' +
@@ -142,7 +144,40 @@ function renderTabs() {
             );
         })
         .join("");
+    // Dropdown mobile
+    document.getElementById("catDropdownLabel").textContent = activeCat;
+    document.getElementById("catDropdownMenu").innerHTML = cats
+        .map(function (c) {
+            return (
+                '<div class="cat-dropdown-item' +
+                (c === activeCat ? " on" : "") +
+                '" onclick="setTabDropdown(\'' +
+                c +
+                "')\">" +
+                c +
+                "</div>"
+            );
+        })
+        .join("");
 }
+
+function toggleCatDropdown() {
+    document.getElementById("catDropdownMenu").classList.toggle("open");
+}
+
+function setTabDropdown(c) {
+    document.getElementById("catDropdownMenu").classList.remove("open");
+    setTab(c);
+}
+
+// Cerrar dropdown al tocar fuera
+document.addEventListener("click", function (e) {
+    var wrap = document.getElementById("catDropdownWrap");
+    if (wrap && !wrap.contains(e.target)) {
+        var menu = document.getElementById("catDropdownMenu");
+        if (menu) menu.classList.remove("open");
+    }
+});
 
 function setTab(c) {
     activeCat = c;
