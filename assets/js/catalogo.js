@@ -145,7 +145,8 @@ function renderTabs() {
         })
         .join("");
     // Dropdown mobile
-    document.getElementById("catDropdownLabel").textContent = "CATEGORÍAS";
+    document.getElementById("catDropdownLabel").textContent =
+        "CATEGORÍA: " + activeCat;
     document.getElementById("catDropdownMenu").innerHTML = cats
         .map(function (c) {
             return (
