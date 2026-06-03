@@ -7,6 +7,22 @@ var products = [],
     viewMode = "grid",
     sortMode = "default";
 
+// ── CARRITO PERSISTENTE ───────────────────────────────────────────────────────
+function saveCart() {
+    try {
+        localStorage.setItem("tb_cart", JSON.stringify(cart));
+    } catch (e) {}
+}
+function loadCart() {
+    try {
+        var saved = localStorage.getItem("tb_cart");
+        if (saved) cart = JSON.parse(saved);
+    } catch (e) {
+        cart = {};
+    }
+}
+loadCart();
+
 fetch(API_URL + "?action=config_get")
     .then(function (r) {
         return r.json();
@@ -95,7 +111,21 @@ function start() {
                     COLORES: p.colores || [],
                 };
             });
+            // Limpiar items del carrito que ya no existen en los productos
+            Object.keys(cart).forEach(function (code) {
+                var found = products.find(function (p) {
+                    return p.CODIGO === code;
+                });
+                if (found) {
+                    cart[code].p = found;
+                } // actualizar referencia con datos frescos
+                else {
+                    delete cart[code];
+                }
+            });
+            saveCart();
             render();
+            updateCart();
         })
         .catch(function () {
             document.getElementById("prods").innerHTML =
@@ -640,6 +670,7 @@ function addOrUpdate(code) {
             lbtn.classList.add("on");
         }
     }
+    saveCart();
     updateCart();
 }
 
@@ -667,6 +698,7 @@ function rmCart(code) {
             lbtn.classList.remove("on");
         }
     }
+    saveCart();
     updateCart();
 }
 
@@ -682,6 +714,7 @@ function setCartQty(code, qty) {
         var id = sid(code);
         var qEl = document.getElementById("qn_" + id);
         if (qEl) qEl.value = snapped;
+        saveCart();
         updateCart();
     }
 }
@@ -971,14 +1004,13 @@ async function sendWA() {
         "https://wa.me/" + WA_NUM + "?text=" + encodeURIComponent(msg),
         "_blank",
     );
-    // Animar botón a estado enviado
+    // Botón queda en estado enviado permanentemente
     btn.style.background = "#2e7d32";
     btn.innerHTML = "✅ Pedido enviado";
-    setTimeout(function () {
-        btn.disabled = false;
-        btn.style.background = "";
-        btn.innerHTML = "📱 Confirmar y enviar pedido";
-    }, 4000);
+    // Limpiar carrito
+    cart = {};
+    saveCart();
+    updateCart();
 }
 
 start();
