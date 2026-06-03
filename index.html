@@ -96,16 +96,137 @@
                         <span class="total-lbl">Total mayorista:</span
                         ><span class="total-val" id="ptotal">$ 0</span>
                     </div>
-                    <div class="fields">
-                        <input
-                            id="cname"
-                            placeholder="Tu nombre / razón social"
-                        />
-                        <input
-                            id="cphone"
-                            placeholder="Tu teléfono (opcional)"
-                        />
+
+                    <!-- TELÉFONO -->
+                    <div class="field-group">
+                        <label class="field-lbl"
+                            >Teléfono <span class="req">*</span></label
+                        >
+                        <div class="tel-row">
+                            <input
+                                id="cCaract"
+                                type="tel"
+                                placeholder="353"
+                                maxlength="4"
+                                oninput="onTelChange()"
+                            />
+                            <input
+                                id="cNum"
+                                type="tel"
+                                placeholder="4277226"
+                                maxlength="8"
+                                oninput="onTelChange()"
+                            />
+                        </div>
+                        <div class="field-hint-sm">
+                            Característica sin 0 + número sin 15
+                        </div>
                     </div>
+
+                    <!-- FORMULARIO CLIENTE (se expande) -->
+                    <div id="clienteForm" style="display: none">
+                        <div class="form-section-title">Datos del pedido</div>
+
+                        <div class="field-group">
+                            <label class="field-lbl"
+                                >Nombre / Razón Social
+                                <span class="req">*</span></label
+                            >
+                            <input
+                                id="cNombre"
+                                type="text"
+                                placeholder="Nombre o razón social"
+                            />
+                        </div>
+                        <div class="field-row">
+                            <div class="field-group">
+                                <label class="field-lbl">CUIT / DNI</label>
+                                <input
+                                    id="cCuitDni"
+                                    type="text"
+                                    placeholder="20-12345678-9"
+                                />
+                            </div>
+                            <div class="field-group">
+                                <label class="field-lbl">Email</label>
+                                <input
+                                    id="cEmail"
+                                    type="email"
+                                    placeholder="mail@ejemplo.com"
+                                />
+                            </div>
+                        </div>
+
+                        <div class="form-section-title">Datos de envío</div>
+                        <div class="field-group">
+                            <label class="field-lbl">Domicilio</label>
+                            <input
+                                id="cDomicilio"
+                                type="text"
+                                placeholder="Calle y número"
+                            />
+                        </div>
+                        <div class="field-row">
+                            <div class="field-group">
+                                <label class="field-lbl">Localidad</label>
+                                <input
+                                    id="cLocalidad"
+                                    type="text"
+                                    placeholder="Ciudad"
+                                />
+                            </div>
+                            <div class="field-group">
+                                <label class="field-lbl">CP</label>
+                                <input
+                                    id="cCP"
+                                    type="text"
+                                    placeholder="5000"
+                                />
+                            </div>
+                        </div>
+                        <div class="field-group">
+                            <label class="field-lbl">Provincia</label>
+                            <input
+                                id="cProvincia"
+                                type="text"
+                                placeholder="Córdoba"
+                            />
+                        </div>
+                        <div class="field-group">
+                            <label class="field-lbl">Transporte</label>
+                            <select
+                                id="cTransporte"
+                                onchange="onTransporteChange()"
+                            >
+                                <option value="">— Seleccioná —</option>
+                            </select>
+                        </div>
+                        <div
+                            class="field-group"
+                            id="cTransporteOtroWrap"
+                            style="display: none"
+                        >
+                            <label class="field-lbl"
+                                >Especificá el transporte</label
+                            >
+                            <input
+                                id="cTransporteOtro"
+                                type="text"
+                                placeholder="Nombre del transporte"
+                            />
+                        </div>
+                        <div class="field-group">
+                            <label class="field-lbl"
+                                >Notas / Aclaraciones</label
+                            >
+                            <textarea
+                                id="cNotas"
+                                placeholder="Indicaciones especiales..."
+                                rows="2"
+                            ></textarea>
+                        </div>
+                    </div>
+
                     <button class="wa" onclick="sendWA()">
                         📱 Enviar pedido por WhatsApp
                     </button>

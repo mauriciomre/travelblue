@@ -27,6 +27,8 @@
     <button class="nav-btn on" onclick="showSection('productos',this)">Productos</button>
     <button class="nav-btn" onclick="showSection('categorias',this)">Categorías</button>
     <button class="nav-btn" onclick="showSection('colores',this)">Colores</button>
+    <button class="nav-btn" onclick="showSection('pedidos',this)">Pedidos</button>
+    <button class="nav-btn" onclick="showSection('clientes',this)">Clientes</button>
     <button class="nav-btn" onclick="showSection('configuracion',this)">Configuración</button>
   </div>
   <div class="h-right">
@@ -93,7 +95,18 @@
 <div class="wrap section" id="secConfiguracion">
   <h2 style="font-size:16px;font-weight:800;color:var(--blue);margin-bottom:16px">Configuración</h2>
   <div class="config-box" style="margin-bottom:16px">
-    <h3>📱 Número de WhatsApp</h3>
+    <h3>🚚 Transportes</h3>
+    <p style="font-size:13px;color:var(--muted);margin-bottom:12px">Lista de transportes disponibles para los clientes al confirmar un pedido.</p>
+    <div class="cat-inline" style="margin-bottom:12px">
+      <input type="text" id="newTransNombre" placeholder="Nombre del transporte" style="flex:1" oninput="this.value=this.value.toUpperCase()">
+      <button class="btn btn-primary" onclick="crearTransporte()">+ Agregar</button>
+    </div>
+    <table>
+      <thead><tr><th>Nombre</th><th>Acciones</th></tr></thead>
+      <tbody id="transTbody"></tbody>
+    </table>
+  </div>
+  <div class="config-box" style="margin-bottom:16px">
     <p style="font-size:13px;color:var(--muted);margin-bottom:12px">Número completo con código de país, sin espacios ni signos. Ej: <code>5493535697188</code></p>
     <div class="config-row">
       <input type="text" id="cfgWA" placeholder="5493535697188">
@@ -126,6 +139,80 @@
       <thead><tr><th>Color</th><th>Nombre</th><th>Hex</th><th>Acciones</th></tr></thead>
       <tbody id="coloresTbody"></tbody>
     </table>
+  </div>
+</div>
+
+<!-- PEDIDOS -->
+<div class="wrap section" id="secPedidos">
+  <h2 style="font-size:16px;font-weight:800;color:var(--blue);margin-bottom:16px">Pedidos</h2>
+  <div class="toolbar" style="margin-bottom:16px">
+    <input type="text" id="pedidoSrch" placeholder="🔍 Buscar por cliente o teléfono..." oninput="filterPedidos()" style="flex:1">
+    <select id="pedidoFiltEst" onchange="filterPedidos()">
+      <option value="">Todos los estados</option>
+      <option value="PENDIENTE">Pendiente</option>
+      <option value="EN_PREPARACION">En preparación</option>
+      <option value="FACTURADO">Facturado</option>
+      <option value="ENVIADO">Enviado</option>
+    </select>
+  </div>
+  <table id="pedidosTable">
+    <thead><tr><th>#</th><th>Fecha</th><th>Cliente</th><th>Teléfono</th><th>Total</th><th>Estado</th><th>Acciones</th></tr></thead>
+    <tbody id="pedidosTbody"></tbody>
+  </table>
+</div>
+
+<!-- CLIENTES -->
+<div class="wrap section" id="secClientes">
+  <h2 style="font-size:16px;font-weight:800;color:var(--blue);margin-bottom:16px">Clientes</h2>
+  <div class="toolbar" style="margin-bottom:16px">
+    <input type="text" id="clienteSrch" placeholder="🔍 Buscar por nombre o teléfono..." oninput="filterClientes()" style="flex:1">
+  </div>
+  <table>
+    <thead><tr><th>Nombre</th><th>Teléfono</th><th>CUIT/DNI</th><th>Localidad</th><th>Pedidos</th><th>Acciones</th></tr></thead>
+    <tbody id="clientesTbody"></tbody>
+  </table>
+</div>
+
+<!-- MODAL PEDIDO DETALLE -->
+<div class="modal-bg" id="pedidoModalBg">
+  <div class="modal" style="max-width:700px">
+    <h2 id="pedidoModalTitle">Pedido #</h2>
+    <div id="pedidoModalBody"></div>
+    <div class="modal-foot">
+      <button class="btn" style="background:#eee" onclick="closePedidoModal()">Cerrar</button>
+      <button class="btn" style="background:#1565c0;color:#fff" onclick="imprimirPedido()">🖨 Imprimir</button>
+      <button class="btn btn-primary" onclick="guardarPedidoObs()">💾 Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL CLIENTE EDITAR -->
+<div class="modal-bg" id="clienteModalBg">
+  <div class="modal" style="max-width:500px">
+    <h2>Editar cliente</h2>
+    <input type="hidden" id="clienteEditId">
+    <div class="row2">
+      <div class="field"><label>Nombre / Razón Social *</label><input id="ceNombre"></div>
+      <div class="field"><label>CUIT / DNI</label><input id="ceCuitDni"></div>
+    </div>
+    <div class="row2">
+      <div class="field"><label>Email</label><input id="ceEmail"></div>
+      <div class="field"><label>Teléfono</label><input id="ceTelefono" readonly style="background:#f5f5f5"></div>
+    </div>
+    <div class="field"><label>Domicilio</label><input id="ceDomicilio"></div>
+    <div class="row2">
+      <div class="field"><label>Localidad</label><input id="ceLocalidad"></div>
+      <div class="field"><label>CP</label><input id="ceCP"></div>
+    </div>
+    <div class="row2">
+      <div class="field"><label>Provincia</label><input id="ceProvincia"></div>
+      <div class="field"><label>Transporte</label><input id="ceTransporte"></div>
+    </div>
+    <div class="field"><label>Notas</label><textarea id="ceNotas" rows="2" style="width:100%;padding:9px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;font-family:inherit"></textarea></div>
+    <div class="modal-foot">
+      <button class="btn" style="background:#eee" onclick="closeClienteModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="guardarClienteEdit()">Guardar</button>
+    </div>
   </div>
 </div>
 
@@ -192,6 +279,19 @@
     </div>
   </div>
 </div>
+<!-- MODAL EDITAR TRANSPORTE -->
+<div class="modal-bg" id="transModalBg">
+  <div class="modal" style="max-width:360px">
+    <h2>Editar transporte</h2>
+    <input type="hidden" id="transEditId">
+    <div class="field"><label>Nombre</label><input id="transEditNombre" oninput="this.value=this.value.toUpperCase()"></div>
+    <div class="modal-foot">
+      <button class="btn" style="background:#eee" onclick="closeTransModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="guardarTransporte()">Guardar</button>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL EDITAR COLOR -->
 <div class="modal-bg" id="colorModalBg">
   <div class="modal" style="max-width:360px">

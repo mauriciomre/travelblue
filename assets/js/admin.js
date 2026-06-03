@@ -98,6 +98,7 @@ async function doLogin() {
             await loadColores();
             await loadProducts();
             loadConfig();
+            loadTransportes();
             document.getElementById("loginWrap").style.display = "none";
             document.getElementById("appWrap").style.display = "block";
         } else {
@@ -134,6 +135,7 @@ async function tryAutoLogin() {
             await loadColores();
             await loadProducts();
             loadConfig();
+            loadTransportes();
             document.getElementById("loginWrap").style.display = "none";
             document.getElementById("appWrap").style.display = "block";
         } else {
@@ -160,6 +162,8 @@ function showSection(s, btn) {
     btn.classList.add("on");
     if (s === "categorias") renderCatTable();
     if (s === "colores") renderColoresTable();
+    if (s === "pedidos") loadPedidos();
+    if (s === "clientes") loadClientes();
 }
 
 // ── CONFIGURACIÓN ─────────────────────────────────────────────────────────────
@@ -1339,4 +1343,490 @@ function toast(msg, bg) {
     t.style.background = bg || "#2e7d32";
     t.classList.add("show");
     setTimeout(() => t.classList.remove("show"), 3000);
+}
+
+// ── TRANSPORTES ───────────────────────────────────────────────────────────────
+var allTransportes = [];
+async function loadTransportes() {
+    var res = await fetch(API + "?action=transportes");
+    allTransportes = await res.json();
+    renderTransTable();
+}
+function renderTransTable() {
+    var el = document.getElementById("transTbody");
+    if (!el) return;
+    var html = "";
+    allTransportes.forEach(function (t) {
+        html += "<tr><td><strong>" + t.nombre + "</strong></td>";
+        html +=
+            '<td><div class="actions"><button class="btn btn-edit" onclick="openTransModal(' +
+            t.id +
+            ')">✏ Editar</button>';
+        html +=
+            '<button class="btn btn-danger" onclick="eliminarTransporte(' +
+            t.id +
+            ",'" +
+            t.nombre +
+            "')\">🗑</button></div></td></tr>";
+    });
+    el.innerHTML =
+        html ||
+        '<tr><td colspan="2" style="text-align:center;color:#aaa;padding:20px">No hay transportes</td></tr>';
+}
+async function crearTransporte() {
+    var nombre = document
+        .getElementById("newTransNombre")
+        .value.trim()
+        .toUpperCase();
+    if (!nombre) {
+        toast("Ingresá un nombre", "#c62828");
+        return;
+    }
+    var res = await fetch(API + "?action=transporte_crear", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            _user: authUser,
+            _pass: authPass,
+            nombre,
+            orden: allTransportes.length,
+        }),
+    });
+    var json = await res.json();
+    if (json.ok) {
+        document.getElementById("newTransNombre").value = "";
+        toast("Transporte creado");
+        await loadTransportes();
+    } else toast("Error: " + (json.error || "ya existe"), "#c62828");
+}
+function openTransModal(id) {
+    var t = allTransportes.find((x) => parseInt(x.id) === parseInt(id));
+    if (!t) return;
+    document.getElementById("transEditId").value = t.id;
+    document.getElementById("transEditNombre").value = t.nombre;
+    document.getElementById("transModalBg").classList.add("open");
+}
+function closeTransModal() {
+    document.getElementById("transModalBg").classList.remove("open");
+}
+async function guardarTransporte() {
+    var id = document.getElementById("transEditId").value;
+    var nombre = document
+        .getElementById("transEditNombre")
+        .value.trim()
+        .toUpperCase();
+    var res = await fetch(API + "?action=transporte_editar&id=" + id, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ _user: authUser, _pass: authPass, nombre }),
+    });
+    var json = await res.json();
+    if (json.ok) {
+        toast("Transporte actualizado");
+        closeTransModal();
+        await loadTransportes();
+    } else toast("Error", "#c62828");
+}
+async function eliminarTransporte(id, nombre) {
+    if (!confirm('¿Eliminar "' + nombre + '"?')) return;
+    var res = await fetch(API + "?action=transporte_eliminar&id=" + id, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ _user: authUser, _pass: authPass }),
+    });
+    var json = await res.json();
+    if (json.ok) {
+        toast("Transporte eliminado");
+        await loadTransportes();
+    }
+}
+
+// ── PEDIDOS ───────────────────────────────────────────────────────────────────
+var allPedidos = [];
+var pedidoActual = null;
+
+async function loadPedidos() {
+    var q = document.getElementById("pedidoSrch").value;
+    var est = document.getElementById("pedidoFiltEst").value;
+    var url = API + "?action=pedidos";
+    if (q) url += "&q=" + encodeURIComponent(q);
+    if (est) url += "&estado=" + encodeURIComponent(est);
+    var res = await fetch(url);
+    allPedidos = await res.json();
+    renderPedidosTable();
+}
+function filterPedidos() {
+    loadPedidos();
+}
+
+var ESTADO_LABELS = {
+    PENDIENTE: { label: "Pendiente", color: "#e65100", bg: "#fff3e0" },
+    EN_PREPARACION: {
+        label: "En preparación",
+        color: "#1565c0",
+        bg: "#e3f2fd",
+    },
+    FACTURADO: { label: "Facturado", color: "#2e7d32", bg: "#e8f5e9" },
+    ENVIADO: { label: "Enviado", color: "#6a1b9a", bg: "#f3e5f5" },
+};
+
+function estadoBadge(est) {
+    var e = ESTADO_LABELS[est] || { label: est, color: "#666", bg: "#f5f5f5" };
+    return (
+        '<span style="background:' +
+        e.bg +
+        ";color:" +
+        e.color +
+        ';padding:3px 10px;border-radius:10px;font-size:11px;font-weight:700">' +
+        e.label +
+        "</span>"
+    );
+}
+
+function renderPedidosTable() {
+    var html = "";
+    allPedidos.forEach(function (p) {
+        var fecha = new Date(p.created_at).toLocaleString("es-AR", {
+            day: "2-digit",
+            month: "2-digit",
+            year: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+        });
+        html += "<tr>";
+        html += "<td><strong>#" + p.id + "</strong></td>";
+        html +=
+            '<td style="font-size:12px;white-space:nowrap">' + fecha + "</td>";
+        html += "<td><strong>" + p.cliente_nombre + "</strong></td>";
+        html +=
+            '<td><a href="https://wa.me/' +
+            p.cliente_tel +
+            '" target="_blank" style="color:var(--blue);text-decoration:none">+' +
+            p.cliente_tel +
+            "</a></td>";
+        html +=
+            '<td style="font-weight:800;color:var(--blue)">' +
+            fmt(p.total) +
+            "</td>";
+        html += "<td>" + estadoBadge(p.estado) + "</td>";
+        html +=
+            '<td><div class="actions"><button class="btn btn-edit" onclick="openPedidoModal(' +
+            p.id +
+            ')">Ver</button></div></td>';
+        html += "</tr>";
+    });
+    document.getElementById("pedidosTbody").innerHTML =
+        html ||
+        '<tr><td colspan="7" style="text-align:center;color:#aaa;padding:30px">No hay pedidos</td></tr>';
+}
+
+async function openPedidoModal(id) {
+    var res = await fetch(API + "?action=pedido_detalle&id=" + id);
+    pedidoActual = await res.json();
+    document.getElementById("pedidoModalTitle").textContent = "Pedido #" + id;
+    var p = pedidoActual;
+    var fecha = new Date(p.created_at).toLocaleString("es-AR");
+    var html =
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">';
+    html +=
+        '<div><div style="font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase;margin-bottom:4px">Cliente</div>';
+    html += "<strong>" + p.cliente_nombre + "</strong><br>";
+    html +=
+        '<a href="https://wa.me/' +
+        p.cliente_tel +
+        '" target="_blank">+' +
+        p.cliente_tel +
+        "</a>";
+    if (p.cuit_dni) html += "<br>" + p.cuit_dni;
+    if (p.email) html += "<br>" + p.email;
+    html += "</div>";
+    html +=
+        '<div><div style="font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase;margin-bottom:4px">Envío</div>';
+    if (p.domicilio) html += p.domicilio + "<br>";
+    if (p.localidad) html += p.localidad + " (" + (p.cp || "") + ")<br>";
+    if (p.provincia) html += p.provincia + "<br>";
+    if (p.transporte) html += "🚚 " + p.transporte;
+    html += "</div></div>";
+    // Estado
+    html +=
+        '<div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;padding:12px;background:#f8f9fb;border-radius:8px">';
+    html += '<span style="font-weight:700;font-size:13px">Estado:</span>';
+    html +=
+        '<select id="pedidoEstadoSel" style="padding:6px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px">';
+    ["PENDIENTE", "EN_PREPARACION", "FACTURADO", "ENVIADO"].forEach(
+        function (est) {
+            html +=
+                '<option value="' +
+                est +
+                '"' +
+                (p.estado === est ? " selected" : "") +
+                ">" +
+                (ESTADO_LABELS[est] ? ESTADO_LABELS[est].label : est) +
+                "</option>";
+        },
+    );
+    html += "</select>";
+    html +=
+        '<button class="btn btn-primary" style="padding:6px 14px;font-size:12px" onclick="cambiarEstadoPedido()">Actualizar</button>';
+    html +=
+        '<span style="font-size:12px;color:var(--muted)">' + fecha + "</span>";
+    html += "</div>";
+    // Historial estados
+    if (p.historial && p.historial.length) {
+        html +=
+            '<div style="margin-bottom:16px"><div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:8px">Historial de estados</div>';
+        p.historial.forEach(function (h) {
+            var fh = new Date(h.created_at).toLocaleString("es-AR");
+            html +=
+                '<div style="font-size:12px;padding:4px 0;border-bottom:1px solid var(--border)">' +
+                estadoBadge(h.estado) +
+                ' <span style="color:var(--muted);margin-left:8px">' +
+                fh +
+                "</span></div>";
+        });
+        html += "</div>";
+    }
+    // Items
+    html +=
+        '<table style="width:100%;margin-bottom:16px"><thead><tr><th>Código</th><th>Descripción</th><th>Cant.</th><th>Precio</th><th>Subtotal</th></tr></thead><tbody>';
+    p.items.forEach(function (item) {
+        html +=
+            "<tr><td><code>" +
+            item.codigo +
+            "</code></td><td>" +
+            item.descripcion +
+            '</td><td style="text-align:center">' +
+            item.cantidad +
+            "</td><td>" +
+            fmt(item.precio_unitario) +
+            '</td><td style="font-weight:700">' +
+            fmt(item.subtotal) +
+            "</td></tr>";
+    });
+    html += "</tbody></table>";
+    html +=
+        '<div style="text-align:right;font-size:18px;font-weight:800;color:var(--blue);margin-bottom:16px">TOTAL: ' +
+        fmt(p.total) +
+        "</div>";
+    // Facturas y observaciones
+    html +=
+        '<div class="field"><label>Números de factura (separados por coma)</label><input id="pedidoFacturas" value="' +
+        (p.facturas || "") +
+        '" placeholder="FA-0001, FB-0002..."></div>';
+    html +=
+        '<div class="field"><label>Observaciones internas</label><textarea id="pedidoObs" rows="3" style="width:100%;padding:9px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;font-family:inherit">' +
+        (p.observaciones || "") +
+        "</textarea></div>";
+    document.getElementById("pedidoModalBody").innerHTML = html;
+    document.getElementById("pedidoModalBg").classList.add("open");
+}
+function closePedidoModal() {
+    document.getElementById("pedidoModalBg").classList.remove("open");
+    pedidoActual = null;
+}
+
+async function cambiarEstadoPedido() {
+    if (!pedidoActual) return;
+    var estado = document.getElementById("pedidoEstadoSel").value;
+    var res = await fetch(API + "?action=pedido_estado&id=" + pedidoActual.id, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ _user: authUser, _pass: authPass, estado }),
+    });
+    var json = await res.json();
+    if (json.ok) {
+        toast("Estado actualizado");
+        pedidoActual.estado = estado;
+        loadPedidos();
+        openPedidoModal(pedidoActual.id);
+    } else toast("Error", "#c62828");
+}
+
+async function guardarPedidoObs() {
+    if (!pedidoActual) return;
+    var obs = document.getElementById("pedidoObs").value;
+    var facturas = document.getElementById("pedidoFacturas").value;
+    var res = await fetch(
+        API + "?action=pedido_actualizar&id=" + pedidoActual.id,
+        {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                _user: authUser,
+                _pass: authPass,
+                observaciones: obs,
+                facturas,
+            }),
+        },
+    );
+    var json = await res.json();
+    if (json.ok) toast("Guardado");
+    else toast("Error", "#c62828");
+}
+
+function imprimirPedido() {
+    if (!pedidoActual) return;
+    var p = pedidoActual;
+    var fecha = new Date(p.created_at).toLocaleString("es-AR");
+    var html = "<html><head><title>Pedido #" + p.id + "</title><style>";
+    html += "body{font-family:Arial,sans-serif;padding:20px;font-size:13px}";
+    html += "h1{font-size:18px;margin-bottom:4px}";
+    html +=
+        ".info{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;padding:12px;background:#f5f5f5;border-radius:8px}";
+    html += "table{width:100%;border-collapse:collapse;margin-bottom:16px}";
+    html +=
+        "th{background:#003087;color:#fff;padding:8px;text-align:left;font-size:12px}";
+    html += "td{padding:8px;border-bottom:1px solid #eee;font-size:12px}";
+    html +=
+        ".check{width:20px;height:20px;border:2px solid #333;display:inline-block;margin-right:8px}";
+    html +=
+        ".total{text-align:right;font-size:16px;font-weight:bold;color:#003087}";
+    html +=
+        ".footer{margin-top:24px;padding-top:16px;border-top:1px solid #ccc;display:grid;grid-template-columns:1fr 1fr;gap:16px}";
+    html +=
+        ".firma{border-top:1px solid #333;margin-top:40px;padding-top:6px;font-size:11px;color:#666}";
+    html += "</style></head><body>";
+    html += "<h1>Pedido #" + p.id + " — Travel Blue Argentina</h1>";
+    html +=
+        '<p style="color:#666;font-size:12px;margin-bottom:16px">Fecha: ' +
+        fecha +
+        "</p>";
+    html += '<div class="info">';
+    html +=
+        "<div><strong>Cliente:</strong> " +
+        p.cliente_nombre +
+        "<br><strong>Tel:</strong> +" +
+        p.cliente_tel;
+    if (p.cuit_dni) html += "<br><strong>CUIT/DNI:</strong> " + p.cuit_dni;
+    html += "</div>";
+    html += "<div>";
+    if (p.domicilio) html += "<strong>Envío:</strong> " + p.domicilio + "<br>";
+    if (p.localidad) html += p.localidad + " (" + (p.cp || "") + ")<br>";
+    if (p.provincia) html += p.provincia + "<br>";
+    if (p.transporte) html += "<strong>Transporte:</strong> " + p.transporte;
+    html += "</div></div>";
+    html +=
+        '<table><thead><tr><th style="width:30px">✓</th><th>Código</th><th>Descripción</th><th>Cant. pedida</th><th>Cant. real</th></tr></thead><tbody>';
+    p.items.forEach(function (item) {
+        html +=
+            '<tr><td><span class="check"></span></td><td>' +
+            item.codigo +
+            "</td><td>" +
+            item.descripcion +
+            '</td><td style="text-align:center;font-weight:bold">' +
+            item.cantidad +
+            '</td><td style="text-align:center">______</td></tr>';
+    });
+    html += "</tbody></table>";
+    html +=
+        '<div class="total">TOTAL: ' +
+        fmt(p.total) +
+        " — " +
+        p.items.length +
+        " código" +
+        (p.items.length !== 1 ? "s" : "") +
+        " diferentes</div>";
+    if (p.observaciones)
+        html +=
+            '<div style="margin-top:12px;padding:10px;background:#fffde7;border-radius:6px;font-size:12px"><strong>Observaciones:</strong> ' +
+            p.observaciones +
+            "</div>";
+    html +=
+        '<div class="footer"><div><p style="font-size:12px;color:#666">Preparado por:</p><div class="firma">Nombre y firma</div></div></div>';
+    html += "</body></html>";
+    var w = window.open("", "_blank");
+    w.document.write(html);
+    w.document.close();
+    w.print();
+}
+
+// ── CLIENTES ──────────────────────────────────────────────────────────────────
+var allClientesAdmin = [];
+
+async function loadClientes() {
+    var q = document.getElementById("clienteSrch").value;
+    var url = API + "?action=clientes";
+    if (q) url += "&q=" + encodeURIComponent(q);
+    var res = await fetch(url);
+    allClientesAdmin = await res.json();
+    renderClientesTable();
+}
+function filterClientes() {
+    loadClientes();
+}
+
+function renderClientesTable() {
+    var html = "";
+    allClientesAdmin.forEach(function (c) {
+        html += "<tr>";
+        html += "<td><strong>" + c.nombre + "</strong></td>";
+        html +=
+            '<td><a href="https://wa.me/' +
+            c.telefono +
+            '" target="_blank" style="color:var(--blue);text-decoration:none">+' +
+            c.telefono +
+            "</a></td>";
+        html += "<td>" + (c.cuit_dni || "—") + "</td>";
+        html += "<td>" + (c.localidad || "—") + "</td>";
+        html +=
+            '<td style="text-align:center">' + (c.total_pedidos || 0) + "</td>";
+        html +=
+            '<td><div class="actions"><button class="btn btn-edit" onclick="openClienteModal(' +
+            c.id +
+            ')">✏ Editar</button></div></td>';
+        html += "</tr>";
+    });
+    document.getElementById("clientesTbody").innerHTML =
+        html ||
+        '<tr><td colspan="6" style="text-align:center;color:#aaa;padding:30px">No hay clientes</td></tr>';
+}
+
+function openClienteModal(id) {
+    var c = allClientesAdmin.find(function (x) {
+        return parseInt(x.id) === parseInt(id);
+    });
+    if (!c) return;
+    document.getElementById("clienteEditId").value = c.id;
+    document.getElementById("ceNombre").value = c.nombre || "";
+    document.getElementById("ceCuitDni").value = c.cuit_dni || "";
+    document.getElementById("ceEmail").value = c.email || "";
+    document.getElementById("ceTelefono").value = c.telefono || "";
+    document.getElementById("ceDomicilio").value = c.domicilio || "";
+    document.getElementById("ceLocalidad").value = c.localidad || "";
+    document.getElementById("ceCP").value = c.cp || "";
+    document.getElementById("ceProvincia").value = c.provincia || "";
+    document.getElementById("ceTransporte").value = c.transporte || "";
+    document.getElementById("ceNotas").value = c.notas || "";
+    document.getElementById("clienteModalBg").classList.add("open");
+}
+function closeClienteModal() {
+    document.getElementById("clienteModalBg").classList.remove("open");
+}
+
+async function guardarClienteEdit() {
+    var id = document.getElementById("clienteEditId").value;
+    var data = {
+        _user: authUser,
+        _pass: authPass,
+        nombre: document.getElementById("ceNombre").value.trim(),
+        cuit_dni: document.getElementById("ceCuitDni").value.trim(),
+        email: document.getElementById("ceEmail").value.trim(),
+        domicilio: document.getElementById("ceDomicilio").value.trim(),
+        localidad: document.getElementById("ceLocalidad").value.trim(),
+        cp: document.getElementById("ceCP").value.trim(),
+        provincia: document.getElementById("ceProvincia").value.trim(),
+        transporte: document.getElementById("ceTransporte").value.trim(),
+        notas: document.getElementById("ceNotas").value.trim(),
+    };
+    var res = await fetch(API + "?action=cliente_editar&id=" + id, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+    });
+    var json = await res.json();
+    if (json.ok) {
+        toast("Cliente actualizado");
+        closeClienteModal();
+        loadClientes();
+    } else toast("Error", "#c62828");
 }

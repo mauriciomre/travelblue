@@ -747,35 +747,212 @@ function bgClose(e) {
     if (e.target === document.getElementById("overlay")) closeCart();
 }
 
-function sendWA() {
+// ── CLIENTE ───────────────────────────────────────────────────────────────────
+var clienteId = null;
+var transportes = [];
+
+fetch(API_URL + "?action=transportes")
+    .then(function (r) {
+        return r.json();
+    })
+    .then(function (data) {
+        transportes = data;
+    })
+    .catch(function () {});
+
+function normalizarTelJS(caract, num) {
+    var c = caract.replace(/\D/g, "").replace(/^0/, "");
+    var n = num.replace(/\D/g, "").replace(/^15/, "");
+    return "54" + c + n;
+}
+
+function telCompleto() {
+    var c = document.getElementById("cCaract").value.trim();
+    var n = document.getElementById("cNum").value.trim();
+    return c.length >= 2 && n.length >= 6;
+}
+
+var telTimeout = null;
+function onTelChange() {
+    clienteId = null;
+    document.getElementById("clienteForm").style.display = "none";
+    clearTimeout(telTimeout);
+    if (!telCompleto()) return;
+    telTimeout = setTimeout(buscarCliente, 600);
+}
+
+async function buscarCliente() {
+    var caract = document.getElementById("cCaract").value.trim();
+    var num = document.getElementById("cNum").value.trim();
+    var tel = normalizarTelJS(caract, num);
+    try {
+        var res = await fetch(
+            API_URL +
+                "?action=cliente_buscar&telefono=" +
+                encodeURIComponent(tel),
+        );
+        var json = await res.json();
+        mostrarFormCliente(json.found ? json.cliente : null);
+    } catch (e) {
+        mostrarFormCliente(null);
+    }
+}
+
+function mostrarFormCliente(cliente) {
+    var form = document.getElementById("clienteForm");
+    form.style.display = "block";
+    clienteId = cliente ? cliente.id : null;
+    document.getElementById("cNombre").value = cliente
+        ? cliente.nombre || ""
+        : "";
+    document.getElementById("cCuitDni").value = cliente
+        ? cliente.cuit_dni || ""
+        : "";
+    document.getElementById("cEmail").value = cliente
+        ? cliente.email || ""
+        : "";
+    document.getElementById("cDomicilio").value = cliente
+        ? cliente.domicilio || ""
+        : "";
+    document.getElementById("cLocalidad").value = cliente
+        ? cliente.localidad || ""
+        : "";
+    document.getElementById("cCP").value = cliente ? cliente.cp || "" : "";
+    document.getElementById("cProvincia").value = cliente
+        ? cliente.provincia || ""
+        : "";
+    document.getElementById("cNotas").value = cliente
+        ? cliente.notas || ""
+        : "";
+    // Transporte
+    var sel = document.getElementById("cTransporte");
+    sel.innerHTML = '<option value="">— Seleccioná —</option>';
+    transportes.forEach(function (t) {
+        sel.innerHTML +=
+            '<option value="' +
+            t.nombre +
+            '"' +
+            (cliente && cliente.transporte === t.nombre ? " selected" : "") +
+            ">" +
+            t.nombre +
+            "</option>";
+    });
+    sel.innerHTML +=
+        '<option value="OTRO"' +
+        (cliente && cliente.transporte === "OTRO" ? " selected" : "") +
+        ">Otro</option>";
+    onTransporteChange();
+    if (cliente && cliente.transporte === "OTRO")
+        document.getElementById("cTransporteOtro").value =
+            cliente.transporte_otro || "";
+}
+
+function onTransporteChange() {
+    var sel = document.getElementById("cTransporte").value;
+    document.getElementById("cTransporteOtroWrap").style.display =
+        sel === "OTRO" ? "block" : "none";
+}
+
+async function sendWA() {
     var keys = Object.keys(cart);
     if (!keys.length) {
         alert("Agregá al menos un producto.");
         return;
     }
-    var nombre = document.getElementById("cname").value.trim();
-    var tel = document.getElementById("cphone").value.trim();
+    var nombre = document.getElementById("cNombre").value.trim();
+    var caract = document.getElementById("cCaract").value.trim();
+    var num = document.getElementById("cNum").value.trim();
+    if (!nombre) {
+        alert("El nombre es obligatorio.");
+        document.getElementById("cNombre").focus();
+        return;
+    }
+    if (!telCompleto()) {
+        alert("El teléfono es obligatorio.");
+        return;
+    }
+    var tel = normalizarTelJS(caract, num);
+    var transporte = document.getElementById("cTransporte").value;
+    if (transporte === "OTRO")
+        transporte =
+            document.getElementById("cTransporteOtro").value.trim() || "OTRO";
+    var clienteData = {
+        telefono: tel,
+        nombre,
+        cuit_dni: document.getElementById("cCuitDni").value.trim(),
+        email: document.getElementById("cEmail").value.trim(),
+        domicilio: document.getElementById("cDomicilio").value.trim(),
+        localidad: document.getElementById("cLocalidad").value.trim(),
+        cp: document.getElementById("cCP").value.trim(),
+        provincia: document.getElementById("cProvincia").value.trim(),
+        transporte,
+        notas: document.getElementById("cNotas").value.trim(),
+    };
+    // Guardar cliente en BD
+    var cRes = await fetch(API_URL + "?action=cliente_guardar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(clienteData),
+    });
+    var cJson = await cRes.json();
+    if (!cJson.ok) {
+        alert("Error al guardar datos del cliente");
+        return;
+    }
+    clienteId = cJson.id;
+    // Armar items
+    var items = [];
+    var total = 0;
+    Object.keys(cart).forEach(function (code) {
+        var item = cart[code];
+        var precio = parseFloat(item.p.PRECIO_MAYORISTA) || 0;
+        var sub = Math.round(precio * item.qty);
+        total += sub;
+        items.push({
+            codigo: item.p.CODIGO,
+            descripcion: item.p.DESCRIPCION,
+            cantidad: item.qty,
+            precio_unitario: precio,
+            subtotal: sub,
+        });
+    });
+    // Guardar pedido en BD
+    await fetch(API_URL + "?action=pedido_crear", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cliente_id: clienteId, total, items }),
+    });
+    // Armar mensaje WhatsApp
     var fecha = new Date().toLocaleDateString("es-AR");
     var msg = "🧳 *PEDIDO TRAVEL BLUE ARGENTINA*\n━━━━━━━━━━━━━━━━━━━━━━\n";
-    if (nombre) msg += "👤 *Cliente:* " + nombre + "\n";
-    if (tel) msg += "📞 *Tel:* " + tel + "\n";
+    msg += "👤 *Cliente:* " + nombre + "\n";
+    msg += "📞 *Tel:* +" + tel + "\n";
+    if (clienteData.cuit_dni)
+        msg += "🪪 *CUIT/DNI:* " + clienteData.cuit_dni + "\n";
+    if (clienteData.domicilio)
+        msg +=
+            "📍 *Envío:* " +
+            clienteData.domicilio +
+            ", " +
+            (clienteData.localidad || "") +
+            " (" +
+            (clienteData.cp || "") +
+            ") " +
+            (clienteData.provincia || "") +
+            "\n";
+    if (transporte) msg += "🚚 *Transporte:* " + transporte + "\n";
+    if (clienteData.notas) msg += "📝 *Notas:* " + clienteData.notas + "\n";
     msg += "📅 *Fecha:* " + fecha + "\n━━━━━━━━━━━━━━━━━━━━━━\n\n";
-    var total = 0;
-    keys.forEach(function (code) {
-        var item = cart[code];
-        var sub = Math.round(
-            (parseFloat(item.p.PRECIO_MAYORISTA) || 0) * item.qty,
-        );
-        total += sub;
+    items.forEach(function (item) {
         msg +=
             "• *" +
-            item.p.DESCRIPCION +
+            item.descripcion +
             "*\n  Cód: " +
-            item.p.CODIGO +
+            item.codigo +
             "  |  Cant: " +
-            item.qty +
+            item.cantidad +
             "  |  " +
-            fmt(sub) +
+            fmt(item.subtotal) +
             "\n\n";
     });
     msg +=

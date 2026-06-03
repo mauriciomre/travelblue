@@ -770,6 +770,85 @@ header {
     width: 100%
 }
 
+/* FORMULARIO CLIENTE */
+.field-group {
+    margin-bottom: 10px
+}
+
+.field-lbl {
+    display: block;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--muted);
+    margin-bottom: 4px;
+    text-transform: uppercase;
+    letter-spacing: .4px
+}
+
+.field-lbl .req {
+    color: var(--red)
+}
+
+.field-group input,
+.field-group select,
+.field-group textarea {
+    width: 100%;
+    padding: 9px 12px;
+    border: 1.5px solid var(--border);
+    border-radius: 8px;
+    font-size: 13px;
+    outline: none;
+    font-family: inherit;
+    transition: border-color .2s
+}
+
+.field-group input:focus,
+.field-group select:focus,
+.field-group textarea:focus {
+    border-color: var(--blue)
+}
+
+.field-group textarea {
+    resize: none
+}
+
+.field-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px
+}
+
+.field-hint-sm {
+    font-size: 10px;
+    color: var(--muted);
+    margin-top: 3px
+}
+
+.tel-row {
+    display: flex;
+    gap: 8px
+}
+
+.tel-row input:first-child {
+    width: 80px;
+    flex-shrink: 0
+}
+
+.tel-row input:last-child {
+    flex: 1
+}
+
+.form-section-title {
+    font-size: 12px;
+    font-weight: 800;
+    color: var(--blue);
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    margin: 12px 0 8px;
+    padding-bottom: 6px;
+    border-bottom: 1.5px solid var(--pale)
+}
+
 .wa {
     width: 100%;
     background: #25D366;
@@ -783,7 +862,8 @@ header {
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 8px
+    gap: 8px;
+    margin-top: 12px
 }
 
 .wa:hover {

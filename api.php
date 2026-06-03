@@ -71,6 +71,71 @@ function setupDB($db) {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
     $db->query("INSERT IGNORE INTO config (clave, valor) VALUES ('whatsapp', '5493535697188')");
+
+    $db->query("CREATE TABLE IF NOT EXISTS transportes (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        nombre VARCHAR(100) NOT NULL UNIQUE,
+        orden INT DEFAULT 0,
+        activo TINYINT DEFAULT 1,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+    $db->query("CREATE TABLE IF NOT EXISTS clientes (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        telefono VARCHAR(20) NOT NULL UNIQUE,
+        nombre VARCHAR(255) NOT NULL,
+        cuit_dni VARCHAR(20) DEFAULT NULL,
+        email VARCHAR(255) DEFAULT NULL,
+        domicilio VARCHAR(255) DEFAULT NULL,
+        localidad VARCHAR(100) DEFAULT NULL,
+        cp VARCHAR(10) DEFAULT NULL,
+        provincia VARCHAR(100) DEFAULT NULL,
+        transporte VARCHAR(100) DEFAULT NULL,
+        notas TEXT DEFAULT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+    $db->query("CREATE TABLE IF NOT EXISTS pedidos (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        cliente_id INT NOT NULL,
+        estado ENUM('PENDIENTE','EN_PREPARACION','FACTURADO','ENVIADO') NOT NULL DEFAULT 'PENDIENTE',
+        total DECIMAL(12,2) NOT NULL DEFAULT 0,
+        observaciones TEXT DEFAULT NULL,
+        facturas VARCHAR(500) DEFAULT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+    $db->query("CREATE TABLE IF NOT EXISTS pedido_items (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        pedido_id INT NOT NULL,
+        codigo VARCHAR(50) NOT NULL,
+        descripcion VARCHAR(255) NOT NULL,
+        cantidad INT NOT NULL DEFAULT 1,
+        precio_unitario DECIMAL(12,2) NOT NULL DEFAULT 0,
+        subtotal DECIMAL(12,2) NOT NULL DEFAULT 0
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+    $db->query("CREATE TABLE IF NOT EXISTS pedido_estados (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        pedido_id INT NOT NULL,
+        estado VARCHAR(50) NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+}
+
+function normalizarTel($tel) {
+    // Eliminar todo excepto dígitos
+    $tel = preg_replace('/[^0-9]/', '', $tel);
+    // Quitar prefijo 54 si ya está
+    if (substr($tel, 0, 2) === '54') $tel = substr($tel, 2);
+    // Quitar 0 inicial (característica con 0)
+    if (substr($tel, 0, 1) === '0') $tel = substr($tel, 1);
+    // Quitar 15 después de la característica (3 dígitos)
+    if (strlen($tel) > 10 && substr($tel, 3, 2) === '15') $tel = substr($tel, 0, 3) . substr($tel, 5);
+    // Guardar siempre con prefijo 54
+    return '54' . $tel;
 }
 
 $action = $_GET['action'] ?? '';
@@ -359,6 +424,178 @@ switch ($action) {
         if (!$clave) { http_response_code(400); die(json_encode(['error' => 'Clave requerida'])); }
         $stmt = $db->prepare("INSERT INTO config (clave, valor) VALUES (?,?) ON DUPLICATE KEY UPDATE valor=?");
         $stmt->bind_param('sss', $clave, $valor, $valor); $stmt->execute();
+        echo json_encode(['ok' => true]);
+        break;
+
+    // ── TRANSPORTES ───────────────────────────────────────────────────────────
+    case 'transportes':
+        $r = $db->query("SELECT * FROM transportes WHERE activo=1 ORDER BY orden, nombre");
+        echo json_encode($r->fetch_all(MYSQLI_ASSOC));
+        break;
+
+    case 'transporte_crear':
+        $data = json_decode(file_get_contents('php://input'), true);
+        checkAuth($data);
+        $nombre = strtoupper(trim($data['nombre'] ?? ''));
+        $orden = intval($data['orden'] ?? 0);
+        if (!$nombre) { http_response_code(400); die(json_encode(['error' => 'Nombre requerido'])); }
+        $stmt = $db->prepare("INSERT INTO transportes (nombre, orden) VALUES (?, ?)");
+        $stmt->bind_param('si', $nombre, $orden);
+        if ($stmt->execute()) echo json_encode(['ok' => true, 'id' => $db->insert_id]);
+        else { http_response_code(400); echo json_encode(['error' => 'Ya existe']); }
+        break;
+
+    case 'transporte_editar':
+        $id = intval($_GET['id'] ?? 0);
+        $data = json_decode(file_get_contents('php://input'), true);
+        checkAuth($data);
+        $nombre = strtoupper(trim($data['nombre'] ?? ''));
+        $stmt = $db->prepare("UPDATE transportes SET nombre=? WHERE id=?");
+        $stmt->bind_param('si', $nombre, $id);
+        $stmt->execute();
+        echo json_encode(['ok' => true]);
+        break;
+
+    case 'transporte_eliminar':
+        $data = json_decode(file_get_contents('php://input'), true);
+        checkAuth($data);
+        $id = intval($_GET['id'] ?? 0);
+        $stmt = $db->prepare("UPDATE transportes SET activo=0 WHERE id=?");
+        $stmt->bind_param('i', $id);
+        $stmt->execute();
+        echo json_encode(['ok' => true]);
+        break;
+
+    // ── CLIENTES ──────────────────────────────────────────────────────────────
+    case 'cliente_buscar':
+        $tel = trim($_GET['telefono'] ?? '');
+        $tel = normalizarTel($tel);
+        $stmt = $db->prepare("SELECT * FROM clientes WHERE telefono=?");
+        $stmt->bind_param('s', $tel);
+        $stmt->execute();
+        $row = $stmt->get_result()->fetch_assoc();
+        if ($row) echo json_encode(['found' => true, 'cliente' => $row]);
+        else echo json_encode(['found' => false]);
+        break;
+
+    case 'cliente_guardar':
+        $data = json_decode(file_get_contents('php://input'), true);
+        $tel = normalizarTel($data['telefono'] ?? '');
+        if (!$tel) { http_response_code(400); die(json_encode(['error' => 'Teléfono requerido'])); }
+        $nombre = trim($data['nombre'] ?? '');
+        if (!$nombre) { http_response_code(400); die(json_encode(['error' => 'Nombre requerido'])); }
+        $stmt = $db->prepare("INSERT INTO clientes (telefono,nombre,cuit_dni,email,domicilio,localidad,cp,provincia,transporte,notas)
+            VALUES (?,?,?,?,?,?,?,?,?,?)
+            ON DUPLICATE KEY UPDATE nombre=VALUES(nombre),cuit_dni=VALUES(cuit_dni),email=VALUES(email),
+            domicilio=VALUES(domicilio),localidad=VALUES(localidad),cp=VALUES(cp),
+            provincia=VALUES(provincia),transporte=VALUES(transporte),notas=VALUES(notas)");
+        $stmt->bind_param('ssssssssss',
+            $tel, $nombre,
+            $data['cuit_dni'] ?? null, $data['email'] ?? null,
+            $data['domicilio'] ?? null, $data['localidad'] ?? null,
+            $data['cp'] ?? null, $data['provincia'] ?? null,
+            $data['transporte'] ?? null, $data['notas'] ?? null
+        );
+        if ($stmt->execute()) {
+            $idCliente = $db->insert_id ?: $db->query("SELECT id FROM clientes WHERE telefono='$tel'")->fetch_assoc()['id'];
+            echo json_encode(['ok' => true, 'id' => $idCliente, 'telefono' => $tel]);
+        } else { http_response_code(400); echo json_encode(['error' => $db->error]); }
+        break;
+
+    case 'clientes':
+        $data = $_GET;
+        $q = $data['q'] ?? '';
+        $sql = "SELECT c.*, COUNT(p.id) as total_pedidos FROM clientes c LEFT JOIN pedidos p ON p.cliente_id=c.id WHERE 1=1";
+        if ($q) $sql .= " AND (c.nombre LIKE '%" . $db->real_escape_string($q) . "%' OR c.telefono LIKE '%" . $db->real_escape_string($q) . "%')";
+        $sql .= " GROUP BY c.id ORDER BY c.nombre";
+        echo json_encode($db->query($sql)->fetch_all(MYSQLI_ASSOC));
+        break;
+
+    case 'cliente_editar':
+        $id = intval($_GET['id'] ?? 0);
+        $data = json_decode(file_get_contents('php://input'), true);
+        checkAuth($data);
+        $stmt = $db->prepare("UPDATE clientes SET nombre=?,cuit_dni=?,email=?,domicilio=?,localidad=?,cp=?,provincia=?,transporte=?,notas=? WHERE id=?");
+        $stmt->bind_param('sssssssssi',
+            $data['nombre'], $data['cuit_dni'], $data['email'],
+            $data['domicilio'], $data['localidad'], $data['cp'],
+            $data['provincia'], $data['transporte'], $data['notas'], $id
+        );
+        $stmt->execute();
+        echo json_encode(['ok' => true]);
+        break;
+
+    // ── PEDIDOS ───────────────────────────────────────────────────────────────
+    case 'pedido_crear':
+        $data = json_decode(file_get_contents('php://input'), true);
+        $cliente_id = intval($data['cliente_id'] ?? 0);
+        $total = floatval($data['total'] ?? 0);
+        $items = $data['items'] ?? [];
+        $obs = $data['observaciones'] ?? '';
+        if (!$cliente_id || !$items) { http_response_code(400); die(json_encode(['error' => 'Datos incompletos'])); }
+        $stmt = $db->prepare("INSERT INTO pedidos (cliente_id,estado,total,observaciones) VALUES (?,?,?,?)");
+        $estado = 'PENDIENTE';
+        $stmt->bind_param('isds', $cliente_id, $estado, $total, $obs);
+        if ($stmt->execute()) {
+            $pedido_id = $db->insert_id;
+            foreach ($items as $item) {
+                $is = $db->prepare("INSERT INTO pedido_items (pedido_id,codigo,descripcion,cantidad,precio_unitario,subtotal) VALUES (?,?,?,?,?,?)");
+                $is->bind_param('issidd', $pedido_id, $item['codigo'], $item['descripcion'], $item['cantidad'], $item['precio_unitario'], $item['subtotal']);
+                $is->execute();
+            }
+            // Registrar estado inicial
+            $es = $db->prepare("INSERT INTO pedido_estados (pedido_id,estado) VALUES (?,?)");
+            $es->bind_param('is', $pedido_id, $estado);
+            $es->execute();
+            echo json_encode(['ok' => true, 'id' => $pedido_id]);
+        } else { http_response_code(400); echo json_encode(['error' => $db->error]); }
+        break;
+
+    case 'pedidos':
+        $q = $_GET['q'] ?? '';
+        $est = $_GET['estado'] ?? '';
+        $sql = "SELECT p.*, c.nombre as cliente_nombre, c.telefono as cliente_tel
+                FROM pedidos p JOIN clientes c ON p.cliente_id=c.id WHERE 1=1";
+        if ($q) $sql .= " AND (c.nombre LIKE '%" . $db->real_escape_string($q) . "%' OR c.telefono LIKE '%" . $db->real_escape_string($q) . "%')";
+        if ($est) $sql .= " AND p.estado='" . $db->real_escape_string($est) . "'";
+        $sql .= " ORDER BY p.created_at DESC";
+        echo json_encode($db->query($sql)->fetch_all(MYSQLI_ASSOC));
+        break;
+
+    case 'pedido_detalle':
+        $id = intval($_GET['id'] ?? 0);
+        $pedido = $db->query("SELECT p.*, c.nombre as cliente_nombre, c.telefono as cliente_tel,
+            c.cuit_dni, c.email, c.domicilio, c.localidad, c.cp, c.provincia, c.transporte
+            FROM pedidos p JOIN clientes c ON p.cliente_id=c.id WHERE p.id=$id")->fetch_assoc();
+        if (!$pedido) { http_response_code(404); die(json_encode(['error' => 'No encontrado'])); }
+        $pedido['items'] = $db->query("SELECT * FROM pedido_items WHERE pedido_id=$id")->fetch_all(MYSQLI_ASSOC);
+        $pedido['historial'] = $db->query("SELECT * FROM pedido_estados WHERE pedido_id=$id ORDER BY created_at ASC")->fetch_all(MYSQLI_ASSOC);
+        echo json_encode($pedido);
+        break;
+
+    case 'pedido_estado':
+        $id = intval($_GET['id'] ?? 0);
+        $data = json_decode(file_get_contents('php://input'), true);
+        checkAuth($data);
+        $estado = $data['estado'] ?? '';
+        $stmt = $db->prepare("UPDATE pedidos SET estado=? WHERE id=?");
+        $stmt->bind_param('si', $estado, $id);
+        $stmt->execute();
+        $es = $db->prepare("INSERT INTO pedido_estados (pedido_id,estado) VALUES (?,?)");
+        $es->bind_param('is', $id, $estado);
+        $es->execute();
+        echo json_encode(['ok' => true]);
+        break;
+
+    case 'pedido_actualizar':
+        $id = intval($_GET['id'] ?? 0);
+        $data = json_decode(file_get_contents('php://input'), true);
+        checkAuth($data);
+        $obs = $data['observaciones'] ?? '';
+        $facturas = $data['facturas'] ?? '';
+        $stmt = $db->prepare("UPDATE pedidos SET observaciones=?,facturas=? WHERE id=?");
+        $stmt->bind_param('ssi', $obs, $facturas, $id);
+        $stmt->execute();
         echo json_encode(['ok' => true]);
         break;
 
