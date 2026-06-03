@@ -888,6 +888,11 @@ async function sendWA() {
         transporte,
         notas: document.getElementById("cNotas").value.trim(),
     };
+    var btn = document.querySelector(".wa");
+    btn.disabled = true;
+    btn.style.background = "#1a9e52";
+    btn.innerHTML =
+        '<span style="display:inline-block;animation:spin .6s linear infinite;margin-right:8px">⏳</span> Procesando...';
     // Guardar cliente en BD
     var cRes = await fetch(API_URL + "?action=cliente_guardar", {
         method: "POST",
@@ -897,6 +902,9 @@ async function sendWA() {
     var cJson = await cRes.json();
     if (!cJson.ok) {
         alert("Error al guardar datos del cliente");
+        btn.disabled = false;
+        btn.style.background = "";
+        btn.innerHTML = "📱 Confirmar y enviar pedido";
         return;
     }
     clienteId = cJson.id;
@@ -963,6 +971,14 @@ async function sendWA() {
         "https://wa.me/" + WA_NUM + "?text=" + encodeURIComponent(msg),
         "_blank",
     );
+    // Animar botón a estado enviado
+    btn.style.background = "#2e7d32";
+    btn.innerHTML = "✅ Pedido enviado";
+    setTimeout(function () {
+        btn.disabled = false;
+        btn.style.background = "";
+        btn.innerHTML = "📱 Confirmar y enviar pedido";
+    }, 4000);
 }
 
 start();
