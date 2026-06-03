@@ -1,5 +1,4 @@
 <?php
-ini_set('display_errors', 1); error_reporting(E_ALL);
 header('Content-Type: application/json; charset=utf-8');
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
@@ -483,22 +482,24 @@ switch ($action) {
         $data = json_decode(file_get_contents('php://input'), true);
         $tel = normalizarTel($data['telefono'] ?? '');
         if (!$tel) { http_response_code(400); die(json_encode(['error' => 'Teléfono requerido'])); }
-        $nombre = trim($data['nombre'] ?? '');
+        $nombre    = trim($data['nombre'] ?? '');
         if (!$nombre) { http_response_code(400); die(json_encode(['error' => 'Nombre requerido'])); }
+        $cuit_dni  = $data['cuit_dni']  ?? null;
+        $email     = $data['email']     ?? null;
+        $domicilio = $data['domicilio'] ?? null;
+        $localidad = $data['localidad'] ?? null;
+        $cp        = $data['cp']        ?? null;
+        $provincia = $data['provincia'] ?? null;
+        $transporte= $data['transporte']?? null;
+        $notas     = $data['notas']     ?? null;
         $stmt = $db->prepare("INSERT INTO clientes (telefono,nombre,cuit_dni,email,domicilio,localidad,cp,provincia,transporte,notas)
             VALUES (?,?,?,?,?,?,?,?,?,?)
             ON DUPLICATE KEY UPDATE nombre=VALUES(nombre),cuit_dni=VALUES(cuit_dni),email=VALUES(email),
             domicilio=VALUES(domicilio),localidad=VALUES(localidad),cp=VALUES(cp),
             provincia=VALUES(provincia),transporte=VALUES(transporte),notas=VALUES(notas)");
-        $stmt->bind_param('ssssssssss',
-            $tel, $nombre,
-            $data['cuit_dni'] ?? null, $data['email'] ?? null,
-            $data['domicilio'] ?? null, $data['localidad'] ?? null,
-            $data['cp'] ?? null, $data['provincia'] ?? null,
-            $data['transporte'] ?? null, $data['notas'] ?? null
-        );
+        $stmt->bind_param('ssssssssss', $tel, $nombre, $cuit_dni, $email, $domicilio, $localidad, $cp, $provincia, $transporte, $notas);
         if ($stmt->execute()) {
-            $idCliente = $db->insert_id ?: $db->query("SELECT id FROM clientes WHERE telefono='$tel'")->fetch_assoc()['id'];
+            $idCliente = $db->insert_id ?: $db->query("SELECT id FROM clientes WHERE telefono='" . $db->real_escape_string($tel) . "'")->fetch_assoc()['id'];
             echo json_encode(['ok' => true, 'id' => $idCliente, 'telefono' => $tel]);
         } else { http_response_code(400); echo json_encode(['error' => $db->error]); }
         break;
