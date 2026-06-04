@@ -821,13 +821,18 @@ header {
     font-size: 13px;
     outline: none;
     font-family: inherit;
-    transition: border-color .2s
+    transition: border-color .2s;
+    text-transform: uppercase
 }
 
 .field-group input:focus,
 .field-group select:focus,
 .field-group textarea:focus {
     border-color: var(--blue)
+}
+
+.field-group input[type=email] {
+    text-transform: lowercase
 }
 
 .field-group textarea {

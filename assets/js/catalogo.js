@@ -946,15 +946,27 @@ async function sendWA() {
             document.getElementById("cTransporteOtro").value.trim() || "OTRO";
     var clienteData = {
         telefono: tel,
-        nombre,
-        cuit_dni: document.getElementById("cCuitDni").value.trim(),
-        email: document.getElementById("cEmail").value.trim(),
-        domicilio: document.getElementById("cDomicilio").value.trim(),
-        localidad: document.getElementById("cLocalidad").value.trim(),
+        nombre: nombre.toUpperCase(),
+        cuit_dni: document
+            .getElementById("cCuitDni")
+            .value.trim()
+            .toUpperCase(),
+        email: document.getElementById("cEmail").value.trim().toLowerCase(),
+        domicilio: document
+            .getElementById("cDomicilio")
+            .value.trim()
+            .toUpperCase(),
+        localidad: document
+            .getElementById("cLocalidad")
+            .value.trim()
+            .toUpperCase(),
         cp: document.getElementById("cCP").value.trim(),
-        provincia: document.getElementById("cProvincia").value.trim(),
+        provincia: document
+            .getElementById("cProvincia")
+            .value.trim()
+            .toUpperCase(),
         transporte,
-        notas: document.getElementById("cNotas").value.trim(),
+        notas: document.getElementById("cNotas").value.trim().toUpperCase(),
     };
     var btn = document.querySelector(".wa");
     btn.disabled = true;
