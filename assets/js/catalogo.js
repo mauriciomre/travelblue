@@ -1185,13 +1185,49 @@ async function sendWA() {
         "https://wa.me/" + WA_NUM + "?text=" + encodeURIComponent(msg),
         "_blank",
     );
-    // Botón queda en estado enviado permanentemente
+    // Botón queda en estado enviado
     btn.style.background = "#2e7d32";
     btn.innerHTML = "✅ Pedido enviado";
-    // Limpiar carrito
+    btn.disabled = true;
+    // Limpiar carrito y resetear cards
     cart = {};
     saveCart();
     updateCart();
+    // Resetear todas las cards visualmente
+    document.querySelectorAll(".card.picked").forEach(function (card) {
+        card.classList.remove("picked");
+        var ab = card.querySelector(".add");
+        if (ab) {
+            ab.textContent = "+ Agregar";
+            ab.classList.remove("on");
+            ab.style.fontSize = "";
+            ab.style.lineHeight = "";
+            ab.style.padding = "";
+            ab.style.background = "";
+            ab.style.borderColor = "";
+            var code = card.id.replace(/^p/, "").replace(/_/g, "/");
+            ab.onclick = function () {
+                addOrUpdate(code);
+            };
+        }
+    });
+    // Resetear filas de lista
+    document
+        .querySelectorAll(".list-table tr.picked-row")
+        .forEach(function (row) {
+            row.classList.remove("picked-row");
+            var ab = row.querySelector(".list-add");
+            if (ab) {
+                ab.textContent = "+ Agregar";
+                ab.classList.remove("on");
+            }
+        });
+    // Rehabilitar botón después de 3 segundos para nuevos pedidos
+    setTimeout(function () {
+        btn.disabled = false;
+        btn.style.background = "";
+        btn.innerHTML = "📱 Confirmar y enviar pedido";
+    }, 3000);
 }
 
 start();
