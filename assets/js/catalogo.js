@@ -835,10 +835,35 @@ async function buscarCliente() {
                 encodeURIComponent(tel),
         );
         var json = await res.json();
-        mostrarFormCliente(json.found ? json.cliente : null);
+        if (json.found) {
+            mostrarFormCliente(json.cliente);
+            toastCarrito(
+                "👋 ¡Bienvenido, " +
+                    json.cliente.nombre.split(" ")[0] +
+                    "! Tus datos fueron cargados automáticamente.",
+                "#2e7d32",
+            );
+        } else {
+            mostrarFormCliente(null);
+            toastCarrito(
+                "📝 Primera vez por acá. Completá tus datos para confirmar el pedido.",
+                "#003087",
+            );
+        }
     } catch (e) {
         mostrarFormCliente(null);
     }
+}
+
+function toastCarrito(msg, color) {
+    var t = document.getElementById("cartToast");
+    if (!t) return;
+    t.textContent = msg;
+    t.style.background = color || "#333";
+    t.classList.add("show");
+    setTimeout(function () {
+        t.classList.remove("show");
+    }, 4000);
 }
 
 function mostrarFormCliente(cliente) {

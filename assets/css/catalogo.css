@@ -638,6 +638,25 @@ header {
     opacity: .8
 }
 
+.cart-toast {
+    background: #333;
+    color: #fff;
+    padding: 10px 16px;
+    font-size: 13px;
+    font-weight: 600;
+    text-align: center;
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height .3s, padding .3s, opacity .3s;
+    opacity: 0
+}
+
+.cart-toast.show {
+    max-height: 60px;
+    opacity: 1;
+    padding: 10px 16px
+}
+
 .p-items {
     flex: 1;
     overflow-y: auto;
