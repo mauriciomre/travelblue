@@ -454,10 +454,14 @@ function cardHTML(p) {
             (inCart
                 ? "toggleRemove('" + p.CODIGO + "')"
                 : "addOrUpdate('" + p.CODIGO + "')") +
-            '" style="' +
-            (inCart ? "font-size:10px;line-height:1.3" : "") +
-            '">' +
-            (inCart ? "✓ En pedido<br>Quitar?" : "+ Agregar") +
+            '"' +
+            (inCart
+                ? ' style="font-size:10px;line-height:1.2;padding:5px 6px"'
+                : "") +
+            ">" +
+            (inCart
+                ? '✓ En pedido<br><span style="font-size:9px;opacity:.85">Quitar?</span>'
+                : "+ Agregar") +
             "</button></div>";
         if (multiplo > 1)
             html +=
@@ -657,7 +661,8 @@ function toggleRemove(code) {
         setTimeout(function () {
             if (btn.dataset.confirm === "1") {
                 btn.dataset.confirm = "0";
-                btn.innerHTML = "✓ En pedido<br>Quitar?";
+                btn.innerHTML =
+                    '✓ En pedido<br><span style="font-size:9px;opacity:.85">Quitar?</span>';
                 btn.style.background = "";
                 btn.style.borderColor = "";
             }
@@ -675,6 +680,7 @@ function toggleRemove(code) {
         btn.innerHTML = "+ Agregar";
         btn.style.fontSize = "";
         btn.style.lineHeight = "";
+        btn.style.padding = "";
         btn.style.background = "";
         btn.style.borderColor = "";
         btn.onclick = function () {
@@ -727,9 +733,11 @@ function addOrUpdate(code) {
         card.classList.add("picked");
         var btn = document.getElementById("ab_" + id);
         if (btn) {
-            btn.innerHTML = "✓ En pedido<br>Quitar?";
+            btn.innerHTML =
+                '✓ En pedido<br><span style="font-size:9px;opacity:.85">Quitar?</span>';
             btn.style.fontSize = "10px";
-            btn.style.lineHeight = "1.3";
+            btn.style.lineHeight = "1.2";
+            btn.style.padding = "5px 6px";
             btn.classList.add("on");
             btn.onclick = function () {
                 toggleRemove(code);
