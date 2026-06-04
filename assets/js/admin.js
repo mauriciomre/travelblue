@@ -2008,6 +2008,14 @@ function filterClientes() {
 }
 
 function renderClientesTable() {
+    // Header dinámico
+    var thead = "<tr>";
+    CLIENT_COLS.forEach(function (c) {
+        if (ccol(c.key)) thead += "<th>" + c.label + "</th>";
+    });
+    thead += "</tr>";
+    document.getElementById("clientesThead").innerHTML = thead;
+
     var html = "";
     allClientesAdmin.forEach(function (c) {
         var eliminado = parseInt(c.eliminado) === 1;

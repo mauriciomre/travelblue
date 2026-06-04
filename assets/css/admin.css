@@ -856,12 +856,12 @@ td.editing {
     cursor: pointer;
     font-size: 13px;
     padding: 0;
-    text-decoration: underline;
-    text-underline-offset: 2px
+    text-decoration: none
 }
 
 .link-btn:hover {
-    color: var(--blue2)
+    color: var(--blue2);
+    text-decoration: underline
 }
 
 /* SORT TOOLBAR */
