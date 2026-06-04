@@ -450,10 +450,12 @@ function cardHTML(p) {
             (inCart ? " on" : "") +
             '" id="ab_' +
             id +
-            '" onclick="addOrUpdate(\'' +
-            p.CODIGO +
-            "')\">" +
-            (inCart ? "✓ En pedido" : "+ Agregar") +
+            '" onclick="' +
+            (inCart
+                ? "toggleRemove('" + p.CODIGO + "')"
+                : "addOrUpdate('" + p.CODIGO + "')") +
+            '">' +
+            (inCart ? "✓ En pedido ×" : "+ Agregar") +
             "</button></div>";
         if (multiplo > 1)
             html +=
@@ -639,8 +641,46 @@ function listRowHTML(p) {
     return html;
 }
 
+function toggleRemove(code) {
+    var id = sid(code);
+    var btn = document.getElementById("ab_" + id);
+    if (!btn) return;
+    // Primer clic: mostrar "¿Quitar?"
+    if (btn.dataset.confirm !== "1") {
+        btn.dataset.confirm = "1";
+        btn.textContent = "¿Quitar del pedido?";
+        btn.style.background = "#c62828";
+        btn.style.borderColor = "#c62828";
+        // Si no hace nada en 3 segundos, vuelve al estado anterior
+        setTimeout(function () {
+            if (btn.dataset.confirm === "1") {
+                btn.dataset.confirm = "0";
+                btn.textContent = "✓ En pedido ×";
+                btn.style.background = "";
+                btn.style.borderColor = "";
+            }
+        }, 3000);
+        return;
+    }
+    // Segundo clic: quitar del carrito
+    btn.dataset.confirm = "0";
+    rmCart(code);
+    // Breve feedback
+    btn.textContent = "Se quitó del pedido";
+    btn.style.background = "#555";
+    btn.style.borderColor = "#555";
+    btn.classList.remove("on");
+    setTimeout(function () {
+        btn.textContent = "+ Agregar";
+        btn.style.background = "";
+        btn.style.borderColor = "";
+        btn.onclick = function () {
+            addOrUpdate(code);
+        };
+    }, 1500);
+}
+
 function manualQty(code, val) {
-    var multiplo = getMultiplo(code);
     var num = parseInt(val) || multiplo;
     var snapped = snapToMultiplo(num, multiplo);
     var id = sid(code);
@@ -684,8 +724,11 @@ function addOrUpdate(code) {
         card.classList.add("picked");
         var btn = document.getElementById("ab_" + id);
         if (btn) {
-            btn.textContent = "✓ En pedido";
+            btn.textContent = "✓ En pedido ×";
             btn.classList.add("on");
+            btn.onclick = function () {
+                toggleRemove(code);
+            };
         }
     }
     var row = document.getElementById("lr_" + id);
@@ -1017,6 +1060,20 @@ async function sendWA() {
                 agotados.push(
                     "• " + cart[code].p.DESCRIPCION + " (Cód: " + code + ")",
                 );
+                // Actualizar card visualmente
+                var id = sid(code);
+                var card = document.getElementById(id);
+                if (card) {
+                    card.classList.remove("picked");
+                    card.classList.add("sold");
+                    var foot = card.querySelector(".foot");
+                    if (foot)
+                        foot.innerHTML =
+                            '<div class="na">No disponible por ahora</div>';
+                    var ctop = card.querySelector(".c-top");
+                    if (ctop && !ctop.querySelector(".badge"))
+                        ctop.innerHTML += '<span class="badge">AGOTADO</span>';
+                }
                 delete cart[code];
             }
         });
