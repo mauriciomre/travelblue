@@ -454,8 +454,10 @@ function cardHTML(p) {
             (inCart
                 ? "toggleRemove('" + p.CODIGO + "')"
                 : "addOrUpdate('" + p.CODIGO + "')") +
+            '" style="' +
+            (inCart ? "font-size:10px;line-height:1.3" : "") +
             '">' +
-            (inCart ? "✓ En pedido ×" : "+ Agregar") +
+            (inCart ? "✓ En pedido<br>Quitar?" : "+ Agregar") +
             "</button></div>";
         if (multiplo > 1)
             html +=
@@ -648,30 +650,31 @@ function toggleRemove(code) {
     // Primer clic: mostrar "¿Quitar?"
     if (btn.dataset.confirm !== "1") {
         btn.dataset.confirm = "1";
-        btn.textContent = "¿Quitar del pedido?";
+        btn.innerHTML = "¿Confirmar quitar?";
+        btn.style.fontSize = "10px";
         btn.style.background = "#c62828";
         btn.style.borderColor = "#c62828";
-        // Si no hace nada en 3 segundos, vuelve al estado anterior
         setTimeout(function () {
             if (btn.dataset.confirm === "1") {
                 btn.dataset.confirm = "0";
-                btn.textContent = "✓ En pedido ×";
+                btn.innerHTML = "✓ En pedido<br>Quitar?";
                 btn.style.background = "";
                 btn.style.borderColor = "";
             }
         }, 3000);
         return;
     }
-    // Segundo clic: quitar del carrito
     btn.dataset.confirm = "0";
     rmCart(code);
-    // Breve feedback
-    btn.textContent = "Se quitó del pedido";
+    btn.innerHTML = "Se quitó ✓";
+    btn.style.fontSize = "11px";
     btn.style.background = "#555";
     btn.style.borderColor = "#555";
     btn.classList.remove("on");
     setTimeout(function () {
-        btn.textContent = "+ Agregar";
+        btn.innerHTML = "+ Agregar";
+        btn.style.fontSize = "";
+        btn.style.lineHeight = "";
         btn.style.background = "";
         btn.style.borderColor = "";
         btn.onclick = function () {
@@ -724,7 +727,9 @@ function addOrUpdate(code) {
         card.classList.add("picked");
         var btn = document.getElementById("ab_" + id);
         if (btn) {
-            btn.textContent = "✓ En pedido ×";
+            btn.innerHTML = "✓ En pedido<br>Quitar?";
+            btn.style.fontSize = "10px";
+            btn.style.lineHeight = "1.3";
             btn.classList.add("on");
             btn.onclick = function () {
                 toggleRemove(code);
