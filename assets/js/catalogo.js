@@ -108,6 +108,9 @@ function start() {
                     UPDATED_AT: p.updated_at
                         ? new Date(p.updated_at).getTime()
                         : Date.now(),
+                    CREATED_AT: p.created_at
+                        ? new Date(p.created_at).getTime()
+                        : 0,
                     COLORES: p.colores || [],
                 };
             });
@@ -231,7 +234,11 @@ function getVisible() {
     });
 
     // Ordenamiento
-    if (sortMode === "alpha") {
+    if (sortMode === "newest") {
+        list = list.slice().sort(function (a, b) {
+            return b.CREATED_AT - a.CREATED_AT;
+        });
+    } else if (sortMode === "alpha") {
         list = list.slice().sort(function (a, b) {
             return a.DESCRIPCION.localeCompare(b.DESCRIPCION);
         });
@@ -291,6 +298,9 @@ function renderProds() {
         '<button class="sort-btn' +
         (sortMode === "default" ? " on" : "") +
         '" data-sort="default" onclick="setSort(\'default\')">Por defecto</button>' +
+        '<button class="sort-btn' +
+        (sortMode === "newest" ? " on" : "") +
+        '" data-sort="newest" onclick="setSort(\'newest\')">Más nuevo</button>' +
         '<button class="sort-btn' +
         (sortMode === "alpha" ? " on" : "") +
         '" data-sort="alpha" onclick="setSort(\'alpha\')">A → Z</button>' +
