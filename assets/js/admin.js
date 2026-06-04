@@ -101,6 +101,9 @@ async function doLogin() {
             loadTransportes();
             document.getElementById("loginWrap").style.display = "none";
             document.getElementById("appWrap").style.display = "block";
+            initSidebar();
+            loadFavs();
+            renderFavbar();
         } else {
             document.getElementById("lerr").textContent =
                 "Usuario o contraseña incorrectos";
@@ -138,6 +141,9 @@ async function tryAutoLogin() {
             loadTransportes();
             document.getElementById("loginWrap").style.display = "none";
             document.getElementById("appWrap").style.display = "block";
+            initSidebar();
+            loadFavs();
+            renderFavbar();
         } else {
             localStorage.removeItem("tb_admin_user");
             localStorage.removeItem("tb_admin_pass");
@@ -148,18 +154,129 @@ document.addEventListener("DOMContentLoaded", function () {
     tryAutoLogin();
 });
 
+// ── SIDEBAR ───────────────────────────────────────────────────────────────────
+var sidebarCollapsed = localStorage.getItem("tb_sidebar") === "collapsed";
+
+function initSidebar() {
+    if (sidebarCollapsed)
+        document.getElementById("sidebar").classList.add("collapsed");
+}
+
+function toggleSidebar() {
+    var sb = document.getElementById("sidebar");
+    sidebarCollapsed = !sidebarCollapsed;
+    sb.classList.toggle("collapsed", sidebarCollapsed);
+    localStorage.setItem(
+        "tb_sidebar",
+        sidebarCollapsed ? "collapsed" : "expanded",
+    );
+}
+
+// ── FAVORITOS ─────────────────────────────────────────────────────────────────
+var ALL_SECTIONS = [
+    { key: "productos", label: "Productos", icon: "📋" },
+    { key: "categorias", label: "Categorías", icon: "🗂" },
+    { key: "colores", label: "Colores", icon: "🎨" },
+    { key: "pedidos", label: "Pedidos", icon: "🛒" },
+    { key: "clientes", label: "Clientes", icon: "👤" },
+    { key: "configuracion", label: "Configuración", icon: "⚙️" },
+];
+var favSections = [];
+
+function loadFavs() {
+    try {
+        favSections = JSON.parse(
+            localStorage.getItem("tb_favs") || '["productos","pedidos"]',
+        );
+    } catch (e) {
+        favSections = ["productos", "pedidos"];
+    }
+}
+function saveFavs() {
+    localStorage.setItem("tb_favs", JSON.stringify(favSections));
+}
+
+function renderFavbar() {
+    var bar = document.getElementById("favbar");
+    bar.innerHTML = favSections
+        .map(function (key) {
+            var s = ALL_SECTIONS.find(function (x) {
+                return x.key === key;
+            });
+            if (!s) return "";
+            return (
+                '<button class="fav-btn" data-section="' +
+                key +
+                '" onclick="showSection(\'' +
+                key +
+                "',this)\">" +
+                s.icon +
+                " " +
+                s.label +
+                "</button>"
+            );
+        })
+        .join("");
+}
+
+function openFavModal() {
+    loadFavs();
+    var html = ALL_SECTIONS.map(function (s) {
+        var checked = favSections.indexOf(s.key) >= 0;
+        return (
+            '<label style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);cursor:pointer">' +
+            '<input type="checkbox" value="' +
+            s.key +
+            '" ' +
+            (checked ? "checked" : "") +
+            "> " +
+            s.icon +
+            " " +
+            s.label +
+            "</label>"
+        );
+    }).join("");
+    document.getElementById("favModalBody").innerHTML = html;
+    document.getElementById("favModalBg").classList.add("open");
+}
+function closeFavModal() {
+    document.getElementById("favModalBg").classList.remove("open");
+}
+function applyFavModal() {
+    favSections = [];
+    document
+        .querySelectorAll("#favModalBody input:checked")
+        .forEach(function (cb) {
+            favSections.push(cb.value);
+        });
+    saveFavs();
+    renderFavbar();
+    closeFavModal();
+}
+
 // ── NAVEGACIÓN ────────────────────────────────────────────────────────────────
 function showSection(s, btn) {
     document
         .querySelectorAll(".section")
         .forEach((el) => el.classList.remove("on"));
     document
-        .querySelectorAll(".nav-btn")
+        .querySelectorAll(".sidebar-item")
         .forEach((el) => el.classList.remove("on"));
     document
-        .getElementById("sec" + s.charAt(0).toUpperCase() + s.slice(1))
-        .classList.add("on");
-    btn.classList.add("on");
+        .querySelectorAll(".fav-btn")
+        .forEach((el) => el.classList.remove("on"));
+    var secEl = document.getElementById(
+        "sec" + s.charAt(0).toUpperCase() + s.slice(1),
+    );
+    if (secEl) secEl.classList.add("on");
+    // Marcar sidebar item activo
+    document
+        .querySelectorAll('.sidebar-item[data-section="' + s + '"]')
+        .forEach((el) => el.classList.add("on"));
+    // Marcar fav activo
+    document
+        .querySelectorAll('.fav-btn[data-section="' + s + '"]')
+        .forEach((el) => el.classList.add("on"));
     if (s === "categorias") renderCatTable();
     if (s === "colores") renderColoresTable();
     if (s === "pedidos") loadPedidos();

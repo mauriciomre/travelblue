@@ -86,7 +86,24 @@ function setSort(v) {
     renderProds();
 }
 
+function renderSkeleton() {
+    var html = '<div class="grid">';
+    for (var i = 0; i < 12; i++) {
+        html += '<div class="card skeleton-card">';
+        html += '<div class="skeleton-img"></div>';
+        html += '<div class="card-body">';
+        html += '<div class="skeleton-line sk-short"></div>';
+        html += '<div class="skeleton-line sk-long"></div>';
+        html += '<div class="skeleton-line sk-medium"></div>';
+        html += '<div class="skeleton-line sk-btn"></div>';
+        html += "</div></div>";
+    }
+    html += "</div>";
+    document.getElementById("prods").innerHTML = html;
+}
+
 function start() {
+    renderSkeleton();
     fetch(API_URL + "?action=productos&t=" + Date.now())
         .then(function (r) {
             if (!r.ok) throw new Error();

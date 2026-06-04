@@ -1,455 +1,2027 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="es">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Admin — Travel Blue Argentina</title>
-<link rel="stylesheet" href="../assets/css/admin.css">
-</head>
-<body>
-
-<div class="login-wrap" id="loginWrap">
-  <div class="login-box">
-    <h2>Travel Blue Admin</h2>
-    <p>Ingresá tus credenciales para continuar</p>
-    <input type="text" id="luser" placeholder="Usuario">
-    <input type="password" id="lpass" placeholder="Contraseña" onkeydown="if(event.key==='Enter')doLogin()">
-    <button onclick="doLogin()">Ingresar</button>
-    <a class="login-catalog-link" href="../">🛍 Ver catálogo</a>
-    <div class="lerr" id="lerr"></div>
-  </div>
-</div>
-
-<div id="appWrap" style="display:none">
-<header>
-  <h1>🧳 Travel Blue</h1>
-  <div class="nav">
-    <button class="nav-btn on" onclick="showSection('productos',this)">Productos</button>
-    <button class="nav-btn" onclick="showSection('categorias',this)">Categorías</button>
-    <button class="nav-btn" onclick="showSection('colores',this)">Colores</button>
-    <button class="nav-btn" onclick="showSection('pedidos',this)">Pedidos</button>
-    <button class="nav-btn" onclick="showSection('clientes',this)">Clientes</button>
-    <button class="nav-btn" onclick="showSection('configuracion',this)">Configuración</button>
-  </div>
-  <div class="h-right">
-    <a class="catalog-link" href="../" target="_blank">🛍 Ver catálogo</a>
-    <button class="logout" onclick="doLogout()">Cerrar sesión</button>
-  </div>
-</header>
-
-<!-- PRODUCTOS -->
-<div class="wrap section on" id="secProductos">
-  <div class="stats">
-    <div class="stat"><div class="stat-n" id="stTotal">—</div><div class="stat-l">Productos</div></div>
-    <div class="stat"><div class="stat-n" id="stDisp">—</div><div class="stat-l">Disponibles</div></div>
-    <div class="stat"><div class="stat-n" id="stAgot">—</div><div class="stat-l">Agotados</div></div>
-    <div class="stat"><div class="stat-n" id="stCats">—</div><div class="stat-l">Categorías</div></div>
-  </div>
-  <div class="toolbar">
-    <input type="text" id="srch" placeholder="🔍 Buscar..." oninput="filterTable()">
-    <select id="filtCat" onchange="filterTable()"><option value="">Todas las categorías</option></select>
-    <select id="filtEst" onchange="filterTable()">
-      <option value="">Todos los estados</option>
-      <option value="DISPONIBLE">Disponible</option>
-      <option value="AGOTADO">Agotado</option>
-    </select>
-    <button class="btn" style="background:#fff;border:1.5px solid var(--border);color:#333" onclick="openColModal()">⚙ Columnas</button>
-    <button class="btn-toggle" id="btnEditMode" onclick="toggleEditMode()">✏ Modo edición</button>
-    <button class="btn btn-primary" onclick="openModal()">+ Nuevo producto</button>
-    <button class="btn btn-import" onclick="importarData()">⬆ Importar</button>
-  </div>
-  <!-- Toolbar de ordenamiento automático (solo en modo edición) -->
-  <div class="sort-toolbar" id="sortToolbar" style="display:none">
-    <span style="font-size:13px;font-weight:600;color:var(--muted)">Ordenar por:</span>
-    <button class="btn" style="background:#e3f2fd;color:#1565c0" onclick="autoSort('codigo')">Código</button>
-    <button class="btn" style="background:#e3f2fd;color:#1565c0" onclick="autoSort('precio')">Precio</button>
-    <button class="btn" style="background:#e3f2fd;color:#1565c0" onclick="autoSort('categoria')">Categoría</button>
-    <button class="btn btn-primary" id="sortSaveBtn" style="display:none" onclick="confirmSortSave()">✓ Guardar orden</button>
-    <button class="btn" id="sortCancelBtn" style="display:none;background:#eee" onclick="cancelSort()">✗ Cancelar</button>
-  </div>
-  <div class="edit-mode-bar" id="editModeBar">✏ Modo edición activo — editá las celdas. Arrastrá para reordenar. <button class="btn btn-primary" style="margin-left:12px;padding:5px 14px;font-size:13px" onclick="saveAllInline()">💾 Guardar todo</button></div>
-  <table id="mainTable">
-    <thead><tr>
-      <th></th><th>Img</th><th>Código</th><th>Descripción</th><th>Categoría</th>
-      <th>Mayorista</th><th>PVP</th><th>Estado</th><th>Múltiplo</th><th>Acciones</th>
-    </tr></thead>
-    <tbody id="tbody"></tbody>
-  </table>
-</div>
-
-<!-- CATEGORÍAS -->
-<div class="wrap section" id="secCategorias">
-  <h2 style="font-size:16px;font-weight:800;color:var(--blue);margin-bottom:8px">Gestión de Categorías</h2>
-  <p style="font-size:13px;color:var(--muted);margin-bottom:16px">Arrastrá las filas para cambiar el orden en que aparecen en el catálogo.</p>
-  <div class="cat-inline">
-    <input type="text" id="newCatNombre" placeholder="Nombre de nueva categoría" onkeydown="if(event.key==='Enter')crearCategoria()">
-    <button class="btn btn-primary" onclick="crearCategoria()">+ Agregar</button>
-  </div>
-  <table>
-    <thead><tr><th></th><th>Nombre</th><th>Productos</th><th>Acciones</th></tr></thead>
-    <tbody id="catTbody"></tbody>
-  </table>
-</div>
-
-<!-- CONFIGURACIÓN -->
-<div class="wrap section" id="secConfiguracion">
-  <h2 style="font-size:16px;font-weight:800;color:var(--blue);margin-bottom:16px">Configuración</h2>
-  <div class="config-box" style="margin-bottom:16px">
-    <h3>🚚 Transportes</h3>
-    <p style="font-size:13px;color:var(--muted);margin-bottom:12px">Lista de transportes disponibles para los clientes al confirmar un pedido.</p>
-    <div class="cat-inline" style="margin-bottom:12px">
-      <input type="text" id="newTransNombre" placeholder="Nombre del transporte" style="flex:1" oninput="this.value=this.value.toUpperCase()">
-      <button class="btn btn-primary" onclick="crearTransporte()">+ Agregar</button>
-    </div>
-    <table>
-      <thead><tr><th>Nombre</th><th>Acciones</th></tr></thead>
-      <tbody id="transTbody"></tbody>
-    </table>
-  </div>
-  <div class="config-box" style="margin-bottom:16px">
-    <p style="font-size:13px;color:var(--muted);margin-bottom:12px">Número completo con código de país, sin espacios ni signos. Ej: <code>5493535697188</code></p>
-    <div class="config-row">
-      <input type="text" id="cfgWA" placeholder="5493535697188">
-      <button class="btn btn-primary" onclick="saveWA()">Guardar</button>
-    </div>
-  </div>
-  <div class="config-box">
-    <h3>🔒 Cambiar contraseña</h3>
-    <div class="field" style="margin-top:12px"><label>Contraseña actual</label><input type="password" id="cfgPassActual" placeholder="••••••••"></div>
-    <div class="field"><label>Nueva contraseña</label><input type="password" id="cfgPassNueva" placeholder="••••••••"></div>
-    <div class="field"><label>Confirmar nueva contraseña</label><input type="password" id="cfgPassConfirma" placeholder="••••••••"></div>
-    <button class="btn btn-primary" onclick="savePassword()">Cambiar contraseña</button>
-  </div>
-</div>
-
-<!-- COLORES -->
-<div class="wrap section" id="secColores">
-  <div style="max-width:700px">
-    <h2 style="font-size:16px;font-weight:800;color:var(--blue);margin-bottom:8px">Colores de productos</h2>
-    <p style="font-size:13px;color:var(--muted);margin-bottom:16px">Paleta global de colores para asignar a los productos del catálogo.</p>
-    <div class="cat-inline" style="margin-bottom:12px">
-      <input type="text" id="newColorNombre" placeholder="Nombre del color (ej: ROJO)" style="flex:1" oninput="this.value=this.value.toUpperCase()">
-      <input type="color" id="newColorHex" value="#000000" style="width:44px;height:38px;padding:2px;border:1.5px solid var(--border);border-radius:8px;cursor:pointer">
-      <button class="btn btn-primary" onclick="crearColor()">+ Agregar</button>
-    </div>
-    <div style="margin-bottom:12px">
-      <input type="text" placeholder="🔍 Buscar color..." style="width:100%;padding:9px 13px;border:1.5px solid var(--border);border-radius:8px;font-size:14px;outline:none" oninput="renderColoresTable(this.value)">
-    </div>
-    <table>
-      <thead><tr><th>Color</th><th>Nombre</th><th>Hex</th><th>Acciones</th></tr></thead>
-      <tbody id="coloresTbody"></tbody>
-    </table>
-  </div>
-</div>
-
-<!-- PEDIDOS -->
-<div class="wrap section" id="secPedidos">
-  <h2 style="font-size:16px;font-weight:800;color:var(--blue);margin-bottom:16px">Pedidos</h2>
-  <div class="toolbar" style="margin-bottom:16px">
-    <input type="text" id="pedidoSrch" placeholder="🔍 Buscar por cliente o teléfono..." oninput="filterPedidos()" style="flex:1">
-    <select id="pedidoFiltEst" onchange="filterPedidos()">
-      <option value="">Todos los estados</option>
-      <option value="PENDIENTE">Pendiente</option>
-      <option value="EN_PREPARACION">En preparación</option>
-      <option value="FACTURADO">Facturado</option>
-      <option value="ENVIADO">Enviado</option>
-    </select>
-  </div>
-  <table id="pedidosTable">
-    <thead><tr><th>#</th><th>Fecha</th><th>Cliente</th><th>Teléfono</th><th>Total</th><th>Estado</th><th>Acciones</th></tr></thead>
-    <tbody id="pedidosTbody"></tbody>
-  </table>
-</div>
-
-<!-- CLIENTES -->
-<div class="wrap section" id="secClientes">
-  <h2 style="font-size:16px;font-weight:800;color:var(--blue);margin-bottom:16px">Clientes</h2>
-  <div class="toolbar" style="margin-bottom:16px">
-    <input type="text" id="clienteSrch" placeholder="🔍 Buscar por nombre o teléfono..." oninput="filterClientes()" style="flex:1">
-  </div>
-  <table>
-    <thead><tr><th>Nombre</th><th>Teléfono</th><th>CUIT/DNI</th><th>Localidad</th><th>Pedidos</th><th>Acciones</th></tr></thead>
-    <tbody id="clientesTbody"></tbody>
-  </table>
-</div>
-
-<!-- MODAL PEDIDO DETALLE -->
-<div class="modal-bg" id="pedidoModalBg">
-  <div class="modal" style="max-width:700px">
-    <h2 id="pedidoModalTitle">Pedido #</h2>
-    <div id="pedidoModalBody"></div>
-    <div class="modal-foot">
-      <button class="btn" style="background:#eee" onclick="closePedidoModal()">Cerrar</button>
-      <button class="btn" style="background:#1565c0;color:#fff" onclick="imprimirPedido()">🖨 Imprimir</button>
-      <button class="btn btn-primary" onclick="guardarPedidoObs()">💾 Guardar</button>
-    </div>
-  </div>
-</div>
-
-<!-- MODAL CLIENTE EDITAR -->
-<div class="modal-bg" id="clienteModalBg">
-  <div class="modal" style="max-width:500px">
-    <h2>Editar cliente</h2>
-    <input type="hidden" id="clienteEditId">
-    <div class="row2">
-      <div class="field"><label>Nombre / Razón Social *</label><input id="ceNombre"></div>
-      <div class="field"><label>CUIT / DNI</label><input id="ceCuitDni"></div>
-    </div>
-    <div class="row2">
-      <div class="field"><label>Email</label><input id="ceEmail"></div>
-      <div class="field"><label>Teléfono</label><input id="ceTelefono" readonly style="background:#f5f5f5"></div>
-    </div>
-    <div class="field"><label>Domicilio</label><input id="ceDomicilio"></div>
-    <div class="row2">
-      <div class="field"><label>Localidad</label><input id="ceLocalidad"></div>
-      <div class="field"><label>CP</label><input id="ceCP"></div>
-    </div>
-    <div class="row2">
-      <div class="field"><label>Provincia</label><input id="ceProvincia"></div>
-      <div class="field"><label>Transporte</label><input id="ceTransporte"></div>
-    </div>
-    <div class="field"><label>Notas</label><textarea id="ceNotas" rows="2" style="width:100%;padding:9px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;font-family:inherit"></textarea></div>
-    <div class="modal-foot">
-      <button class="btn" style="background:#eee" onclick="closeClienteModal()">Cancelar</button>
-      <button class="btn btn-primary" onclick="guardarClienteEdit()">Guardar</button>
-    </div>
-  </div>
-</div>
-
-<!-- MODAL PRODUCTO -->
-<div class="modal-bg" id="modalBg">
-  <div class="modal">
-    <h2 id="modalTitle">Nuevo producto</h2>
-    <input type="hidden" id="fId">
-    <input type="hidden" id="fFotoActual">
-    <div class="field">
-      <label>Imagen del producto</label>
-      <div class="img-upload">
-        <input type="file" id="fImagen" accept="image/*" onchange="previewImg(this)">
-        <img id="imgCurrent" class="img-current" style="display:none" onerror="this.style.display='none'">
-        <div class="img-label" id="imgLabelText">📷 Hacé clic o arrastrá una imagen<br><small>JPG, PNG o WebP — máx. 5MB</small></div>
-        <img id="imgPreview" class="img-preview">
-        <div class="upload-progress" id="uploadProgress"><div class="upload-progress-bar" id="uploadBar"></div></div>
-      </div>
-    </div>
-    <div class="row2">
-      <div class="field">
-        <label>Código *</label>
-        <input id="fCodigo" oninput="checkCodigo(this)">
-        <div class="field-hint" id="codigoHint"></div>
-      </div>
-      <div class="field">
-        <label>Categoría *</label>
-        <select id="fCategoria"><option value="">— Seleccioná —</option></select>
-      </div>
-    </div>
-    <div class="field"><label>Descripción *</label><input id="fDesc"></div>
-    <div class="row2">
-      <div class="field"><label>Precio Mayorista ($) *</label><input id="fMay" type="number"></div>
-      <div class="field"><label>PVP Sugerido ($) *</label><input id="fPvp" type="number"></div>
-    </div>
-    <div class="row2">
-      <div class="field"><label>Estado *</label>
-        <select id="fEstado"><option value="DISPONIBLE">Disponible</option><option value="AGOTADO">Agotado</option></select>
-      </div>
-      <div class="field">
-        <label>Múltiplo</label>
-        <input id="fMultiplo" type="number" min="1" value="1">
-        <div style="font-size:11px;color:var(--muted);margin-top:4px">Ej: 6 → solo se puede pedir de a 6, 12, 18...</div>
-      </div>
-    </div>
-    <div class="field">
-      <label>Colores disponibles</label>
-      <div style="display:flex;gap:8px;margin-bottom:8px">
-        <input type="text" placeholder="🔍 Buscar color..." style="flex:1;padding:7px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px" oninput="renderColorSelector(this.value)">
-      </div>
-      <div id="fColores" class="color-selector-list"></div>
-      <div style="background:#f8f9fb;border:1.5px dashed var(--border);border-radius:8px;padding:10px;margin-top:8px">
-        <div style="font-size:12px;font-weight:700;color:var(--muted);margin-bottom:8px">+ Crear nuevo color</div>
-        <div style="display:flex;gap:8px;align-items:center">
-          <input type="text" id="quickColorNombre" placeholder="Nombre" style="flex:1;padding:7px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px" oninput="this.value=this.value.toUpperCase()">
-          <input type="color" id="quickColorHex" value="#000000" style="width:44px;height:36px;padding:2px;border:1.5px solid var(--border);border-radius:8px;cursor:pointer">
-          <button class="btn btn-primary" style="padding:7px 12px;font-size:12px" onclick="crearColorDesdeModal()">Agregar</button>
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Admin — Travel Blue Argentina</title>
+        <link rel="stylesheet" href="../assets/css/admin.css" />
+    </head>
+    <body>
+        <div class="login-wrap" id="loginWrap">
+            <div class="login-box">
+                <h2>Travel Blue Admin</h2>
+                <p>Ingresá tus credenciales para continuar</p>
+                <input type="text" id="luser" placeholder="Usuario" />
+                <input
+                    type="password"
+                    id="lpass"
+                    placeholder="Contraseña"
+                    onkeydown="if (event.key === 'Enter') doLogin();"
+                />
+                <button onclick="doLogin()">Ingresar</button>
+                <a class="login-catalog-link" href="../">🛍 Ver catálogo</a>
+                <div class="lerr" id="lerr"></div>
+            </div>
         </div>
-      </div>
-    </div>
-    <div class="modal-foot">
-      <button class="btn" style="background:#eee" onclick="closeModal()">Cancelar</button>
-      <button class="btn btn-primary" id="btnGuardar" onclick="saveProduct()">Guardar</button>
-    </div>
-  </div>
-</div>
-<!-- MODAL EDITAR TRANSPORTE -->
-<div class="modal-bg" id="transModalBg">
-  <div class="modal" style="max-width:360px">
-    <h2>Editar transporte</h2>
-    <input type="hidden" id="transEditId">
-    <div class="field"><label>Nombre</label><input id="transEditNombre" oninput="this.value=this.value.toUpperCase()"></div>
-    <div class="modal-foot">
-      <button class="btn" style="background:#eee" onclick="closeTransModal()">Cancelar</button>
-      <button class="btn btn-primary" onclick="guardarTransporte()">Guardar</button>
-    </div>
-  </div>
-</div>
 
-<!-- MODAL EDITAR COLOR -->
-<div class="modal-bg" id="colorModalBg">
-  <div class="modal" style="max-width:360px">
-    <h2>Editar color</h2>
-    <input type="hidden" id="colorEditId">
-    <div class="field"><label>Nombre</label><input id="colorEditNombre"></div>
-    <div class="field"><label>Color</label><input type="color" id="colorEditHex" style="width:60px;height:38px;padding:2px;border:1.5px solid var(--border);border-radius:8px;cursor:pointer"></div>
-    <div class="modal-foot">
-      <button class="btn" style="background:#eee" onclick="closeColorModal()">Cancelar</button>
-      <button class="btn btn-primary" onclick="guardarColor()">Guardar</button>
-    </div>
-  </div>
-</div>
+        <div id="appWrap" style="display: none">
+            <!-- TOPBAR -->
+            <div class="topbar">
+                <button
+                    class="sidebar-toggle"
+                    onclick="toggleSidebar()"
+                    title="Menú"
+                >
+                    ☰
+                </button>
+                <div class="topbar-brand">🧳 Travel Blue</div>
+                <!-- FAVORITOS -->
+                <div class="favbar" id="favbar"></div>
+                <button
+                    class="fav-add-btn"
+                    onclick="openFavModal()"
+                    title="Personalizar favoritos"
+                >
+                    ★
+                </button>
+                <div class="topbar-right">
+                    <a class="catalog-link" href="../" target="_blank"
+                        >🛍 Ver catálogo</a
+                    >
+                    <button class="logout" onclick="doLogout()">Salir</button>
+                </div>
+            </div>
 
-<div class="modal-bg" id="catModalBg">
-  <div class="modal" style="max-width:360px">
-    <h2>Editar categoría</h2>
-    <input type="hidden" id="catEditId">
-    <div class="field"><label>Nombre</label><input id="catEditNombre"></div>
-    <div class="modal-foot">
-      <button class="btn" style="background:#eee" onclick="closeCatModal()">Cancelar</button>
-      <button class="btn btn-primary" onclick="guardarCategoria()">Guardar</button>
-    </div>
-  </div>
-</div>
+            <!-- LAYOUT -->
+            <div class="admin-layout">
+                <!-- SIDEBAR -->
+                <nav class="sidebar" id="sidebar">
+                    <div class="sidebar-group">
+                        <div class="sidebar-group-title">
+                            <span class="sg-icon">📦</span
+                            ><span class="sg-label">Catálogo</span>
+                        </div>
+                        <button
+                            class="sidebar-item on"
+                            data-section="productos"
+                            onclick="showSection('productos', this)"
+                        >
+                            <span class="si-icon">📋</span
+                            ><span class="si-label">Productos</span>
+                        </button>
+                        <button
+                            class="sidebar-item"
+                            data-section="categorias"
+                            onclick="showSection('categorias', this)"
+                        >
+                            <span class="si-icon">🗂</span
+                            ><span class="si-label">Categorías</span>
+                        </button>
+                        <button
+                            class="sidebar-item"
+                            data-section="colores"
+                            onclick="showSection('colores', this)"
+                        >
+                            <span class="si-icon">🎨</span
+                            ><span class="si-label">Colores</span>
+                        </button>
+                    </div>
+                    <div class="sidebar-group">
+                        <div class="sidebar-group-title">
+                            <span class="sg-icon">📋</span
+                            ><span class="sg-label">Pedidos</span>
+                        </div>
+                        <button
+                            class="sidebar-item"
+                            data-section="pedidos"
+                            onclick="showSection('pedidos', this)"
+                        >
+                            <span class="si-icon">🛒</span
+                            ><span class="si-label">Pedidos</span>
+                        </button>
+                    </div>
+                    <div class="sidebar-group">
+                        <div class="sidebar-group-title">
+                            <span class="sg-icon">👥</span
+                            ><span class="sg-label">Clientes</span>
+                        </div>
+                        <button
+                            class="sidebar-item"
+                            data-section="clientes"
+                            onclick="showSection('clientes', this)"
+                        >
+                            <span class="si-icon">👤</span
+                            ><span class="si-label">Clientes</span>
+                        </button>
+                    </div>
+                    <div class="sidebar-group">
+                        <div class="sidebar-group-title">
+                            <span class="sg-icon">⚙️</span
+                            ><span class="sg-label">Configuración</span>
+                        </div>
+                        <button
+                            class="sidebar-item"
+                            data-section="configuracion"
+                            onclick="showSection('configuracion', this)"
+                        >
+                            <span class="si-icon">⚙️</span
+                            ><span class="si-label">Configuración</span>
+                        </button>
+                    </div>
+                </nav>
 
-<!-- MODAL COLUMNAS -->
-<div class="modal-bg" id="colModalBg">
-  <div class="modal" style="max-width:340px">
-    <h2>Columnas visibles</h2>
-    <div id="colModalBody" style="margin:16px 0"></div>
-    <div class="modal-foot">
-      <button class="btn" style="background:#eee" onclick="closeColModal()">Cancelar</button>
-      <button class="btn btn-primary" onclick="applyColModal()">Aplicar</button>
-    </div>
-  </div>
-</div>
+                <!-- MAIN CONTENT -->
+                <main class="admin-main" id="adminMain">
+                    <!-- PRODUCTOS -->
+                    <div class="wrap section on" id="secProductos">
+                        <div class="stats">
+                            <div class="stat">
+                                <div class="stat-n" id="stTotal">—</div>
+                                <div class="stat-l">Productos</div>
+                            </div>
+                            <div class="stat">
+                                <div class="stat-n" id="stDisp">—</div>
+                                <div class="stat-l">Disponibles</div>
+                            </div>
+                            <div class="stat">
+                                <div class="stat-n" id="stAgot">—</div>
+                                <div class="stat-l">Agotados</div>
+                            </div>
+                            <div class="stat">
+                                <div class="stat-n" id="stCats">—</div>
+                                <div class="stat-l">Categorías</div>
+                            </div>
+                        </div>
+                        <div class="toolbar">
+                            <input
+                                type="text"
+                                id="srch"
+                                placeholder="🔍 Buscar..."
+                                oninput="filterTable()"
+                            />
+                            <select id="filtCat" onchange="filterTable()">
+                                <option value="">Todas las categorías</option>
+                            </select>
+                            <select id="filtEst" onchange="filterTable()">
+                                <option value="">Todos los estados</option>
+                                <option value="DISPONIBLE">Disponible</option>
+                                <option value="AGOTADO">Agotado</option>
+                            </select>
+                            <button
+                                class="btn"
+                                style="
+                                    background: #fff;
+                                    border: 1.5px solid var(--border);
+                                    color: #333;
+                                "
+                                onclick="openColModal()"
+                            >
+                                ⚙ Columnas
+                            </button>
+                            <button
+                                class="btn-toggle"
+                                id="btnEditMode"
+                                onclick="toggleEditMode()"
+                            >
+                                ✏ Modo edición
+                            </button>
+                            <button
+                                class="btn btn-primary"
+                                onclick="openModal()"
+                            >
+                                + Nuevo producto
+                            </button>
+                            <button
+                                class="btn btn-import"
+                                onclick="importarData()"
+                            >
+                                ⬆ Importar
+                            </button>
+                        </div>
+                        <!-- Toolbar de ordenamiento automático (solo en modo edición) -->
+                        <div
+                            class="sort-toolbar"
+                            id="sortToolbar"
+                            style="display: none"
+                        >
+                            <span
+                                style="
+                                    font-size: 13px;
+                                    font-weight: 600;
+                                    color: var(--muted);
+                                "
+                                >Ordenar por:</span
+                            >
+                            <button
+                                class="btn"
+                                style="background: #e3f2fd; color: #1565c0"
+                                onclick="autoSort('codigo')"
+                            >
+                                Código
+                            </button>
+                            <button
+                                class="btn"
+                                style="background: #e3f2fd; color: #1565c0"
+                                onclick="autoSort('precio')"
+                            >
+                                Precio
+                            </button>
+                            <button
+                                class="btn"
+                                style="background: #e3f2fd; color: #1565c0"
+                                onclick="autoSort('categoria')"
+                            >
+                                Categoría
+                            </button>
+                            <button
+                                class="btn btn-primary"
+                                id="sortSaveBtn"
+                                style="display: none"
+                                onclick="confirmSortSave()"
+                            >
+                                ✓ Guardar orden
+                            </button>
+                            <button
+                                class="btn"
+                                id="sortCancelBtn"
+                                style="display: none; background: #eee"
+                                onclick="cancelSort()"
+                            >
+                                ✗ Cancelar
+                            </button>
+                        </div>
+                        <div class="edit-mode-bar" id="editModeBar">
+                            ✏ Modo edición activo — editá las celdas. Arrastrá
+                            para reordenar.
+                            <button
+                                class="btn btn-primary"
+                                style="
+                                    margin-left: 12px;
+                                    padding: 5px 14px;
+                                    font-size: 13px;
+                                "
+                                onclick="saveAllInline()"
+                            >
+                                💾 Guardar todo
+                            </button>
+                        </div>
+                        <table id="mainTable">
+                            <thead>
+                                <tr>
+                                    <th></th>
+                                    <th>Img</th>
+                                    <th>Código</th>
+                                    <th>Descripción</th>
+                                    <th>Categoría</th>
+                                    <th>Mayorista</th>
+                                    <th>PVP</th>
+                                    <th>Estado</th>
+                                    <th>Múltiplo</th>
+                                    <th>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tbody"></tbody>
+                        </table>
+                    </div>
 
-<div class="toast" id="toast"></div>
+                    <!-- CATEGORÍAS -->
+                    <div class="wrap section" id="secCategorias">
+                        <h2
+                            style="
+                                font-size: 16px;
+                                font-weight: 800;
+                                color: var(--blue);
+                                margin-bottom: 8px;
+                            "
+                        >
+                            Gestión de Categorías
+                        </h2>
+                        <p
+                            style="
+                                font-size: 13px;
+                                color: var(--muted);
+                                margin-bottom: 16px;
+                            "
+                        >
+                            Arrastrá las filas para cambiar el orden en que
+                            aparecen en el catálogo.
+                        </p>
+                        <div class="cat-inline">
+                            <input
+                                type="text"
+                                id="newCatNombre"
+                                placeholder="Nombre de nueva categoría"
+                                onkeydown="
+                                    if (event.key === 'Enter') crearCategoria();
+                                "
+                            />
+                            <button
+                                class="btn btn-primary"
+                                onclick="crearCategoria()"
+                            >
+                                + Agregar
+                            </button>
+                        </div>
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th></th>
+                                    <th>Nombre</th>
+                                    <th>Productos</th>
+                                    <th>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody id="catTbody"></tbody>
+                        </table>
+                    </div>
 
-<script src="../assets/js/admin.js"></script>
-<script>
-var DATA_INICIAL=[
-  {CATEGORIA:'MOCHILAS',CODIGO:'33020',DESCRIPCION:'MOCHILA BACKPACK PRESTIGE BLACK',PRECIO_MAYORISTA:'49999',PVP:'115999',ESTADO:'DISPONIBLE'},
-  {CATEGORIA:'MOCHILAS',CODIGO:'33021',DESCRIPCION:'MOCHILA PRESTIGE EXECUTIVE GREY',PRECIO_MAYORISTA:'49999',PVP:'115999',ESTADO:'DISPONIBLE'},
-  {CATEGORIA:'MOCHILAS',CODIGO:'33022',DESCRIPCION:'MOCHILA PRO 23 SIGNATURE GREEN',PRECIO_MAYORISTA:'69999',PVP:'139000',ESTADO:'DISPONIBLE'},
-  {CATEGORIA:'MOCHILAS',CODIGO:'33030',DESCRIPCION:'MOCHILA LUXE PRO EXECUTIVE BLACK',PRECIO_MAYORISTA:'59999',PVP:'139000',ESTADO:'DISPONIBLE'},
-  {CATEGORIA:'MOCHILAS',CODIGO:'33040',DESCRIPCION:'MOCHILA INNOVATOR EXECUTIVE BLACK',PRECIO_MAYORISTA:'52000',PVP:'115999',ESTADO:'DISPONIBLE'},
-  {CATEGORIA:'MOCHILAS',CODIGO:'33048',DESCRIPCION:'MOCHILA PRO 23 SIGNATURE 1205 BLACK',PRECIO_MAYORISTA:'68999',PVP:'139000',ESTADO:'DISPONIBLE'},
-  {CATEGORIA:'MOCHILAS',CODIGO:'33050',DESCRIPCION:'MOCHILA BACKPACK XPERT BLACK',PRECIO_MAYORISTA:'39999',PVP:'98999',ESTADO:'DISPONIBLE'},
-  {CATEGORIA:'MOCHILAS',CODIGO:'33051',DESCRIPCION:'MOCHILA BACKPACK XPERT GREY',PRECIO_MAYORISTA:'39999',PVP:'115999',ESTADO:'DISPONIBLE'},
-  {CATEGORIA:'MOCHILAS',CODIGO:'33055',DESCRIPCION:'MOCHILA JOURNEY LITE M BLACK',PRECIO_MAYORISTA:'64999',PVP:'129900',ESTADO:'DISPONIBLE'},
-  {CATEGORIA:'MOCHILAS',CODIGO:'33056',DESCRIPCION:'MOCHILA JOURNEY LITE M GREY',PRECIO_MAYORISTA:'64999',PVP:'129900',ESTADO:'DISPONIBLE'},
-  {CATEGORIA:'MOCHILAS',CODIGO:'33057',DESCRIPCION:'MOCHILA JOURNEY LITE M NAVY BLUE',PRECIO_MAYORISTA:'64999',PVP:'129900',ESTADO:'DISPONIBLE'},
-  {CATEGORIA:'MOCHILAS',CODIGO:'33059',DESCRIPCION:'MOCHILA ADVENTURE PACK',PRECIO_MAYORISTA:'44500',PVP:'94999',ESTADO:'DISPONIBLE'},
-  {CATEGORIA:'MOCHILAS',CODIGO:'33070',DESCRIPCION:'MOCHILA METRO PRO EXECUTIVE BLACK',PRECIO_MAYORISTA:'49999',PVP:'114999',ESTADO:'DISPONIBLE'},
-  {CATEGORIA:'MOCHILAS',CODIGO:'33075',DESCRIPCION:'MOCHILA ELEGANCE EXECUTIVE BLACK',PRECIO_MAYORISTA:'49999',PVP:'114999',ESTADO:'DISPONIBLE'},
-  {CATEGORIA:'MOCHILAS',CODIGO:'33098',DESCRIPCION:'MOCHILA ECOJOURNEY TECH',PRECIO_MAYORISTA:'79999',PVP:'169000',ESTADO:'DISPONIBLE'},
-  {CATEGORIA:'MOCHILAS',CODIGO:'33100',DESCRIPCION:'MOCHILA CITY SCAPE URBAN BLUE',PRECIO_MAYORISTA:'34999',PVP:'79899',ESTADO:'DISPONIBLE'},
-  {CATEGORIA:'MOCHILAS',CODIGO:'33103',DESCRIPCION:'MOCHILA TREKKER LITE BLACK',PRECIO_MAYORISTA:'34999',PVP:'79899',ESTADO:'DISPONIBLE'},
-  {CATEGORIA:'MOCHILAS',CODIGO:'33104',DESCRIPCION:'MOCHILA TREKKER BLACK',PRECIO_MAYORISTA:'36500',PVP:'64999',ESTADO:'DISPONIBLE'},
-  {CATEGORIA:'MOCHILAS',CODIGO:'33107',DESCRIPCION:'MOCHILA TREKKER CAMEL',PRECIO_MAYORISTA:'34999',PVP:'85000',ESTADO:'DISPONIBLE'},
-  {CATEGORIA:'MOCHILAS',CODIGO:'33109',DESCRIPCION:'MOCHILA TREKKER OLIVE',PRECIO_MAYORISTA:'34999',PVP:'85000',ESTADO:'DISPONIBLE'},
-  {CATEGORIA:'MOCHILAS',CODIGO:'33110',DESCRIPCION:'MOCHILA HARMONY URBAN BLUE',PRECIO_MAYORISTA:'34999',PVP:'79899',ESTADO:'DISPONIBLE'},
-  {CATEGORIA:'MOCHILAS',CODIGO:'33111',DESCRIPCION:'MOCHILA HARMONY URBAN GREY',PRECIO_MAYORISTA:'34999',PVP:'79899',ESTADO:'DISPONIBLE'},
-  {CATEGORIA:'MOCHILAS',CODIGO:'33120',DESCRIPCION:'MOCHILA DOWNTOWN EXPLORER BLACK',PRECIO_MAYORISTA:'34999',PVP:'79899',ESTADO:'DISPONIBLE'},
-  {CATEGORIA:'MOCHILAS',CODIGO:'33121',DESCRIPCION:'MOCHILA DOWNTOWN EXPLORER NAVY',PRECIO_MAYORISTA:'34999',PVP:'79899',ESTADO:'DISPONIBLE'},
-  {CATEGORIA:'MOCHILAS',CODIGO:'33180',DESCRIPCION:'MOCHILA BACKPACK ISOLA MILAN BLACK',PRECIO_MAYORISTA:'36999',PVP:'79999',ESTADO:'DISPONIBLE'},
-  {CATEGORIA:'MOCHILAS',CODIGO:'3BP-5711.1',DESCRIPCION:'MOCHILA BACKPACK DUBLIN BLACK',PRECIO_MAYORISTA:'33999',PVP:'75000',ESTADO:'DISPONIBLE'},
-  {CATEGORIA:'MOCHILAS',CODIGO:'3BP-5712.1',DESCRIPCION:'MOCHILA BACKPACK MEDELLIN BLACK',PRECIO_MAYORISTA:'29999',PVP:'52000',ESTADO:'DISPONIBLE'},
-  {CATEGORIA:'MOCHILAS',CODIGO:'3BP-5753.1',DESCRIPCION:'MOCHILA BACKPACK NEW ORLEAN BLACK',PRECIO_MAYORISTA:'24999',PVP:'43000',ESTADO:'DISPONIBLE'},
-  {CATEGORIA:'MOCHILAS',CODIGO:'3BP-5761.1',DESCRIPCION:'MOCHILA BACKPACK MELBOURNE BLACK',PRECIO_MAYORISTA:'29999',PVP:'52000',ESTADO:'DISPONIBLE'},
-  {CATEGORIA:'VALIJAS',CODIGO:'43305',DESCRIPCION:'VALIJA CARRY ON 20 WANDERER TITAN',PRECIO_MAYORISTA:'83500',PVP:'165000',ESTADO:'DISPONIBLE'},
-  {CATEGORIA:'VALIJAS',CODIGO:'43307',DESCRIPCION:'VALIJA CARRY ON 20 WANDERER NEGRA',PRECIO_MAYORISTA:'83500',PVP:'165000',ESTADO:'DISPONIBLE'},
-  {CATEGORIA:'VALIJAS',CODIGO:'43311',DESCRIPCION:'VALIJA CARRY ON JOURNEYJET BLACK 20',PRECIO_MAYORISTA:'83500',PVP:'165000',ESTADO:'DISPONIBLE'},
-  {CATEGORIA:'VALIJAS',CODIGO:'43312',DESCRIPCION:'VALIJA CARRY ON JOURNEYJET WHITE 20',PRECIO_MAYORISTA:'83500',PVP:'165000',ESTADO:'DISPONIBLE'},
-  {CATEGORIA:'VALIJAS',CODIGO:'43313',DESCRIPCION:'VALIJA CARRY ON JOURNEYJET GREEN 20',PRECIO_MAYORISTA:'83500',PVP:'165000',ESTADO:'DISPONIBLE'},
-  {CATEGORIA:'VALIJAS',CODIGO:'43314',DESCRIPCION:'VALIJA CARRY ON ADVENTURE NAVY 20',PRECIO_MAYORISTA:'83500',PVP:'165000',ESTADO:'DISPONIBLE'},
-  {CATEGORIA:'VALIJAS',CODIGO:'43315',DESCRIPCION:'VALIJA CARRY ON 20 ADVENTURE NEGRA',PRECIO_MAYORISTA:'83500',PVP:'165000',ESTADO:'DISPONIBLE'},
-  {CATEGORIA:'VALIJAS',CODIGO:'43327',DESCRIPCION:'VALIJA CARRY ON 20 LUXE WANDERER ORANGE',PRECIO_MAYORISTA:'83500',PVP:'165000',ESTADO:'DISPONIBLE'},
-  {CATEGORIA:'VALIJAS',CODIGO:'43329',DESCRIPCION:'VALIJA CARRY ON 20 LUXE WANDERER PURPLE',PRECIO_MAYORISTA:'83500',PVP:'165000',ESTADO:'DISPONIBLE'},
-  {CATEGORIA:'VALIJAS',CODIGO:'43351',DESCRIPCION:'VALIJA CARRY ON 20 SAHARA NUDE',PRECIO_MAYORISTA:'62500',PVP:'129999',ESTADO:'AGOTADO'},
-  {CATEGORIA:'VALIJAS',CODIGO:'43352',DESCRIPCION:'VALIJA CARRY ON 20 SAHARA BLACK',PRECIO_MAYORISTA:'62500',PVP:'129999',ESTADO:'DISPONIBLE'},
-  {CATEGORIA:'VALIJAS',CODIGO:'43353',DESCRIPCION:'VALIJA CARRY ON 20 SAHARA TURQUESA',PRECIO_MAYORISTA:'62500',PVP:'129999',ESTADO:'DISPONIBLE'},
-  {CATEGORIA:'VALIJAS',CODIGO:'433.68-72',DESCRIPCION:'SET VALIJA EVEREST 20 24 NEGRA',PRECIO_MAYORISTA:'128400',PVP:'269998',ESTADO:'DISPONIBLE'},
-  {CATEGORIA:'VALIJAS',CODIGO:'4330.1-2',DESCRIPCION:'SET VALIJA 20 24 NOMAD NEGRA',PRECIO_MAYORISTA:'178500',PVP:'364999',ESTADO:'DISPONIBLE'},
-  {CATEGORIA:'VALIJAS',CODIGO:'4330.3-4',DESCRIPCION:'SET VALIJA 20 24 NOMAD PINK',PRECIO_MAYORISTA:'178500',PVP:'364999',ESTADO:'DISPONIBLE'},
-  {CATEGORIA:'ACCESORIOS',CODIGO:'3065',DESCRIPCION:'MOCHILA PLEGABLE',PRECIO_MAYORISTA:'12999',PVP:'29900',ESTADO:'DISPONIBLE'},
-  {CATEGORIA:'ACCESORIOS',CODIGO:'3068',DESCRIPCION:'MOCHILA PLEGABLE',PRECIO_MAYORISTA:'10999',PVP:'24900',ESTADO:'DISPONIBLE'},
-  {CATEGORIA:'ACCESORIOS',CODIGO:'8027',DESCRIPCION:'CANDADO DE SEGURIDAD TSA',PRECIO_MAYORISTA:'5399',PVP:'13989',ESTADO:'DISPONIBLE'},
-  {CATEGORIA:'ACCESORIOS',CODIGO:'8028',DESCRIPCION:'CANDADOS TSA PARA VALIJA X 2 UNIDADES',PRECIO_MAYORISTA:'7700',PVP:'18989',ESTADO:'DISPONIBLE'},
-  {CATEGORIA:'ACCESORIOS',CODIGO:'8036',DESCRIPCION:'CANDADO TSA CON COMBINACION 3 DIALES',PRECIO_MAYORISTA:'6999',PVP:'16989',ESTADO:'DISPONIBLE'},
-  {CATEGORIA:'ACCESORIOS',CODIGO:'8038',DESCRIPCION:'CANDADO TSA PARA VALIJAS X 2 UN.',PRECIO_MAYORISTA:'13500',PVP:'32990',ESTADO:'DISPONIBLE'},
-  {CATEGORIA:'ACCESORIOS',CODIGO:'8040',DESCRIPCION:'CORREA DE VIAJE',PRECIO_MAYORISTA:'3850',PVP:'9989',ESTADO:'DISPONIBLE'},
-  {CATEGORIA:'ACCESORIOS',CODIGO:'8053',DESCRIPCION:'BOLSA PLEGABLE',PRECIO_MAYORISTA:'6350',PVP:'15900',ESTADO:'DISPONIBLE'},
-  {CATEGORIA:'ACCESORIOS',CODIGO:'8066',DESCRIPCION:'BOLSO PLEGABLE DE MANO',PRECIO_MAYORISTA:'9999',PVP:'26900',ESTADO:'DISPONIBLE'},
-  {CATEGORIA:'ACCESORIOS',CODIGO:'8067',DESCRIPCION:'BOLSO PLEGABLE DE MANO IMPERMEABLE',PRECIO_MAYORISTA:'12999',PVP:'31900',ESTADO:'DISPONIBLE'},
-  {CATEGORIA:'ACCESORIOS',CODIGO:'8101',DESCRIPCION:'IDENTIFICADOR DE VALIJA PUZZLE',PRECIO_MAYORISTA:'2999',PVP:'7499',ESTADO:'DISPONIBLE'},
-  {CATEGORIA:'ACCESORIOS',CODIGO:'8102',DESCRIPCION:'IDENTIFICADOR DE VALIJA WAVES',PRECIO_MAYORISTA:'2999',PVP:'7499',ESTADO:'DISPONIBLE'},
-  {CATEGORIA:'ACCESORIOS',CODIGO:'8103',DESCRIPCION:'IDENTIFICADOR DE VALIJA SQUARES',PRECIO_MAYORISTA:'2999',PVP:'7499',ESTADO:'DISPONIBLE'},
-  {CATEGORIA:'ACCESORIOS',CODIGO:'8104',DESCRIPCION:'IDENTIFICADOR DE VALIJA MAP',PRECIO_MAYORISTA:'2999',PVP:'7499',ESTADO:'DISPONIBLE'},
-  {CATEGORIA:'ACCESORIOS',CODIGO:'8111',DESCRIPCION:'PORTAVALORES',PRECIO_MAYORISTA:'5999',PVP:'14900',ESTADO:'DISPONIBLE'},
-  {CATEGORIA:'ACCESORIOS',CODIGO:'8113',DESCRIPCION:'PORTAVALORES',PRECIO_MAYORISTA:'6750',PVP:'16900',ESTADO:'DISPONIBLE'},
-  {CATEGORIA:'ACCESORIOS',CODIGO:'8124',DESCRIPCION:'PORTAVALORES ULTRA SLIM NECK CARRIER',PRECIO_MAYORISTA:'5999',PVP:'14989',ESTADO:'DISPONIBLE'},
-  {CATEGORIA:'ACCESORIOS',CODIGO:'8207',DESCRIPCION:'ALMOHADA DE VIAJE INTELIGENTE',PRECIO_MAYORISTA:'7999',PVP:'16000',ESTADO:'DISPONIBLE'},
-  {CATEGORIA:'ACCESORIOS',CODIGO:'8208',DESCRIPCION:'ALMOHADA DE VIAJE DREAMER',PRECIO_MAYORISTA:'9999',PVP:'25000',ESTADO:'DISPONIBLE'},
-  {CATEGORIA:'ACCESORIOS',CODIGO:'8209',DESCRIPCION:'ALMOHADA DE VIAJE INFINITY',PRECIO_MAYORISTA:'14999',PVP:'39900',ESTADO:'DISPONIBLE'},
-  {CATEGORIA:'ACCESORIOS',CODIGO:'8212',DESCRIPCION:'ALMOHADA DE VIAJE INTELIGENTE',PRECIO_MAYORISTA:'12999',PVP:'35000',ESTADO:'DISPONIBLE'},
-  {CATEGORIA:'ACCESORIOS',CODIGO:'8217',DESCRIPCION:'ALMOHADA ERGONOMICA MASAJE',PRECIO_MAYORISTA:'19999',PVP:'42900',ESTADO:'AGOTADO'},
-  {CATEGORIA:'ACCESORIOS',CODIGO:'8220',DESCRIPCION:'ALMOHADA DE VIAJE',PRECIO_MAYORISTA:'3700',PVP:'9900',ESTADO:'DISPONIBLE'},
-  {CATEGORIA:'ACCESORIOS',CODIGO:'8221',DESCRIPCION:'ALMOHADA DE VIAJE INFLABLE',PRECIO_MAYORISTA:'5899',PVP:'14989',ESTADO:'AGOTADO'},
-  {CATEGORIA:'ACCESORIOS',CODIGO:'8222',DESCRIPCION:'ALMOHADA DE VIAJE',PRECIO_MAYORISTA:'6600',PVP:'15989',ESTADO:'DISPONIBLE'},
-  {CATEGORIA:'ACCESORIOS',CODIGO:'8223',DESCRIPCION:'COMFORT SET ALMOHADA + ANTIFAZ',PRECIO_MAYORISTA:'7350',PVP:'18499',ESTADO:'DISPONIBLE'},
-  {CATEGORIA:'ACCESORIOS',CODIGO:'8232',DESCRIPCION:'ALMOHADA DE VIAJE INTELIGENTE',PRECIO_MAYORISTA:'12500',PVP:'28900',ESTADO:'DISPONIBLE'},
-  {CATEGORIA:'ACCESORIOS',CODIGO:'8330',DESCRIPCION:'ORGANIZADOR DE ROPA PARA EQUIPAJE',PRECIO_MAYORISTA:'7550',PVP:'18900',ESTADO:'DISPONIBLE'},
-  {CATEGORIA:'ACCESORIOS',CODIGO:'8341',DESCRIPCION:'ORGANIZADOR NECESER PARA EQUIPAJE',PRECIO_MAYORISTA:'11500',PVP:'27499',ESTADO:'DISPONIBLE'},
-  {CATEGORIA:'ACCESORIOS',CODIGO:'8450',DESCRIPCION:'ANTIFAZ PARA DORMIR',PRECIO_MAYORISTA:'2399',PVP:'5900',ESTADO:'AGOTADO'},
-  {CATEGORIA:'ACCESORIOS',CODIGO:'8451',DESCRIPCION:'COMFORT SET ANTIFAZ + TAPONES',PRECIO_MAYORISTA:'2899',PVP:'6900',ESTADO:'DISPONIBLE'},
-  {CATEGORIA:'ACCESORIOS',CODIGO:'8453',DESCRIPCION:'ANTIFAZ PARA DORMIR LUXURY',PRECIO_MAYORISTA:'3700',PVP:'8900',ESTADO:'AGOTADO'},
-  {CATEGORIA:'ACCESORIOS',CODIGO:'8454',DESCRIPCION:'ANTIFAZ PARA DORMIR',PRECIO_MAYORISTA:'4200',PVP:'10900',ESTADO:'DISPONIBLE'},
-  {CATEGORIA:'ACCESORIOS',CODIGO:'8490',DESCRIPCION:'TAPONES PARA LOS OIDOS',PRECIO_MAYORISTA:'2399',PVP:'5900',ESTADO:'DISPONIBLE'},
-  {CATEGORIA:'ACCESORIOS',CODIGO:'8492',DESCRIPCION:'TAPONES DE VUELO PARA LOS OIDOS',PRECIO_MAYORISTA:'5399',PVP:'12999',ESTADO:'DISPONIBLE'},
-  {CATEGORIA:'ACCESORIOS',CODIGO:'8493',DESCRIPCION:'TAPONES DE SILICONA PARA LOS OIDOS',PRECIO_MAYORISTA:'5399',PVP:'13900',ESTADO:'DISPONIBLE'},
-  {CATEGORIA:'ACCESORIOS',CODIGO:'8590',DESCRIPCION:'CUBRE VALIJA SMALL 20 A 22',PRECIO_MAYORISTA:'17500',PVP:'39900',ESTADO:'DISPONIBLE'},
-  {CATEGORIA:'ACCESORIOS',CODIGO:'8591',DESCRIPCION:'CUBRE VALIJA MEDIUM 24 A 26',PRECIO_MAYORISTA:'18999',PVP:'42900',ESTADO:'DISPONIBLE'},
-  {CATEGORIA:'ACCESORIOS',CODIGO:'8592',DESCRIPCION:'CUBRE VALIJA LARGE 28 A 30',PRECIO_MAYORISTA:'19999',PVP:'44900',ESTADO:'DISPONIBLE'},
-  {CATEGORIA:'ACCESORIOS',CODIGO:'8593',DESCRIPCION:'CUBRE VALIJA SMALL 20 A 22 (B)',PRECIO_MAYORISTA:'17500',PVP:'39900',ESTADO:'DISPONIBLE'},
-  {CATEGORIA:'ACCESORIOS',CODIGO:'8594',DESCRIPCION:'CUBRE VALIJA MEDIUM 24 A 26 (B)',PRECIO_MAYORISTA:'18999',PVP:'42900',ESTADO:'DISPONIBLE'},
-  {CATEGORIA:'ACCESORIOS',CODIGO:'8595',DESCRIPCION:'CUBRE VALIJA LARGE 28 A 30 (B)',PRECIO_MAYORISTA:'19999',PVP:'44900',ESTADO:'DISPONIBLE'},
-  {CATEGORIA:'ACCESORIOS',CODIGO:'8596',DESCRIPCION:'CUBRE VALIJA SMALL 20 A 22 (C)',PRECIO_MAYORISTA:'14500',PVP:'33900',ESTADO:'DISPONIBLE'},
-  {CATEGORIA:'ACCESORIOS',CODIGO:'8597',DESCRIPCION:'CUBRE VALIJA MEDIUM 24 A 26 (C)',PRECIO_MAYORISTA:'15999',PVP:'36900',ESTADO:'DISPONIBLE'},
-  {CATEGORIA:'ACCESORIOS',CODIGO:'8598',DESCRIPCION:'CUBRE VALIJA LARGE 24 A 26 (C)',PRECIO_MAYORISTA:'17500',PVP:'39900',ESTADO:'DISPONIBLE'},
-  {CATEGORIA:'ACCESORIOS',CODIGO:'8635',DESCRIPCION:'RINONERA METRO POUCH',PRECIO_MAYORISTA:'13999',PVP:'32990',ESTADO:'DISPONIBLE'},
-  {CATEGORIA:'ACCESORIOS',CODIGO:'8650',DESCRIPCION:'MANTA DE VIAJE',PRECIO_MAYORISTA:'11999',PVP:'19500',ESTADO:'DISPONIBLE'},
-  {CATEGORIA:'ACCESORIOS',CODIGO:'8660',DESCRIPCION:'PILOTO',PRECIO_MAYORISTA:'3399',PVP:'7989',ESTADO:'DISPONIBLE'},
-  {CATEGORIA:'ACCESORIOS',CODIGO:'8790',DESCRIPCION:'SOQUETES DE COMPRESION L/XL',PRECIO_MAYORISTA:'7550',PVP:'17900',ESTADO:'DISPONIBLE'},
-  {CATEGORIA:'ACCESORIOS',CODIGO:'8791',DESCRIPCION:'SOQUETES DE COMPRESION S/M',PRECIO_MAYORISTA:'7550',PVP:'17900',ESTADO:'DISPONIBLE'},
-  {CATEGORIA:'ACCESORIOS',CODIGO:'9521',DESCRIPCION:'BOTELLA TERMICA NAVY',PRECIO_MAYORISTA:'12500',PVP:'27900',ESTADO:'DISPONIBLE'},
-  {CATEGORIA:'ACCESORIOS',CODIGO:'9522',DESCRIPCION:'BOTELLA TERMICA IVORY',PRECIO_MAYORISTA:'12500',PVP:'27900',ESTADO:'AGOTADO'},
-  {CATEGORIA:'ACCESORIOS',CODIGO:'9523',DESCRIPCION:'BOTELLA TERMICA GREY',PRECIO_MAYORISTA:'12500',PVP:'27900',ESTADO:'DISPONIBLE'},
-  {CATEGORIA:'ACCESORIOS',CODIGO:'9524',DESCRIPCION:'BOTELLA TERMICA LIGHT GREEN',PRECIO_MAYORISTA:'12500',PVP:'27900',ESTADO:'AGOTADO'},
-  {CATEGORIA:'ACCESORIOS',CODIGO:'9525',DESCRIPCION:'BOTELLA TERMICA BLACK',PRECIO_MAYORISTA:'12500',PVP:'27900',ESTADO:'DISPONIBLE'},
-  {CATEGORIA:'ACCESORIOS',CODIGO:'82412',DESCRIPCION:'ALMOHADA DE VIAJE CON MASAJEADOR ANOMEO',PRECIO_MAYORISTA:'16999',PVP:'42900',ESTADO:'DISPONIBLE'},
-  {CATEGORIA:'SLOOTH',CODIGO:'89031',DESCRIPCION:'ALMOHADA DE VIAJE PANDA KID',PRECIO_MAYORISTA:'11000',PVP:'25000',ESTADO:'DISPONIBLE'},
-  {CATEGORIA:'SLOOTH',CODIGO:'89032',DESCRIPCION:'ALMOHADA DE VIAJE UNICORNIO KID',PRECIO_MAYORISTA:'11000',PVP:'25000',ESTADO:'DISPONIBLE'},
-  {CATEGORIA:'SLOOTH',CODIGO:'89034',DESCRIPCION:'ALMOHADA DE VIAJE OSO KID',PRECIO_MAYORISTA:'11000',PVP:'25000',ESTADO:'DISPONIBLE'},
-  {CATEGORIA:'SLOOTH',CODIGO:'89035',DESCRIPCION:'ALMOHADA DE VIAJE TIGRE ROSA KID',PRECIO_MAYORISTA:'11000',PVP:'25000',ESTADO:'DISPONIBLE'},
-  {CATEGORIA:'SLOOTH',CODIGO:'89036',DESCRIPCION:'ALMOHADA DE VIAJE TIGRE AZUL KID',PRECIO_MAYORISTA:'11000',PVP:'25000',ESTADO:'DISPONIBLE'},
-  {CATEGORIA:'SLOOTH',CODIGO:'81.440.1',DESCRIPCION:'ALMOHADA DE VIAJE INTELIGENTE',PRECIO_MAYORISTA:'9500',PVP:'18999',ESTADO:'DISPONIBLE'},
-  {CATEGORIA:'SLOOTH',CODIGO:'81.462.1',DESCRIPCION:'ALMOHADA DE VIAJE INTELIGENTE',PRECIO_MAYORISTA:'7999',PVP:'17000',ESTADO:'DISPONIBLE'},
-  {CATEGORIA:'SLOOTH',CODIGO:'89048',DESCRIPCION:'ALMOHADA DE VIAJE ERGONOMICA GRIS',PRECIO_MAYORISTA:'9999',PVP:'19999',ESTADO:'DISPONIBLE'},
-  {CATEGORIA:'SLOOTH',CODIGO:'81.490.1',DESCRIPCION:'ALMOHADA DE VIAJE ERGONOMICA NEGRO',PRECIO_MAYORISTA:'10500',PVP:'22000',ESTADO:'DISPONIBLE'},
-  {CATEGORIA:'SLOOTH',CODIGO:'81.502.1',DESCRIPCION:'ALMOHADA DE VIAJE ERGONOMICA',PRECIO_MAYORISTA:'10500',PVP:'22000',ESTADO:'DISPONIBLE'},
-  {CATEGORIA:'SLOOTH',CODIGO:'81.520.4',DESCRIPCION:'ALMOHADA DE VIAJE',PRECIO_MAYORISTA:'7999',PVP:'18499',ESTADO:'DISPONIBLE'},
-  {CATEGORIA:'SLOOTH',CODIGO:'81.960.1',DESCRIPCION:'ALMOHADA DE VIAJE ERGONOMICA',PRECIO_MAYORISTA:'10500',PVP:'22000',ESTADO:'AGOTADO'},
-  {CATEGORIA:'SLOOTH',CODIGO:'85.230.3',DESCRIPCION:'CANDADO TSA KEY',PRECIO_MAYORISTA:'5999',PVP:'14000',ESTADO:'AGOTADO'},
-  {CATEGORIA:'SLOOTH',CODIGO:'85.260.1',DESCRIPCION:'CANDADO TSA CON COMBINACION',PRECIO_MAYORISTA:'5999',PVP:'14000',ESTADO:'DISPONIBLE'}
-];
-</script>
-</body>
+                    <!-- CONFIGURACIÓN -->
+                    <div class="wrap section" id="secConfiguracion">
+                        <h2
+                            style="
+                                font-size: 16px;
+                                font-weight: 800;
+                                color: var(--blue);
+                                margin-bottom: 16px;
+                            "
+                        >
+                            Configuración
+                        </h2>
+                        <div class="config-box" style="margin-bottom: 16px">
+                            <h3>🚚 Transportes</h3>
+                            <p
+                                style="
+                                    font-size: 13px;
+                                    color: var(--muted);
+                                    margin-bottom: 12px;
+                                "
+                            >
+                                Lista de transportes disponibles para los
+                                clientes al confirmar un pedido.
+                            </p>
+                            <div class="cat-inline" style="margin-bottom: 12px">
+                                <input
+                                    type="text"
+                                    id="newTransNombre"
+                                    placeholder="Nombre del transporte"
+                                    style="flex: 1"
+                                    oninput="
+                                        this.value = this.value.toUpperCase()
+                                    "
+                                />
+                                <button
+                                    class="btn btn-primary"
+                                    onclick="crearTransporte()"
+                                >
+                                    + Agregar
+                                </button>
+                            </div>
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Nombre</th>
+                                        <th>Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="transTbody"></tbody>
+                            </table>
+                        </div>
+                        <div class="config-box" style="margin-bottom: 16px">
+                            <p
+                                style="
+                                    font-size: 13px;
+                                    color: var(--muted);
+                                    margin-bottom: 12px;
+                                "
+                            >
+                                Número completo con código de país, sin espacios
+                                ni signos. Ej: <code>5493535697188</code>
+                            </p>
+                            <div class="config-row">
+                                <input
+                                    type="text"
+                                    id="cfgWA"
+                                    placeholder="5493535697188"
+                                />
+                                <button
+                                    class="btn btn-primary"
+                                    onclick="saveWA()"
+                                >
+                                    Guardar
+                                </button>
+                            </div>
+                        </div>
+                        <div class="config-box">
+                            <h3>🔒 Cambiar contraseña</h3>
+                            <div class="field" style="margin-top: 12px">
+                                <label>Contraseña actual</label
+                                ><input
+                                    type="password"
+                                    id="cfgPassActual"
+                                    placeholder="••••••••"
+                                />
+                            </div>
+                            <div class="field">
+                                <label>Nueva contraseña</label
+                                ><input
+                                    type="password"
+                                    id="cfgPassNueva"
+                                    placeholder="••••••••"
+                                />
+                            </div>
+                            <div class="field">
+                                <label>Confirmar nueva contraseña</label
+                                ><input
+                                    type="password"
+                                    id="cfgPassConfirma"
+                                    placeholder="••••••••"
+                                />
+                            </div>
+                            <button
+                                class="btn btn-primary"
+                                onclick="savePassword()"
+                            >
+                                Cambiar contraseña
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- COLORES -->
+                    <div class="wrap section" id="secColores">
+                        <div style="max-width: 700px">
+                            <h2
+                                style="
+                                    font-size: 16px;
+                                    font-weight: 800;
+                                    color: var(--blue);
+                                    margin-bottom: 8px;
+                                "
+                            >
+                                Colores de productos
+                            </h2>
+                            <p
+                                style="
+                                    font-size: 13px;
+                                    color: var(--muted);
+                                    margin-bottom: 16px;
+                                "
+                            >
+                                Paleta global de colores para asignar a los
+                                productos del catálogo.
+                            </p>
+                            <div class="cat-inline" style="margin-bottom: 12px">
+                                <input
+                                    type="text"
+                                    id="newColorNombre"
+                                    placeholder="Nombre del color (ej: ROJO)"
+                                    style="flex: 1"
+                                    oninput="
+                                        this.value = this.value.toUpperCase()
+                                    "
+                                />
+                                <input
+                                    type="color"
+                                    id="newColorHex"
+                                    value="#000000"
+                                    style="
+                                        width: 44px;
+                                        height: 38px;
+                                        padding: 2px;
+                                        border: 1.5px solid var(--border);
+                                        border-radius: 8px;
+                                        cursor: pointer;
+                                    "
+                                />
+                                <button
+                                    class="btn btn-primary"
+                                    onclick="crearColor()"
+                                >
+                                    + Agregar
+                                </button>
+                            </div>
+                            <div style="margin-bottom: 12px">
+                                <input
+                                    type="text"
+                                    placeholder="🔍 Buscar color..."
+                                    style="
+                                        width: 100%;
+                                        padding: 9px 13px;
+                                        border: 1.5px solid var(--border);
+                                        border-radius: 8px;
+                                        font-size: 14px;
+                                        outline: none;
+                                    "
+                                    oninput="renderColoresTable(this.value)"
+                                />
+                            </div>
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Color</th>
+                                        <th>Nombre</th>
+                                        <th>Hex</th>
+                                        <th>Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="coloresTbody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- PEDIDOS -->
+                    <div class="wrap section" id="secPedidos">
+                        <h2
+                            style="
+                                font-size: 16px;
+                                font-weight: 800;
+                                color: var(--blue);
+                                margin-bottom: 16px;
+                            "
+                        >
+                            Pedidos
+                        </h2>
+                        <div class="toolbar" style="margin-bottom: 16px">
+                            <input
+                                type="text"
+                                id="pedidoSrch"
+                                placeholder="🔍 Buscar por cliente o teléfono..."
+                                oninput="filterPedidos()"
+                                style="flex: 1"
+                            />
+                            <select
+                                id="pedidoFiltEst"
+                                onchange="filterPedidos()"
+                            >
+                                <option value="">Todos los estados</option>
+                                <option value="PENDIENTE">Pendiente</option>
+                                <option value="EN_PREPARACION">
+                                    En preparación
+                                </option>
+                                <option value="FACTURADO">Facturado</option>
+                                <option value="ENVIADO">Enviado</option>
+                            </select>
+                        </div>
+                        <table id="pedidosTable">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Fecha</th>
+                                    <th>Cliente</th>
+                                    <th>Teléfono</th>
+                                    <th>Total</th>
+                                    <th>Estado</th>
+                                    <th>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody id="pedidosTbody"></tbody>
+                        </table>
+                    </div>
+
+                    <!-- CLIENTES -->
+                    <div class="wrap section" id="secClientes">
+                        <h2
+                            style="
+                                font-size: 16px;
+                                font-weight: 800;
+                                color: var(--blue);
+                                margin-bottom: 16px;
+                            "
+                        >
+                            Clientes
+                        </h2>
+                        <div class="toolbar" style="margin-bottom: 16px">
+                            <input
+                                type="text"
+                                id="clienteSrch"
+                                placeholder="🔍 Buscar por nombre o teléfono..."
+                                oninput="filterClientes()"
+                                style="flex: 1"
+                            />
+                        </div>
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Nombre</th>
+                                    <th>Teléfono</th>
+                                    <th>CUIT/DNI</th>
+                                    <th>Localidad</th>
+                                    <th>Pedidos</th>
+                                    <th>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody id="clientesTbody"></tbody>
+                        </table>
+                    </div>
+
+                    <!-- MODAL PEDIDO DETALLE -->
+                    <div class="modal-bg" id="pedidoModalBg">
+                        <div class="modal" style="max-width: 700px">
+                            <h2 id="pedidoModalTitle">Pedido #</h2>
+                            <div id="pedidoModalBody"></div>
+                            <div class="modal-foot">
+                                <button
+                                    class="btn"
+                                    style="background: #eee"
+                                    onclick="closePedidoModal()"
+                                >
+                                    Cerrar
+                                </button>
+                                <button
+                                    class="btn"
+                                    style="background: #1565c0; color: #fff"
+                                    onclick="imprimirPedido()"
+                                >
+                                    🖨 Imprimir
+                                </button>
+                                <button
+                                    class="btn btn-primary"
+                                    onclick="guardarPedidoObs()"
+                                >
+                                    💾 Guardar
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- MODAL CLIENTE EDITAR -->
+                    <div class="modal-bg" id="clienteModalBg">
+                        <div class="modal" style="max-width: 500px">
+                            <h2>Editar cliente</h2>
+                            <input type="hidden" id="clienteEditId" />
+                            <div class="row2">
+                                <div class="field">
+                                    <label>Nombre / Razón Social *</label
+                                    ><input id="ceNombre" />
+                                </div>
+                                <div class="field">
+                                    <label>CUIT / DNI</label
+                                    ><input id="ceCuitDni" />
+                                </div>
+                            </div>
+                            <div class="row2">
+                                <div class="field">
+                                    <label>Email</label><input id="ceEmail" />
+                                </div>
+                                <div class="field">
+                                    <label>Teléfono</label
+                                    ><input
+                                        id="ceTelefono"
+                                        readonly
+                                        style="background: #f5f5f5"
+                                    />
+                                </div>
+                            </div>
+                            <div class="field">
+                                <label>Domicilio</label
+                                ><input id="ceDomicilio" />
+                            </div>
+                            <div class="row2">
+                                <div class="field">
+                                    <label>Localidad</label
+                                    ><input id="ceLocalidad" />
+                                </div>
+                                <div class="field">
+                                    <label>CP</label><input id="ceCP" />
+                                </div>
+                            </div>
+                            <div class="row2">
+                                <div class="field">
+                                    <label>Provincia</label
+                                    ><input id="ceProvincia" />
+                                </div>
+                                <div class="field">
+                                    <label>Transporte</label
+                                    ><input id="ceTransporte" />
+                                </div>
+                            </div>
+                            <div class="field">
+                                <label>Notas</label
+                                ><textarea
+                                    id="ceNotas"
+                                    rows="2"
+                                    style="
+                                        width: 100%;
+                                        padding: 9px;
+                                        border: 1.5px solid var(--border);
+                                        border-radius: 8px;
+                                        font-size: 13px;
+                                        font-family: inherit;
+                                    "
+                                ></textarea>
+                            </div>
+                            <div class="modal-foot">
+                                <button
+                                    class="btn"
+                                    style="background: #eee"
+                                    onclick="closeClienteModal()"
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    class="btn btn-primary"
+                                    onclick="guardarClienteEdit()"
+                                >
+                                    Guardar
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- MODAL PRODUCTO -->
+                    <div class="modal-bg" id="modalBg">
+                        <div class="modal">
+                            <h2 id="modalTitle">Nuevo producto</h2>
+                            <input type="hidden" id="fId" />
+                            <input type="hidden" id="fFotoActual" />
+                            <div class="field">
+                                <label>Imagen del producto</label>
+                                <div class="img-upload">
+                                    <input
+                                        type="file"
+                                        id="fImagen"
+                                        accept="image/*"
+                                        onchange="previewImg(this)"
+                                    />
+                                    <img
+                                        id="imgCurrent"
+                                        class="img-current"
+                                        style="display: none"
+                                        onerror="this.style.display = 'none'"
+                                    />
+                                    <div class="img-label" id="imgLabelText">
+                                        📷 Hacé clic o arrastrá una imagen<br /><small
+                                            >JPG, PNG o WebP — máx. 5MB</small
+                                        >
+                                    </div>
+                                    <img id="imgPreview" class="img-preview" />
+                                    <div
+                                        class="upload-progress"
+                                        id="uploadProgress"
+                                    >
+                                        <div
+                                            class="upload-progress-bar"
+                                            id="uploadBar"
+                                        ></div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row2">
+                                <div class="field">
+                                    <label>Código *</label>
+                                    <input
+                                        id="fCodigo"
+                                        oninput="checkCodigo(this)"
+                                    />
+                                    <div
+                                        class="field-hint"
+                                        id="codigoHint"
+                                    ></div>
+                                </div>
+                                <div class="field">
+                                    <label>Categoría *</label>
+                                    <select id="fCategoria">
+                                        <option value="">— Seleccioná —</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="field">
+                                <label>Descripción *</label><input id="fDesc" />
+                            </div>
+                            <div class="row2">
+                                <div class="field">
+                                    <label>Precio Mayorista ($) *</label
+                                    ><input id="fMay" type="number" />
+                                </div>
+                                <div class="field">
+                                    <label>PVP Sugerido ($) *</label
+                                    ><input id="fPvp" type="number" />
+                                </div>
+                            </div>
+                            <div class="row2">
+                                <div class="field">
+                                    <label>Estado *</label>
+                                    <select id="fEstado">
+                                        <option value="DISPONIBLE">
+                                            Disponible
+                                        </option>
+                                        <option value="AGOTADO">Agotado</option>
+                                    </select>
+                                </div>
+                                <div class="field">
+                                    <label>Múltiplo</label>
+                                    <input
+                                        id="fMultiplo"
+                                        type="number"
+                                        min="1"
+                                        value="1"
+                                    />
+                                    <div
+                                        style="
+                                            font-size: 11px;
+                                            color: var(--muted);
+                                            margin-top: 4px;
+                                        "
+                                    >
+                                        Ej: 6 → solo se puede pedir de a 6, 12,
+                                        18...
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="field">
+                                <label>Colores disponibles</label>
+                                <div
+                                    style="
+                                        display: flex;
+                                        gap: 8px;
+                                        margin-bottom: 8px;
+                                    "
+                                >
+                                    <input
+                                        type="text"
+                                        placeholder="🔍 Buscar color..."
+                                        style="
+                                            flex: 1;
+                                            padding: 7px 10px;
+                                            border: 1.5px solid var(--border);
+                                            border-radius: 8px;
+                                            font-size: 13px;
+                                        "
+                                        oninput="
+                                            renderColorSelector(this.value)
+                                        "
+                                    />
+                                </div>
+                                <div
+                                    id="fColores"
+                                    class="color-selector-list"
+                                ></div>
+                                <div
+                                    style="
+                                        background: #f8f9fb;
+                                        border: 1.5px dashed var(--border);
+                                        border-radius: 8px;
+                                        padding: 10px;
+                                        margin-top: 8px;
+                                    "
+                                >
+                                    <div
+                                        style="
+                                            font-size: 12px;
+                                            font-weight: 700;
+                                            color: var(--muted);
+                                            margin-bottom: 8px;
+                                        "
+                                    >
+                                        + Crear nuevo color
+                                    </div>
+                                    <div
+                                        style="
+                                            display: flex;
+                                            gap: 8px;
+                                            align-items: center;
+                                        "
+                                    >
+                                        <input
+                                            type="text"
+                                            id="quickColorNombre"
+                                            placeholder="Nombre"
+                                            style="
+                                                flex: 1;
+                                                padding: 7px 10px;
+                                                border: 1.5px solid
+                                                    var(--border);
+                                                border-radius: 8px;
+                                                font-size: 13px;
+                                            "
+                                            oninput="
+                                                this.value =
+                                                    this.value.toUpperCase()
+                                            "
+                                        />
+                                        <input
+                                            type="color"
+                                            id="quickColorHex"
+                                            value="#000000"
+                                            style="
+                                                width: 44px;
+                                                height: 36px;
+                                                padding: 2px;
+                                                border: 1.5px solid
+                                                    var(--border);
+                                                border-radius: 8px;
+                                                cursor: pointer;
+                                            "
+                                        />
+                                        <button
+                                            class="btn btn-primary"
+                                            style="
+                                                padding: 7px 12px;
+                                                font-size: 12px;
+                                            "
+                                            onclick="crearColorDesdeModal()"
+                                        >
+                                            Agregar
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="modal-foot">
+                                <button
+                                    class="btn"
+                                    style="background: #eee"
+                                    onclick="closeModal()"
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    class="btn btn-primary"
+                                    id="btnGuardar"
+                                    onclick="saveProduct()"
+                                >
+                                    Guardar
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- MODAL EDITAR TRANSPORTE -->
+                    <div class="modal-bg" id="transModalBg">
+                        <div class="modal" style="max-width: 360px">
+                            <h2>Editar transporte</h2>
+                            <input type="hidden" id="transEditId" />
+                            <div class="field">
+                                <label>Nombre</label
+                                ><input
+                                    id="transEditNombre"
+                                    oninput="
+                                        this.value = this.value.toUpperCase()
+                                    "
+                                />
+                            </div>
+                            <div class="modal-foot">
+                                <button
+                                    class="btn"
+                                    style="background: #eee"
+                                    onclick="closeTransModal()"
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    class="btn btn-primary"
+                                    onclick="guardarTransporte()"
+                                >
+                                    Guardar
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- MODAL EDITAR COLOR -->
+                    <div class="modal-bg" id="colorModalBg">
+                        <div class="modal" style="max-width: 360px">
+                            <h2>Editar color</h2>
+                            <input type="hidden" id="colorEditId" />
+                            <div class="field">
+                                <label>Nombre</label
+                                ><input id="colorEditNombre" />
+                            </div>
+                            <div class="field">
+                                <label>Color</label
+                                ><input
+                                    type="color"
+                                    id="colorEditHex"
+                                    style="
+                                        width: 60px;
+                                        height: 38px;
+                                        padding: 2px;
+                                        border: 1.5px solid var(--border);
+                                        border-radius: 8px;
+                                        cursor: pointer;
+                                    "
+                                />
+                            </div>
+                            <div class="modal-foot">
+                                <button
+                                    class="btn"
+                                    style="background: #eee"
+                                    onclick="closeColorModal()"
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    class="btn btn-primary"
+                                    onclick="guardarColor()"
+                                >
+                                    Guardar
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="modal-bg" id="catModalBg">
+                        <div class="modal" style="max-width: 360px">
+                            <h2>Editar categoría</h2>
+                            <input type="hidden" id="catEditId" />
+                            <div class="field">
+                                <label>Nombre</label
+                                ><input id="catEditNombre" />
+                            </div>
+                            <div class="modal-foot">
+                                <button
+                                    class="btn"
+                                    style="background: #eee"
+                                    onclick="closeCatModal()"
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    class="btn btn-primary"
+                                    onclick="guardarCategoria()"
+                                >
+                                    Guardar
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- MODAL COLUMNAS -->
+                    <div class="modal-bg" id="colModalBg">
+                        <div class="modal" style="max-width: 340px">
+                            <h2>Columnas visibles</h2>
+                            <div id="colModalBody" style="margin: 16px 0"></div>
+                            <div class="modal-foot">
+                                <button
+                                    class="btn"
+                                    style="background: #eee"
+                                    onclick="closeColModal()"
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    class="btn btn-primary"
+                                    onclick="applyColModal()"
+                                >
+                                    Aplicar
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="toast" id="toast"></div>
+
+                    <!-- MODAL FAVORITOS -->
+                    <div class="modal-bg" id="favModalBg">
+                        <div class="modal" style="max-width: 360px">
+                            <h2>⭐ Accesos favoritos</h2>
+                            <p
+                                style="
+                                    font-size: 13px;
+                                    color: var(--muted);
+                                    margin-bottom: 16px;
+                                "
+                            >
+                                Seleccioná las secciones que querés tener en la
+                                barra superior.
+                            </p>
+                            <div id="favModalBody" style="margin: 16px 0"></div>
+                            <div class="modal-foot">
+                                <button
+                                    class="btn"
+                                    style="background: #eee"
+                                    onclick="closeFavModal()"
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    class="btn btn-primary"
+                                    onclick="applyFavModal()"
+                                >
+                                    Aplicar
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </main>
+            </div>
+            <!-- end admin-layout -->
+        </div>
+        <!-- end appWrap -->
+
+        <script src="../assets/js/admin.js"></script>
+        <script>
+            var DATA_INICIAL = [
+                {
+                    CATEGORIA: "MOCHILAS",
+                    CODIGO: "33020",
+                    DESCRIPCION: "MOCHILA BACKPACK PRESTIGE BLACK",
+                    PRECIO_MAYORISTA: "49999",
+                    PVP: "115999",
+                    ESTADO: "DISPONIBLE",
+                },
+                {
+                    CATEGORIA: "MOCHILAS",
+                    CODIGO: "33021",
+                    DESCRIPCION: "MOCHILA PRESTIGE EXECUTIVE GREY",
+                    PRECIO_MAYORISTA: "49999",
+                    PVP: "115999",
+                    ESTADO: "DISPONIBLE",
+                },
+                {
+                    CATEGORIA: "MOCHILAS",
+                    CODIGO: "33022",
+                    DESCRIPCION: "MOCHILA PRO 23 SIGNATURE GREEN",
+                    PRECIO_MAYORISTA: "69999",
+                    PVP: "139000",
+                    ESTADO: "DISPONIBLE",
+                },
+                {
+                    CATEGORIA: "MOCHILAS",
+                    CODIGO: "33030",
+                    DESCRIPCION: "MOCHILA LUXE PRO EXECUTIVE BLACK",
+                    PRECIO_MAYORISTA: "59999",
+                    PVP: "139000",
+                    ESTADO: "DISPONIBLE",
+                },
+                {
+                    CATEGORIA: "MOCHILAS",
+                    CODIGO: "33040",
+                    DESCRIPCION: "MOCHILA INNOVATOR EXECUTIVE BLACK",
+                    PRECIO_MAYORISTA: "52000",
+                    PVP: "115999",
+                    ESTADO: "DISPONIBLE",
+                },
+                {
+                    CATEGORIA: "MOCHILAS",
+                    CODIGO: "33048",
+                    DESCRIPCION: "MOCHILA PRO 23 SIGNATURE 1205 BLACK",
+                    PRECIO_MAYORISTA: "68999",
+                    PVP: "139000",
+                    ESTADO: "DISPONIBLE",
+                },
+                {
+                    CATEGORIA: "MOCHILAS",
+                    CODIGO: "33050",
+                    DESCRIPCION: "MOCHILA BACKPACK XPERT BLACK",
+                    PRECIO_MAYORISTA: "39999",
+                    PVP: "98999",
+                    ESTADO: "DISPONIBLE",
+                },
+                {
+                    CATEGORIA: "MOCHILAS",
+                    CODIGO: "33051",
+                    DESCRIPCION: "MOCHILA BACKPACK XPERT GREY",
+                    PRECIO_MAYORISTA: "39999",
+                    PVP: "115999",
+                    ESTADO: "DISPONIBLE",
+                },
+                {
+                    CATEGORIA: "MOCHILAS",
+                    CODIGO: "33055",
+                    DESCRIPCION: "MOCHILA JOURNEY LITE M BLACK",
+                    PRECIO_MAYORISTA: "64999",
+                    PVP: "129900",
+                    ESTADO: "DISPONIBLE",
+                },
+                {
+                    CATEGORIA: "MOCHILAS",
+                    CODIGO: "33056",
+                    DESCRIPCION: "MOCHILA JOURNEY LITE M GREY",
+                    PRECIO_MAYORISTA: "64999",
+                    PVP: "129900",
+                    ESTADO: "DISPONIBLE",
+                },
+                {
+                    CATEGORIA: "MOCHILAS",
+                    CODIGO: "33057",
+                    DESCRIPCION: "MOCHILA JOURNEY LITE M NAVY BLUE",
+                    PRECIO_MAYORISTA: "64999",
+                    PVP: "129900",
+                    ESTADO: "DISPONIBLE",
+                },
+                {
+                    CATEGORIA: "MOCHILAS",
+                    CODIGO: "33059",
+                    DESCRIPCION: "MOCHILA ADVENTURE PACK",
+                    PRECIO_MAYORISTA: "44500",
+                    PVP: "94999",
+                    ESTADO: "DISPONIBLE",
+                },
+                {
+                    CATEGORIA: "MOCHILAS",
+                    CODIGO: "33070",
+                    DESCRIPCION: "MOCHILA METRO PRO EXECUTIVE BLACK",
+                    PRECIO_MAYORISTA: "49999",
+                    PVP: "114999",
+                    ESTADO: "DISPONIBLE",
+                },
+                {
+                    CATEGORIA: "MOCHILAS",
+                    CODIGO: "33075",
+                    DESCRIPCION: "MOCHILA ELEGANCE EXECUTIVE BLACK",
+                    PRECIO_MAYORISTA: "49999",
+                    PVP: "114999",
+                    ESTADO: "DISPONIBLE",
+                },
+                {
+                    CATEGORIA: "MOCHILAS",
+                    CODIGO: "33098",
+                    DESCRIPCION: "MOCHILA ECOJOURNEY TECH",
+                    PRECIO_MAYORISTA: "79999",
+                    PVP: "169000",
+                    ESTADO: "DISPONIBLE",
+                },
+                {
+                    CATEGORIA: "MOCHILAS",
+                    CODIGO: "33100",
+                    DESCRIPCION: "MOCHILA CITY SCAPE URBAN BLUE",
+                    PRECIO_MAYORISTA: "34999",
+                    PVP: "79899",
+                    ESTADO: "DISPONIBLE",
+                },
+                {
+                    CATEGORIA: "MOCHILAS",
+                    CODIGO: "33103",
+                    DESCRIPCION: "MOCHILA TREKKER LITE BLACK",
+                    PRECIO_MAYORISTA: "34999",
+                    PVP: "79899",
+                    ESTADO: "DISPONIBLE",
+                },
+                {
+                    CATEGORIA: "MOCHILAS",
+                    CODIGO: "33104",
+                    DESCRIPCION: "MOCHILA TREKKER BLACK",
+                    PRECIO_MAYORISTA: "36500",
+                    PVP: "64999",
+                    ESTADO: "DISPONIBLE",
+                },
+                {
+                    CATEGORIA: "MOCHILAS",
+                    CODIGO: "33107",
+                    DESCRIPCION: "MOCHILA TREKKER CAMEL",
+                    PRECIO_MAYORISTA: "34999",
+                    PVP: "85000",
+                    ESTADO: "DISPONIBLE",
+                },
+                {
+                    CATEGORIA: "MOCHILAS",
+                    CODIGO: "33109",
+                    DESCRIPCION: "MOCHILA TREKKER OLIVE",
+                    PRECIO_MAYORISTA: "34999",
+                    PVP: "85000",
+                    ESTADO: "DISPONIBLE",
+                },
+                {
+                    CATEGORIA: "MOCHILAS",
+                    CODIGO: "33110",
+                    DESCRIPCION: "MOCHILA HARMONY URBAN BLUE",
+                    PRECIO_MAYORISTA: "34999",
+                    PVP: "79899",
+                    ESTADO: "DISPONIBLE",
+                },
+                {
+                    CATEGORIA: "MOCHILAS",
+                    CODIGO: "33111",
+                    DESCRIPCION: "MOCHILA HARMONY URBAN GREY",
+                    PRECIO_MAYORISTA: "34999",
+                    PVP: "79899",
+                    ESTADO: "DISPONIBLE",
+                },
+                {
+                    CATEGORIA: "MOCHILAS",
+                    CODIGO: "33120",
+                    DESCRIPCION: "MOCHILA DOWNTOWN EXPLORER BLACK",
+                    PRECIO_MAYORISTA: "34999",
+                    PVP: "79899",
+                    ESTADO: "DISPONIBLE",
+                },
+                {
+                    CATEGORIA: "MOCHILAS",
+                    CODIGO: "33121",
+                    DESCRIPCION: "MOCHILA DOWNTOWN EXPLORER NAVY",
+                    PRECIO_MAYORISTA: "34999",
+                    PVP: "79899",
+                    ESTADO: "DISPONIBLE",
+                },
+                {
+                    CATEGORIA: "MOCHILAS",
+                    CODIGO: "33180",
+                    DESCRIPCION: "MOCHILA BACKPACK ISOLA MILAN BLACK",
+                    PRECIO_MAYORISTA: "36999",
+                    PVP: "79999",
+                    ESTADO: "DISPONIBLE",
+                },
+                {
+                    CATEGORIA: "MOCHILAS",
+                    CODIGO: "3BP-5711.1",
+                    DESCRIPCION: "MOCHILA BACKPACK DUBLIN BLACK",
+                    PRECIO_MAYORISTA: "33999",
+                    PVP: "75000",
+                    ESTADO: "DISPONIBLE",
+                },
+                {
+                    CATEGORIA: "MOCHILAS",
+                    CODIGO: "3BP-5712.1",
+                    DESCRIPCION: "MOCHILA BACKPACK MEDELLIN BLACK",
+                    PRECIO_MAYORISTA: "29999",
+                    PVP: "52000",
+                    ESTADO: "DISPONIBLE",
+                },
+                {
+                    CATEGORIA: "MOCHILAS",
+                    CODIGO: "3BP-5753.1",
+                    DESCRIPCION: "MOCHILA BACKPACK NEW ORLEAN BLACK",
+                    PRECIO_MAYORISTA: "24999",
+                    PVP: "43000",
+                    ESTADO: "DISPONIBLE",
+                },
+                {
+                    CATEGORIA: "MOCHILAS",
+                    CODIGO: "3BP-5761.1",
+                    DESCRIPCION: "MOCHILA BACKPACK MELBOURNE BLACK",
+                    PRECIO_MAYORISTA: "29999",
+                    PVP: "52000",
+                    ESTADO: "DISPONIBLE",
+                },
+                {
+                    CATEGORIA: "VALIJAS",
+                    CODIGO: "43305",
+                    DESCRIPCION: "VALIJA CARRY ON 20 WANDERER TITAN",
+                    PRECIO_MAYORISTA: "83500",
+                    PVP: "165000",
+                    ESTADO: "DISPONIBLE",
+                },
+                {
+                    CATEGORIA: "VALIJAS",
+                    CODIGO: "43307",
+                    DESCRIPCION: "VALIJA CARRY ON 20 WANDERER NEGRA",
+                    PRECIO_MAYORISTA: "83500",
+                    PVP: "165000",
+                    ESTADO: "DISPONIBLE",
+                },
+                {
+                    CATEGORIA: "VALIJAS",
+                    CODIGO: "43311",
+                    DESCRIPCION: "VALIJA CARRY ON JOURNEYJET BLACK 20",
+                    PRECIO_MAYORISTA: "83500",
+                    PVP: "165000",
+                    ESTADO: "DISPONIBLE",
+                },
+                {
+                    CATEGORIA: "VALIJAS",
+                    CODIGO: "43312",
+                    DESCRIPCION: "VALIJA CARRY ON JOURNEYJET WHITE 20",
+                    PRECIO_MAYORISTA: "83500",
+                    PVP: "165000",
+                    ESTADO: "DISPONIBLE",
+                },
+                {
+                    CATEGORIA: "VALIJAS",
+                    CODIGO: "43313",
+                    DESCRIPCION: "VALIJA CARRY ON JOURNEYJET GREEN 20",
+                    PRECIO_MAYORISTA: "83500",
+                    PVP: "165000",
+                    ESTADO: "DISPONIBLE",
+                },
+                {
+                    CATEGORIA: "VALIJAS",
+                    CODIGO: "43314",
+                    DESCRIPCION: "VALIJA CARRY ON ADVENTURE NAVY 20",
+                    PRECIO_MAYORISTA: "83500",
+                    PVP: "165000",
+                    ESTADO: "DISPONIBLE",
+                },
+                {
+                    CATEGORIA: "VALIJAS",
+                    CODIGO: "43315",
+                    DESCRIPCION: "VALIJA CARRY ON 20 ADVENTURE NEGRA",
+                    PRECIO_MAYORISTA: "83500",
+                    PVP: "165000",
+                    ESTADO: "DISPONIBLE",
+                },
+                {
+                    CATEGORIA: "VALIJAS",
+                    CODIGO: "43327",
+                    DESCRIPCION: "VALIJA CARRY ON 20 LUXE WANDERER ORANGE",
+                    PRECIO_MAYORISTA: "83500",
+                    PVP: "165000",
+                    ESTADO: "DISPONIBLE",
+                },
+                {
+                    CATEGORIA: "VALIJAS",
+                    CODIGO: "43329",
+                    DESCRIPCION: "VALIJA CARRY ON 20 LUXE WANDERER PURPLE",
+                    PRECIO_MAYORISTA: "83500",
+                    PVP: "165000",
+                    ESTADO: "DISPONIBLE",
+                },
+                {
+                    CATEGORIA: "VALIJAS",
+                    CODIGO: "43351",
+                    DESCRIPCION: "VALIJA CARRY ON 20 SAHARA NUDE",
+                    PRECIO_MAYORISTA: "62500",
+                    PVP: "129999",
+                    ESTADO: "AGOTADO",
+                },
+                {
+                    CATEGORIA: "VALIJAS",
+                    CODIGO: "43352",
+                    DESCRIPCION: "VALIJA CARRY ON 20 SAHARA BLACK",
+                    PRECIO_MAYORISTA: "62500",
+                    PVP: "129999",
+                    ESTADO: "DISPONIBLE",
+                },
+                {
+                    CATEGORIA: "VALIJAS",
+                    CODIGO: "43353",
+                    DESCRIPCION: "VALIJA CARRY ON 20 SAHARA TURQUESA",
+                    PRECIO_MAYORISTA: "62500",
+                    PVP: "129999",
+                    ESTADO: "DISPONIBLE",
+                },
+                {
+                    CATEGORIA: "VALIJAS",
+                    CODIGO: "433.68-72",
+                    DESCRIPCION: "SET VALIJA EVEREST 20 24 NEGRA",
+                    PRECIO_MAYORISTA: "128400",
+                    PVP: "269998",
+                    ESTADO: "DISPONIBLE",
+                },
+                {
+                    CATEGORIA: "VALIJAS",
+                    CODIGO: "4330.1-2",
+                    DESCRIPCION: "SET VALIJA 20 24 NOMAD NEGRA",
+                    PRECIO_MAYORISTA: "178500",
+                    PVP: "364999",
+                    ESTADO: "DISPONIBLE",
+                },
+                {
+                    CATEGORIA: "VALIJAS",
+                    CODIGO: "4330.3-4",
+                    DESCRIPCION: "SET VALIJA 20 24 NOMAD PINK",
+                    PRECIO_MAYORISTA: "178500",
+                    PVP: "364999",
+                    ESTADO: "DISPONIBLE",
+                },
+                {
+                    CATEGORIA: "ACCESORIOS",
+                    CODIGO: "3065",
+                    DESCRIPCION: "MOCHILA PLEGABLE",
+                    PRECIO_MAYORISTA: "12999",
+                    PVP: "29900",
+                    ESTADO: "DISPONIBLE",
+                },
+                {
+                    CATEGORIA: "ACCESORIOS",
+                    CODIGO: "3068",
+                    DESCRIPCION: "MOCHILA PLEGABLE",
+                    PRECIO_MAYORISTA: "10999",
+                    PVP: "24900",
+                    ESTADO: "DISPONIBLE",
+                },
+                {
+                    CATEGORIA: "ACCESORIOS",
+                    CODIGO: "8027",
+                    DESCRIPCION: "CANDADO DE SEGURIDAD TSA",
+                    PRECIO_MAYORISTA: "5399",
+                    PVP: "13989",
+                    ESTADO: "DISPONIBLE",
+                },
+                {
+                    CATEGORIA: "ACCESORIOS",
+                    CODIGO: "8028",
+                    DESCRIPCION: "CANDADOS TSA PARA VALIJA X 2 UNIDADES",
+                    PRECIO_MAYORISTA: "7700",
+                    PVP: "18989",
+                    ESTADO: "DISPONIBLE",
+                },
+                {
+                    CATEGORIA: "ACCESORIOS",
+                    CODIGO: "8036",
+                    DESCRIPCION: "CANDADO TSA CON COMBINACION 3 DIALES",
+                    PRECIO_MAYORISTA: "6999",
+                    PVP: "16989",
+                    ESTADO: "DISPONIBLE",
+                },
+                {
+                    CATEGORIA: "ACCESORIOS",
+                    CODIGO: "8038",
+                    DESCRIPCION: "CANDADO TSA PARA VALIJAS X 2 UN.",
+                    PRECIO_MAYORISTA: "13500",
+                    PVP: "32990",
+                    ESTADO: "DISPONIBLE",
+                },
+                {
+                    CATEGORIA: "ACCESORIOS",
+                    CODIGO: "8040",
+                    DESCRIPCION: "CORREA DE VIAJE",
+                    PRECIO_MAYORISTA: "3850",
+                    PVP: "9989",
+                    ESTADO: "DISPONIBLE",
+                },
+                {
+                    CATEGORIA: "ACCESORIOS",
+                    CODIGO: "8053",
+                    DESCRIPCION: "BOLSA PLEGABLE",
+                    PRECIO_MAYORISTA: "6350",
+                    PVP: "15900",
+                    ESTADO: "DISPONIBLE",
+                },
+                {
+                    CATEGORIA: "ACCESORIOS",
+                    CODIGO: "8066",
+                    DESCRIPCION: "BOLSO PLEGABLE DE MANO",
+                    PRECIO_MAYORISTA: "9999",
+                    PVP: "26900",
+                    ESTADO: "DISPONIBLE",
+                },
+                {
+                    CATEGORIA: "ACCESORIOS",
+                    CODIGO: "8067",
+                    DESCRIPCION: "BOLSO PLEGABLE DE MANO IMPERMEABLE",
+                    PRECIO_MAYORISTA: "12999",
+                    PVP: "31900",
+                    ESTADO: "DISPONIBLE",
+                },
+                {
+                    CATEGORIA: "ACCESORIOS",
+                    CODIGO: "8101",
+                    DESCRIPCION: "IDENTIFICADOR DE VALIJA PUZZLE",
+                    PRECIO_MAYORISTA: "2999",
+                    PVP: "7499",
+                    ESTADO: "DISPONIBLE",
+                },
+                {
+                    CATEGORIA: "ACCESORIOS",
+                    CODIGO: "8102",
+                    DESCRIPCION: "IDENTIFICADOR DE VALIJA WAVES",
+                    PRECIO_MAYORISTA: "2999",
+                    PVP: "7499",
+                    ESTADO: "DISPONIBLE",
+                },
+                {
+                    CATEGORIA: "ACCESORIOS",
+                    CODIGO: "8103",
+                    DESCRIPCION: "IDENTIFICADOR DE VALIJA SQUARES",
+                    PRECIO_MAYORISTA: "2999",
+                    PVP: "7499",
+                    ESTADO: "DISPONIBLE",
+                },
+                {
+                    CATEGORIA: "ACCESORIOS",
+                    CODIGO: "8104",
+                    DESCRIPCION: "IDENTIFICADOR DE VALIJA MAP",
+                    PRECIO_MAYORISTA: "2999",
+                    PVP: "7499",
+                    ESTADO: "DISPONIBLE",
+                },
+                {
+                    CATEGORIA: "ACCESORIOS",
+                    CODIGO: "8111",
+                    DESCRIPCION: "PORTAVALORES",
+                    PRECIO_MAYORISTA: "5999",
+                    PVP: "14900",
+                    ESTADO: "DISPONIBLE",
+                },
+                {
+                    CATEGORIA: "ACCESORIOS",
+                    CODIGO: "8113",
+                    DESCRIPCION: "PORTAVALORES",
+                    PRECIO_MAYORISTA: "6750",
+                    PVP: "16900",
+                    ESTADO: "DISPONIBLE",
+                },
+                {
+                    CATEGORIA: "ACCESORIOS",
+                    CODIGO: "8124",
+                    DESCRIPCION: "PORTAVALORES ULTRA SLIM NECK CARRIER",
+                    PRECIO_MAYORISTA: "5999",
+                    PVP: "14989",
+                    ESTADO: "DISPONIBLE",
+                },
+                {
+                    CATEGORIA: "ACCESORIOS",
+                    CODIGO: "8207",
+                    DESCRIPCION: "ALMOHADA DE VIAJE INTELIGENTE",
+                    PRECIO_MAYORISTA: "7999",
+                    PVP: "16000",
+                    ESTADO: "DISPONIBLE",
+                },
+                {
+                    CATEGORIA: "ACCESORIOS",
+                    CODIGO: "8208",
+                    DESCRIPCION: "ALMOHADA DE VIAJE DREAMER",
+                    PRECIO_MAYORISTA: "9999",
+                    PVP: "25000",
+                    ESTADO: "DISPONIBLE",
+                },
+                {
+                    CATEGORIA: "ACCESORIOS",
+                    CODIGO: "8209",
+                    DESCRIPCION: "ALMOHADA DE VIAJE INFINITY",
+                    PRECIO_MAYORISTA: "14999",
+                    PVP: "39900",
+                    ESTADO: "DISPONIBLE",
+                },
+                {
+                    CATEGORIA: "ACCESORIOS",
+                    CODIGO: "8212",
+                    DESCRIPCION: "ALMOHADA DE VIAJE INTELIGENTE",
+                    PRECIO_MAYORISTA: "12999",
+                    PVP: "35000",
+                    ESTADO: "DISPONIBLE",
+                },
+                {
+                    CATEGORIA: "ACCESORIOS",
+                    CODIGO: "8217",
+                    DESCRIPCION: "ALMOHADA ERGONOMICA MASAJE",
+                    PRECIO_MAYORISTA: "19999",
+                    PVP: "42900",
+                    ESTADO: "AGOTADO",
+                },
+                {
+                    CATEGORIA: "ACCESORIOS",
+                    CODIGO: "8220",
+                    DESCRIPCION: "ALMOHADA DE VIAJE",
+                    PRECIO_MAYORISTA: "3700",
+                    PVP: "9900",
+                    ESTADO: "DISPONIBLE",
+                },
+                {
+                    CATEGORIA: "ACCESORIOS",
+                    CODIGO: "8221",
+                    DESCRIPCION: "ALMOHADA DE VIAJE INFLABLE",
+                    PRECIO_MAYORISTA: "5899",
+                    PVP: "14989",
+                    ESTADO: "AGOTADO",
+                },
+                {
+                    CATEGORIA: "ACCESORIOS",
+                    CODIGO: "8222",
+                    DESCRIPCION: "ALMOHADA DE VIAJE",
+                    PRECIO_MAYORISTA: "6600",
+                    PVP: "15989",
+                    ESTADO: "DISPONIBLE",
+                },
+                {
+                    CATEGORIA: "ACCESORIOS",
+                    CODIGO: "8223",
+                    DESCRIPCION: "COMFORT SET ALMOHADA + ANTIFAZ",
+                    PRECIO_MAYORISTA: "7350",
+                    PVP: "18499",
+                    ESTADO: "DISPONIBLE",
+                },
+                {
+                    CATEGORIA: "ACCESORIOS",
+                    CODIGO: "8232",
+                    DESCRIPCION: "ALMOHADA DE VIAJE INTELIGENTE",
+                    PRECIO_MAYORISTA: "12500",
+                    PVP: "28900",
+                    ESTADO: "DISPONIBLE",
+                },
+                {
+                    CATEGORIA: "ACCESORIOS",
+                    CODIGO: "8330",
+                    DESCRIPCION: "ORGANIZADOR DE ROPA PARA EQUIPAJE",
+                    PRECIO_MAYORISTA: "7550",
+                    PVP: "18900",
+                    ESTADO: "DISPONIBLE",
+                },
+                {
+                    CATEGORIA: "ACCESORIOS",
+                    CODIGO: "8341",
+                    DESCRIPCION: "ORGANIZADOR NECESER PARA EQUIPAJE",
+                    PRECIO_MAYORISTA: "11500",
+                    PVP: "27499",
+                    ESTADO: "DISPONIBLE",
+                },
+                {
+                    CATEGORIA: "ACCESORIOS",
+                    CODIGO: "8450",
+                    DESCRIPCION: "ANTIFAZ PARA DORMIR",
+                    PRECIO_MAYORISTA: "2399",
+                    PVP: "5900",
+                    ESTADO: "AGOTADO",
+                },
+                {
+                    CATEGORIA: "ACCESORIOS",
+                    CODIGO: "8451",
+                    DESCRIPCION: "COMFORT SET ANTIFAZ + TAPONES",
+                    PRECIO_MAYORISTA: "2899",
+                    PVP: "6900",
+                    ESTADO: "DISPONIBLE",
+                },
+                {
+                    CATEGORIA: "ACCESORIOS",
+                    CODIGO: "8453",
+                    DESCRIPCION: "ANTIFAZ PARA DORMIR LUXURY",
+                    PRECIO_MAYORISTA: "3700",
+                    PVP: "8900",
+                    ESTADO: "AGOTADO",
+                },
+                {
+                    CATEGORIA: "ACCESORIOS",
+                    CODIGO: "8454",
+                    DESCRIPCION: "ANTIFAZ PARA DORMIR",
+                    PRECIO_MAYORISTA: "4200",
+                    PVP: "10900",
+                    ESTADO: "DISPONIBLE",
+                },
+                {
+                    CATEGORIA: "ACCESORIOS",
+                    CODIGO: "8490",
+                    DESCRIPCION: "TAPONES PARA LOS OIDOS",
+                    PRECIO_MAYORISTA: "2399",
+                    PVP: "5900",
+                    ESTADO: "DISPONIBLE",
+                },
+                {
+                    CATEGORIA: "ACCESORIOS",
+                    CODIGO: "8492",
+                    DESCRIPCION: "TAPONES DE VUELO PARA LOS OIDOS",
+                    PRECIO_MAYORISTA: "5399",
+                    PVP: "12999",
+                    ESTADO: "DISPONIBLE",
+                },
+                {
+                    CATEGORIA: "ACCESORIOS",
+                    CODIGO: "8493",
+                    DESCRIPCION: "TAPONES DE SILICONA PARA LOS OIDOS",
+                    PRECIO_MAYORISTA: "5399",
+                    PVP: "13900",
+                    ESTADO: "DISPONIBLE",
+                },
+                {
+                    CATEGORIA: "ACCESORIOS",
+                    CODIGO: "8590",
+                    DESCRIPCION: "CUBRE VALIJA SMALL 20 A 22",
+                    PRECIO_MAYORISTA: "17500",
+                    PVP: "39900",
+                    ESTADO: "DISPONIBLE",
+                },
+                {
+                    CATEGORIA: "ACCESORIOS",
+                    CODIGO: "8591",
+                    DESCRIPCION: "CUBRE VALIJA MEDIUM 24 A 26",
+                    PRECIO_MAYORISTA: "18999",
+                    PVP: "42900",
+                    ESTADO: "DISPONIBLE",
+                },
+                {
+                    CATEGORIA: "ACCESORIOS",
+                    CODIGO: "8592",
+                    DESCRIPCION: "CUBRE VALIJA LARGE 28 A 30",
+                    PRECIO_MAYORISTA: "19999",
+                    PVP: "44900",
+                    ESTADO: "DISPONIBLE",
+                },
+                {
+                    CATEGORIA: "ACCESORIOS",
+                    CODIGO: "8593",
+                    DESCRIPCION: "CUBRE VALIJA SMALL 20 A 22 (B)",
+                    PRECIO_MAYORISTA: "17500",
+                    PVP: "39900",
+                    ESTADO: "DISPONIBLE",
+                },
+                {
+                    CATEGORIA: "ACCESORIOS",
+                    CODIGO: "8594",
+                    DESCRIPCION: "CUBRE VALIJA MEDIUM 24 A 26 (B)",
+                    PRECIO_MAYORISTA: "18999",
+                    PVP: "42900",
+                    ESTADO: "DISPONIBLE",
+                },
+                {
+                    CATEGORIA: "ACCESORIOS",
+                    CODIGO: "8595",
+                    DESCRIPCION: "CUBRE VALIJA LARGE 28 A 30 (B)",
+                    PRECIO_MAYORISTA: "19999",
+                    PVP: "44900",
+                    ESTADO: "DISPONIBLE",
+                },
+                {
+                    CATEGORIA: "ACCESORIOS",
+                    CODIGO: "8596",
+                    DESCRIPCION: "CUBRE VALIJA SMALL 20 A 22 (C)",
+                    PRECIO_MAYORISTA: "14500",
+                    PVP: "33900",
+                    ESTADO: "DISPONIBLE",
+                },
+                {
+                    CATEGORIA: "ACCESORIOS",
+                    CODIGO: "8597",
+                    DESCRIPCION: "CUBRE VALIJA MEDIUM 24 A 26 (C)",
+                    PRECIO_MAYORISTA: "15999",
+                    PVP: "36900",
+                    ESTADO: "DISPONIBLE",
+                },
+                {
+                    CATEGORIA: "ACCESORIOS",
+                    CODIGO: "8598",
+                    DESCRIPCION: "CUBRE VALIJA LARGE 24 A 26 (C)",
+                    PRECIO_MAYORISTA: "17500",
+                    PVP: "39900",
+                    ESTADO: "DISPONIBLE",
+                },
+                {
+                    CATEGORIA: "ACCESORIOS",
+                    CODIGO: "8635",
+                    DESCRIPCION: "RINONERA METRO POUCH",
+                    PRECIO_MAYORISTA: "13999",
+                    PVP: "32990",
+                    ESTADO: "DISPONIBLE",
+                },
+                {
+                    CATEGORIA: "ACCESORIOS",
+                    CODIGO: "8650",
+                    DESCRIPCION: "MANTA DE VIAJE",
+                    PRECIO_MAYORISTA: "11999",
+                    PVP: "19500",
+                    ESTADO: "DISPONIBLE",
+                },
+                {
+                    CATEGORIA: "ACCESORIOS",
+                    CODIGO: "8660",
+                    DESCRIPCION: "PILOTO",
+                    PRECIO_MAYORISTA: "3399",
+                    PVP: "7989",
+                    ESTADO: "DISPONIBLE",
+                },
+                {
+                    CATEGORIA: "ACCESORIOS",
+                    CODIGO: "8790",
+                    DESCRIPCION: "SOQUETES DE COMPRESION L/XL",
+                    PRECIO_MAYORISTA: "7550",
+                    PVP: "17900",
+                    ESTADO: "DISPONIBLE",
+                },
+                {
+                    CATEGORIA: "ACCESORIOS",
+                    CODIGO: "8791",
+                    DESCRIPCION: "SOQUETES DE COMPRESION S/M",
+                    PRECIO_MAYORISTA: "7550",
+                    PVP: "17900",
+                    ESTADO: "DISPONIBLE",
+                },
+                {
+                    CATEGORIA: "ACCESORIOS",
+                    CODIGO: "9521",
+                    DESCRIPCION: "BOTELLA TERMICA NAVY",
+                    PRECIO_MAYORISTA: "12500",
+                    PVP: "27900",
+                    ESTADO: "DISPONIBLE",
+                },
+                {
+                    CATEGORIA: "ACCESORIOS",
+                    CODIGO: "9522",
+                    DESCRIPCION: "BOTELLA TERMICA IVORY",
+                    PRECIO_MAYORISTA: "12500",
+                    PVP: "27900",
+                    ESTADO: "AGOTADO",
+                },
+                {
+                    CATEGORIA: "ACCESORIOS",
+                    CODIGO: "9523",
+                    DESCRIPCION: "BOTELLA TERMICA GREY",
+                    PRECIO_MAYORISTA: "12500",
+                    PVP: "27900",
+                    ESTADO: "DISPONIBLE",
+                },
+                {
+                    CATEGORIA: "ACCESORIOS",
+                    CODIGO: "9524",
+                    DESCRIPCION: "BOTELLA TERMICA LIGHT GREEN",
+                    PRECIO_MAYORISTA: "12500",
+                    PVP: "27900",
+                    ESTADO: "AGOTADO",
+                },
+                {
+                    CATEGORIA: "ACCESORIOS",
+                    CODIGO: "9525",
+                    DESCRIPCION: "BOTELLA TERMICA BLACK",
+                    PRECIO_MAYORISTA: "12500",
+                    PVP: "27900",
+                    ESTADO: "DISPONIBLE",
+                },
+                {
+                    CATEGORIA: "ACCESORIOS",
+                    CODIGO: "82412",
+                    DESCRIPCION: "ALMOHADA DE VIAJE CON MASAJEADOR ANOMEO",
+                    PRECIO_MAYORISTA: "16999",
+                    PVP: "42900",
+                    ESTADO: "DISPONIBLE",
+                },
+                {
+                    CATEGORIA: "SLOOTH",
+                    CODIGO: "89031",
+                    DESCRIPCION: "ALMOHADA DE VIAJE PANDA KID",
+                    PRECIO_MAYORISTA: "11000",
+                    PVP: "25000",
+                    ESTADO: "DISPONIBLE",
+                },
+                {
+                    CATEGORIA: "SLOOTH",
+                    CODIGO: "89032",
+                    DESCRIPCION: "ALMOHADA DE VIAJE UNICORNIO KID",
+                    PRECIO_MAYORISTA: "11000",
+                    PVP: "25000",
+                    ESTADO: "DISPONIBLE",
+                },
+                {
+                    CATEGORIA: "SLOOTH",
+                    CODIGO: "89034",
+                    DESCRIPCION: "ALMOHADA DE VIAJE OSO KID",
+                    PRECIO_MAYORISTA: "11000",
+                    PVP: "25000",
+                    ESTADO: "DISPONIBLE",
+                },
+                {
+                    CATEGORIA: "SLOOTH",
+                    CODIGO: "89035",
+                    DESCRIPCION: "ALMOHADA DE VIAJE TIGRE ROSA KID",
+                    PRECIO_MAYORISTA: "11000",
+                    PVP: "25000",
+                    ESTADO: "DISPONIBLE",
+                },
+                {
+                    CATEGORIA: "SLOOTH",
+                    CODIGO: "89036",
+                    DESCRIPCION: "ALMOHADA DE VIAJE TIGRE AZUL KID",
+                    PRECIO_MAYORISTA: "11000",
+                    PVP: "25000",
+                    ESTADO: "DISPONIBLE",
+                },
+                {
+                    CATEGORIA: "SLOOTH",
+                    CODIGO: "81.440.1",
+                    DESCRIPCION: "ALMOHADA DE VIAJE INTELIGENTE",
+                    PRECIO_MAYORISTA: "9500",
+                    PVP: "18999",
+                    ESTADO: "DISPONIBLE",
+                },
+                {
+                    CATEGORIA: "SLOOTH",
+                    CODIGO: "81.462.1",
+                    DESCRIPCION: "ALMOHADA DE VIAJE INTELIGENTE",
+                    PRECIO_MAYORISTA: "7999",
+                    PVP: "17000",
+                    ESTADO: "DISPONIBLE",
+                },
+                {
+                    CATEGORIA: "SLOOTH",
+                    CODIGO: "89048",
+                    DESCRIPCION: "ALMOHADA DE VIAJE ERGONOMICA GRIS",
+                    PRECIO_MAYORISTA: "9999",
+                    PVP: "19999",
+                    ESTADO: "DISPONIBLE",
+                },
+                {
+                    CATEGORIA: "SLOOTH",
+                    CODIGO: "81.490.1",
+                    DESCRIPCION: "ALMOHADA DE VIAJE ERGONOMICA NEGRO",
+                    PRECIO_MAYORISTA: "10500",
+                    PVP: "22000",
+                    ESTADO: "DISPONIBLE",
+                },
+                {
+                    CATEGORIA: "SLOOTH",
+                    CODIGO: "81.502.1",
+                    DESCRIPCION: "ALMOHADA DE VIAJE ERGONOMICA",
+                    PRECIO_MAYORISTA: "10500",
+                    PVP: "22000",
+                    ESTADO: "DISPONIBLE",
+                },
+                {
+                    CATEGORIA: "SLOOTH",
+                    CODIGO: "81.520.4",
+                    DESCRIPCION: "ALMOHADA DE VIAJE",
+                    PRECIO_MAYORISTA: "7999",
+                    PVP: "18499",
+                    ESTADO: "DISPONIBLE",
+                },
+                {
+                    CATEGORIA: "SLOOTH",
+                    CODIGO: "81.960.1",
+                    DESCRIPCION: "ALMOHADA DE VIAJE ERGONOMICA",
+                    PRECIO_MAYORISTA: "10500",
+                    PVP: "22000",
+                    ESTADO: "AGOTADO",
+                },
+                {
+                    CATEGORIA: "SLOOTH",
+                    CODIGO: "85.230.3",
+                    DESCRIPCION: "CANDADO TSA KEY",
+                    PRECIO_MAYORISTA: "5999",
+                    PVP: "14000",
+                    ESTADO: "AGOTADO",
+                },
+                {
+                    CATEGORIA: "SLOOTH",
+                    CODIGO: "85.260.1",
+                    DESCRIPCION: "CANDADO TSA CON COMBINACION",
+                    PRECIO_MAYORISTA: "5999",
+                    PVP: "14000",
+                    ESTADO: "DISPONIBLE",
+                },
+            ];
+        </script>
+    </body>
 </html>
