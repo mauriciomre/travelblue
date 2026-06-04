@@ -947,13 +947,24 @@ async function sendWA() {
     var nombre = document.getElementById("cNombre").value.trim();
     var caract = document.getElementById("cCaract").value.trim();
     var num = document.getElementById("cNum").value.trim();
+    if (!telCompleto()) {
+        // Si el formulario no está visible, mostrarlo para que el cliente sepa qué falta
+        if (document.getElementById("clienteForm").style.display === "none") {
+            toastCarrito(
+                "📞 Completá el número de teléfono para continuar.",
+                "#c62828",
+            );
+        } else {
+            alert(
+                "El teléfono está incompleto. Ingresá la característica y el número.",
+            );
+        }
+        document.getElementById("cCaract").focus();
+        return;
+    }
     if (!nombre) {
         alert("El nombre es obligatorio.");
         document.getElementById("cNombre").focus();
-        return;
-    }
-    if (!telCompleto()) {
-        alert("El teléfono es obligatorio.");
         return;
     }
     var tel = normalizarTelJS(caract, num);
