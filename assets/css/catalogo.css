@@ -792,6 +792,26 @@ header {
     width: 100%
 }
 
+.continue-btn {
+    width: 100%;
+    background: none;
+    border: 1.5px solid var(--border);
+    color: var(--muted);
+    border-radius: 10px;
+    padding: 9px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    margin-bottom: 10px;
+    transition: all .15s
+}
+
+.continue-btn:hover {
+    border-color: var(--blue);
+    color: var(--blue);
+    background: var(--pale)
+}
+
 /* FORMULARIO CLIENTE */
 .field-group {
     margin-bottom: 10px
