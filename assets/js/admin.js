@@ -1686,10 +1686,12 @@ function imprimirPedido() {
     html +=
         ".firma{border-top:1px solid #333;margin-top:50px;padding-top:6px;font-size:13px;color:#666}";
     html += "@media print{body{padding:10px}}";
+    html +=
+        ".deposit-box{display:inline-block;width:36px;height:28px;border:2px solid #333;vertical-align:middle}";
     html += "</style></head><body>";
     html += "<h1>Pedido #" + p.id + " — Travel Blue Argentina</h1>";
     html +=
-        '<p style="color:#666;font-size:12px;margin-bottom:16px">Fecha: ' +
+        '<p style="color:#666;font-size:13px;margin-bottom:16px">Fecha: ' +
         fecha +
         "</p>";
     html += '<div class="info">';
@@ -1707,16 +1709,18 @@ function imprimirPedido() {
     if (p.transporte) html += "<strong>Transporte:</strong> " + p.transporte;
     html += "</div></div>";
     html +=
-        '<table><thead><tr><th style="width:30px">✓</th><th>Código</th><th>Descripción</th><th>Cant. pedida</th><th>Cant. real</th></tr></thead><tbody>';
+        '<table><thead><tr><th>Código</th><th>Descripción</th><th style="text-align:center">Cant.</th><th style="text-align:center;width:70px">Central</th><th style="text-align:center;width:70px">Seppey</th></tr></thead><tbody>';
     p.items.forEach(function (item) {
         html +=
-            '<tr><td><span class="check"></span></td><td>' +
-            item.codigo +
-            "</td><td>" +
-            item.descripcion +
-            '</td><td style="text-align:center;font-weight:bold">' +
+            "<tr><td>" + item.codigo + "</td><td>" + item.descripcion + "</td>";
+        html +=
+            '<td style="text-align:center;font-weight:bold">' +
             item.cantidad +
-            '</td><td style="text-align:center">______</td></tr>';
+            "</td>";
+        html +=
+            '<td style="text-align:center"><span class="deposit-box"></span></td>';
+        html +=
+            '<td style="text-align:center"><span class="deposit-box"></span></td></tr>';
     });
     html += "</tbody></table>";
     html +=

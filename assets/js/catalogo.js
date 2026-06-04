@@ -925,6 +925,42 @@ async function sendWA() {
     btn.disabled = true;
     btn.style.background = "#1a9e52";
     btn.innerHTML =
+        '<span style="display:inline-block;animation:spin .6s linear infinite;margin-right:8px">⏳</span> Verificando stock...';
+
+    // Verificar stock actualizado
+    try {
+        var resProds = await fetch(
+            API_URL + "?action=productos&t=" + Date.now(),
+        );
+        var freshProds = await resProds.json();
+        var agotados = [];
+        Object.keys(cart).forEach(function (code) {
+            var fresh = freshProds.find(function (p) {
+                return p.codigo === code;
+            });
+            if (fresh && (fresh.estado || "").toUpperCase() === "AGOTADO") {
+                agotados.push(
+                    "• " + cart[code].p.DESCRIPCION + " (Cód: " + code + ")",
+                );
+                delete cart[code];
+            }
+        });
+        if (agotados.length > 0) {
+            saveCart();
+            updateCart();
+            btn.disabled = false;
+            btn.style.background = "";
+            btn.innerHTML = "📱 Confirmar y enviar pedido";
+            alert(
+                "⚠️ Los siguientes artículos se agotaron y fueron quitados de tu pedido:\n\n" +
+                    agotados.join("\n") +
+                    "\n\nPodés agregar otros artículos o continuar con el pedido actual.",
+            );
+            return;
+        }
+    } catch (e) {}
+
+    btn.innerHTML =
         '<span style="display:inline-block;animation:spin .6s linear infinite;margin-right:8px">⏳</span> Procesando...';
     // Guardar cliente en BD
     var cRes = await fetch(API_URL + "?action=cliente_guardar", {
