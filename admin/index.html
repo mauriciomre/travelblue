@@ -57,10 +57,6 @@
                 <!-- SIDEBAR -->
                 <nav class="sidebar" id="sidebar">
                     <div class="sidebar-group">
-                        <div class="sidebar-group-title">
-                            <span class="sg-icon">📦</span
-                            ><span class="sg-label">Catálogo</span>
-                        </div>
                         <button
                             class="sidebar-item on"
                             data-section="productos"
@@ -87,10 +83,6 @@
                         </button>
                     </div>
                     <div class="sidebar-group">
-                        <div class="sidebar-group-title">
-                            <span class="sg-icon">📋</span
-                            ><span class="sg-label">Pedidos</span>
-                        </div>
                         <button
                             class="sidebar-item"
                             data-section="pedidos"
@@ -101,10 +93,6 @@
                         </button>
                     </div>
                     <div class="sidebar-group">
-                        <div class="sidebar-group-title">
-                            <span class="sg-icon">👥</span
-                            ><span class="sg-label">Clientes</span>
-                        </div>
                         <button
                             class="sidebar-item"
                             data-section="clientes"
@@ -115,10 +103,6 @@
                         </button>
                     </div>
                     <div class="sidebar-group">
-                        <div class="sidebar-group-title">
-                            <span class="sg-icon">⚙️</span
-                            ><span class="sg-label">Configuración</span>
-                        </div>
                         <button
                             class="sidebar-item"
                             data-section="configuracion"
@@ -127,6 +111,14 @@
                             <span class="si-icon">⚙️</span
                             ><span class="si-label">Configuración</span>
                         </button>
+                    </div>
+                    <div
+                        class="sidebar-collapse-btn"
+                        onclick="toggleSidebar()"
+                        title="Colapsar / expandir menú"
+                    >
+                        <span class="si-icon collapse-icon">◀</span
+                        ><span class="si-label">Colapsar menú</span>
                     </div>
                 </nav>
 
@@ -190,12 +182,6 @@
                                 onclick="openModal()"
                             >
                                 + Nuevo producto
-                            </button>
-                            <button
-                                class="btn btn-import"
-                                onclick="importarData()"
-                            >
-                                ⬆ Importar
                             </button>
                         </div>
                         <!-- Toolbar de ordenamiento automático (solo en modo edición) -->
