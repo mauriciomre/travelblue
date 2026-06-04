@@ -539,12 +539,16 @@
                                 onchange="filterPedidos()"
                             >
                                 <option value="">Todos los estados</option>
+                                <option value="TODOS_CON_ELIMINADOS">
+                                    Todos (+ Eliminados)
+                                </option>
                                 <option value="PENDIENTE">Pendiente</option>
                                 <option value="EN_PREPARACION">
                                     En preparación
                                 </option>
                                 <option value="FACTURADO">Facturado</option>
                                 <option value="ENVIADO">Enviado</option>
+                                <option value="ELIMINADO">Eliminados</option>
                             </select>
                         </div>
                         <table id="pedidosTable">
@@ -579,13 +583,38 @@
                             <input
                                 type="text"
                                 id="clienteSrch"
-                                placeholder="🔍 Buscar por nombre o teléfono..."
+                                placeholder="🔍 Buscar por nombre, teléfono o CUIT..."
                                 oninput="filterClientes()"
                                 style="flex: 1"
                             />
+                            <select
+                                id="clienteFiltVista"
+                                onchange="filterClientes()"
+                            >
+                                <option value="activos">Activos</option>
+                                <option value="eliminados">Eliminados</option>
+                                <option value="todos">Todos</option>
+                            </select>
+                            <button
+                                class="btn"
+                                style="
+                                    background: #fff;
+                                    border: 1.5px solid var(--border);
+                                    color: #333;
+                                "
+                                onclick="openClientColModal()"
+                            >
+                                ⚙ Columnas
+                            </button>
+                            <button
+                                class="btn btn-primary"
+                                onclick="openNuevoClienteModal()"
+                            >
+                                + Nuevo cliente
+                            </button>
                         </div>
                         <table>
-                            <thead>
+                            <thead id="clientesThead">
                                 <tr>
                                     <th>Nombre</th>
                                     <th>Teléfono</th>
@@ -1024,6 +1053,32 @@
                                     onclick="guardarCategoria()"
                                 >
                                     Guardar
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- MODAL COLUMNAS CLIENTES -->
+                    <div class="modal-bg" id="clientColModalBg">
+                        <div class="modal" style="max-width: 340px">
+                            <h2>Columnas de clientes</h2>
+                            <div
+                                id="clientColModalBody"
+                                style="margin: 16px 0"
+                            ></div>
+                            <div class="modal-foot">
+                                <button
+                                    class="btn"
+                                    style="background: #eee"
+                                    onclick="closeClientColModal()"
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    class="btn btn-primary"
+                                    onclick="applyClientColModal()"
+                                >
+                                    Aplicar
                                 </button>
                             </div>
                         </div>

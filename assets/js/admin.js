@@ -1566,8 +1566,15 @@ async function loadPedidos() {
     var q = document.getElementById("pedidoSrch").value;
     var est = document.getElementById("pedidoFiltEst").value;
     var url = API + "?action=pedidos";
+    if (est === "TODOS_CON_ELIMINADOS") {
+        url += "&vista=todos";
+    } else if (est === "ELIMINADO") {
+        url += "&vista=eliminados";
+    } else {
+        url += "&vista=activos";
+        if (est) url += "&estado=" + encodeURIComponent(est);
+    }
     if (q) url += "&q=" + encodeURIComponent(q);
-    if (est) url += "&estado=" + encodeURIComponent(est);
     var res = await fetch(url);
     allPedidos = await res.json();
     renderPedidosTable();
@@ -1585,6 +1592,7 @@ var ESTADO_LABELS = {
     },
     FACTURADO: { label: "Facturado", color: "#2e7d32", bg: "#e8f5e9" },
     ENVIADO: { label: "Enviado", color: "#6a1b9a", bg: "#f3e5f5" },
+    ELIMINADO: { label: "Eliminado", color: "#999", bg: "#f5f5f5" },
 };
 
 function estadoBadge(est) {
@@ -1610,11 +1618,17 @@ function renderPedidosTable() {
             hour: "2-digit",
             minute: "2-digit",
         });
-        html += "<tr>";
+        var eliminado = p.estado === "ELIMINADO";
+        html += "<tr" + (eliminado ? ' style="opacity:.5"' : "") + ">";
         html += "<td><strong>#" + p.id + "</strong></td>";
         html +=
             '<td style="font-size:12px;white-space:nowrap">' + fecha + "</td>";
-        html += "<td><strong>" + p.cliente_nombre + "</strong></td>";
+        html +=
+            '<td><button class="link-btn" onclick="abrirClienteDesdePedido(' +
+            p.cliente_id +
+            ')">' +
+            p.cliente_nombre +
+            "</button></td>";
         html +=
             '<td><a href="https://wa.me/' +
             p.cliente_tel +
@@ -1629,12 +1643,61 @@ function renderPedidosTable() {
         html +=
             '<td><div class="actions"><button class="btn btn-edit" onclick="openPedidoModal(' +
             p.id +
-            ')">Ver</button></div></td>';
+            ')">Ver</button>';
+        if (eliminado)
+            html +=
+                '<button class="btn" style="background:#e8f5e9;color:#2e7d32;padding:6px 12px;font-size:12px" onclick="restaurarPedido(' +
+                p.id +
+                ')">↩ Restaurar</button>';
+        else
+            html +=
+                '<button class="btn btn-danger" onclick="eliminarPedido(' +
+                p.id +
+                ')">🗑</button>';
+        html += "</div></td>";
         html += "</tr>";
     });
     document.getElementById("pedidosTbody").innerHTML =
         html ||
         '<tr><td colspan="7" style="text-align:center;color:#aaa;padding:30px">No hay pedidos</td></tr>';
+}
+
+async function eliminarPedido(id) {
+    if (!confirm("¿Marcar este pedido como eliminado?")) return;
+    var res = await fetch(API + "?action=pedido_eliminar&id=" + id, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ _user: authUser, _pass: authPass }),
+    });
+    var json = await res.json();
+    if (json.ok) {
+        toast("Pedido eliminado");
+        loadPedidos();
+    } else toast("Error", "#c62828");
+}
+
+async function restaurarPedido(id) {
+    var res = await fetch(API + "?action=pedido_restaurar&id=" + id, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ _user: authUser, _pass: authPass }),
+    });
+    var json = await res.json();
+    if (json.ok) {
+        toast("Pedido restaurado");
+        loadPedidos();
+    } else toast("Error", "#c62828");
+}
+
+function abrirClienteDesdePedido(clienteId) {
+    showSection(
+        "clientes",
+        document.querySelector('.sidebar-item[data-section="clientes"]'),
+    );
+    setTimeout(async function () {
+        await loadClientes();
+        openClienteModal(clienteId);
+    }, 100);
 }
 
 async function openPedidoModal(id) {
@@ -1865,9 +1928,76 @@ function imprimirPedido() {
 // ── CLIENTES ──────────────────────────────────────────────────────────────────
 var allClientesAdmin = [];
 
+var CLIENT_COLS = [
+    { key: "nombre", label: "Nombre" },
+    { key: "telefono", label: "Teléfono" },
+    { key: "cuit_dni", label: "CUIT / DNI" },
+    { key: "email", label: "Email" },
+    { key: "localidad", label: "Localidad" },
+    { key: "provincia", label: "Provincia" },
+    { key: "domicilio", label: "Domicilio" },
+    { key: "cp", label: "CP" },
+    { key: "transporte", label: "Transporte" },
+    { key: "notas", label: "Notas" },
+    { key: "pedidos", label: "Pedidos" },
+    { key: "acciones", label: "Acciones" },
+];
+var visibleClientCols = {};
+function loadClientColPrefs() {
+    try {
+        var saved = JSON.parse(localStorage.getItem("tb_client_cols") || "{}");
+        CLIENT_COLS.forEach(function (c) {
+            visibleClientCols[c.key] =
+                saved[c.key] !== undefined ? saved[c.key] : true;
+        });
+    } catch (e) {
+        CLIENT_COLS.forEach(function (c) {
+            visibleClientCols[c.key] = true;
+        });
+    }
+}
+function saveClientColPrefs() {
+    localStorage.setItem("tb_client_cols", JSON.stringify(visibleClientCols));
+}
+loadClientColPrefs();
+
+function openClientColModal() {
+    var html = CLIENT_COLS.map(function (c) {
+        return (
+            '<label style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);cursor:pointer">' +
+            '<input type="checkbox" value="' +
+            c.key +
+            '" ' +
+            (visibleClientCols[c.key] ? "checked" : "") +
+            " onchange=\"visibleClientCols['" +
+            c.key +
+            "']=this.checked\"> " +
+            c.label +
+            "</label>"
+        );
+    }).join("");
+    document.getElementById("clientColModalBody").innerHTML = html;
+    document.getElementById("clientColModalBg").classList.add("open");
+}
+function closeClientColModal() {
+    document.getElementById("clientColModalBg").classList.remove("open");
+}
+function applyClientColModal() {
+    saveClientColPrefs();
+    closeClientColModal();
+    renderClientesTable();
+}
+
+function ccol(key) {
+    return visibleClientCols[key] !== false;
+}
+
 async function loadClientes() {
     var q = document.getElementById("clienteSrch").value;
-    var url = API + "?action=clientes";
+    var vista = document.getElementById("clienteFiltVista")
+        ? document.getElementById("clienteFiltVista").value
+        : "activos";
+    var url = API + "?action=clientes&vista=" + vista;
     if (q) url += "&q=" + encodeURIComponent(q);
     var res = await fetch(url);
     allClientesAdmin = await res.json();
@@ -1880,27 +2010,120 @@ function filterClientes() {
 function renderClientesTable() {
     var html = "";
     allClientesAdmin.forEach(function (c) {
-        html += "<tr>";
-        html += "<td><strong>" + c.nombre + "</strong></td>";
-        html +=
-            '<td><a href="https://wa.me/' +
-            c.telefono +
-            '" target="_blank" style="color:var(--blue);text-decoration:none">+' +
-            c.telefono +
-            "</a></td>";
-        html += "<td>" + (c.cuit_dni || "—") + "</td>";
-        html += "<td>" + (c.localidad || "—") + "</td>";
-        html +=
-            '<td style="text-align:center">' + (c.total_pedidos || 0) + "</td>";
-        html +=
-            '<td><div class="actions"><button class="btn btn-edit" onclick="openClienteModal(' +
-            c.id +
-            ')">✏ Editar</button></div></td>';
+        var eliminado = parseInt(c.eliminado) === 1;
+        html += "<tr" + (eliminado ? ' style="opacity:.5"' : "") + ">";
+        if (ccol("nombre"))
+            html += "<td><strong>" + c.nombre + "</strong></td>";
+        if (ccol("telefono"))
+            html +=
+                '<td><a href="https://wa.me/' +
+                c.telefono +
+                '" target="_blank" style="color:var(--blue);text-decoration:none">+' +
+                c.telefono +
+                "</a></td>";
+        if (ccol("cuit_dni")) html += "<td>" + (c.cuit_dni || "—") + "</td>";
+        if (ccol("email")) html += "<td>" + (c.email || "—") + "</td>";
+        if (ccol("localidad")) html += "<td>" + (c.localidad || "—") + "</td>";
+        if (ccol("provincia")) html += "<td>" + (c.provincia || "—") + "</td>";
+        if (ccol("domicilio")) html += "<td>" + (c.domicilio || "—") + "</td>";
+        if (ccol("cp")) html += "<td>" + (c.cp || "—") + "</td>";
+        if (ccol("transporte"))
+            html += "<td>" + (c.transporte || "—") + "</td>";
+        if (ccol("notas"))
+            html +=
+                '<td style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' +
+                (c.notas || "—") +
+                "</td>";
+        if (ccol("pedidos"))
+            html +=
+                '<td style="text-align:center"><button class="link-btn" onclick="verPedidosCliente(' +
+                c.id +
+                "," +
+                c.cliente_nombre_esc +
+                ')">' +
+                (c.total_pedidos || 0) +
+                "</button></td>";
+        if (ccol("acciones")) {
+            html +=
+                '<td><div class="actions"><button class="btn btn-edit" onclick="openClienteModal(' +
+                c.id +
+                ')">✏ Editar</button>';
+            if (eliminado)
+                html +=
+                    '<button class="btn" style="background:#e8f5e9;color:#2e7d32;padding:6px 12px;font-size:12px" onclick="restaurarCliente(' +
+                    c.id +
+                    ')">↩</button>';
+            else
+                html +=
+                    '<button class="btn btn-danger" onclick="eliminarCliente(' +
+                    c.id +
+                    ",'" +
+                    c.nombre.replace(/'/g, "") +
+                    "')\">🗑</button>";
+            html += "</div></td>";
+        }
         html += "</tr>";
     });
     document.getElementById("clientesTbody").innerHTML =
         html ||
-        '<tr><td colspan="6" style="text-align:center;color:#aaa;padding:30px">No hay clientes</td></tr>';
+        '<tr><td colspan="12" style="text-align:center;color:#aaa;padding:30px">No hay clientes</td></tr>';
+}
+
+function verPedidosCliente(clienteId) {
+    showSection(
+        "pedidos",
+        document.querySelector('.sidebar-item[data-section="pedidos"]'),
+    );
+    setTimeout(async function () {
+        document.getElementById("pedidoSrch").value = "";
+        document.getElementById("pedidoFiltEst").value = "";
+        var url = API + "?action=pedidos&vista=activos&cliente_id=" + clienteId;
+        var res = await fetch(url);
+        allPedidos = await res.json();
+        renderPedidosTable();
+    }, 100);
+}
+
+async function eliminarCliente(id, nombre) {
+    if (!confirm('¿Eliminar al cliente "' + nombre + '"?')) return;
+    var res = await fetch(API + "?action=cliente_eliminar&id=" + id, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ _user: authUser, _pass: authPass }),
+    });
+    var json = await res.json();
+    if (json.ok) {
+        toast("Cliente eliminado");
+        loadClientes();
+    } else toast("Error", "#c62828");
+}
+
+async function restaurarCliente(id) {
+    var res = await fetch(API + "?action=cliente_restaurar&id=" + id, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ _user: authUser, _pass: authPass }),
+    });
+    var json = await res.json();
+    if (json.ok) {
+        toast("Cliente restaurado");
+        loadClientes();
+    } else toast("Error", "#c62828");
+}
+
+function openNuevoClienteModal() {
+    document.getElementById("clienteEditId").value = "";
+    document.getElementById("ceNombre").value = "";
+    document.getElementById("ceCuitDni").value = "";
+    document.getElementById("ceEmail").value = "";
+    document.getElementById("ceTelefono").value = "";
+    document.getElementById("ceDomicilio").value = "";
+    document.getElementById("ceLocalidad").value = "";
+    document.getElementById("ceCP").value = "";
+    document.getElementById("ceProvincia").value = "";
+    document.getElementById("ceTransporte").value = "";
+    document.getElementById("ceNotas").value = "";
+    document.getElementById("clienteModalBg").classList.add("open");
 }
 
 function openClienteModal(id) {
@@ -1927,10 +2150,17 @@ function closeClienteModal() {
 
 async function guardarClienteEdit() {
     var id = document.getElementById("clienteEditId").value;
+    var tel = document.getElementById("ceTelefono").value.trim();
+    var nombre = document.getElementById("ceNombre").value.trim();
+    if (!nombre) {
+        toast("El nombre es obligatorio", "#c62828");
+        return;
+    }
     var data = {
         _user: authUser,
         _pass: authPass,
-        nombre: document.getElementById("ceNombre").value.trim(),
+        nombre,
+        telefono: tel,
         cuit_dni: document.getElementById("ceCuitDni").value.trim(),
         email: document.getElementById("ceEmail").value.trim(),
         domicilio: document.getElementById("ceDomicilio").value.trim(),
@@ -1940,15 +2170,16 @@ async function guardarClienteEdit() {
         transporte: document.getElementById("ceTransporte").value.trim(),
         notas: document.getElementById("ceNotas").value.trim(),
     };
-    var res = await fetch(API + "?action=cliente_editar&id=" + id, {
+    var action = id ? "cliente_editar&id=" + id : "cliente_crear";
+    var res = await fetch(API + "?action=" + action, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
     });
     var json = await res.json();
     if (json.ok) {
-        toast("Cliente actualizado");
+        toast(id ? "Cliente actualizado" : "Cliente creado");
         closeClienteModal();
         loadClientes();
-    } else toast("Error", "#c62828");
+    } else toast("Error: " + (json.error || "desconocido"), "#c62828");
 }

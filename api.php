@@ -92,6 +92,7 @@ function setupDB($db) {
         provincia VARCHAR(100) DEFAULT NULL,
         transporte VARCHAR(100) DEFAULT NULL,
         notas TEXT DEFAULT NULL,
+        eliminado TINYINT DEFAULT 0,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
@@ -99,13 +100,19 @@ function setupDB($db) {
     $db->query("CREATE TABLE IF NOT EXISTS pedidos (
         id INT AUTO_INCREMENT PRIMARY KEY,
         cliente_id INT NOT NULL,
-        estado ENUM('PENDIENTE','EN_PREPARACION','FACTURADO','ENVIADO') NOT NULL DEFAULT 'PENDIENTE',
+        estado ENUM('PENDIENTE','EN_PREPARACION','FACTURADO','ENVIADO','ELIMINADO') NOT NULL DEFAULT 'PENDIENTE',
         total DECIMAL(12,2) NOT NULL DEFAULT 0,
         observaciones TEXT DEFAULT NULL,
         facturas VARCHAR(500) DEFAULT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+    // Agregar columna eliminado en clientes si no existe
+    $colCheck = $db->query("SHOW COLUMNS FROM clientes LIKE 'eliminado'");
+    if ($colCheck && $colCheck->num_rows === 0) $db->query("ALTER TABLE clientes ADD COLUMN eliminado TINYINT DEFAULT 0");
+    // Agregar ELIMINADO al ENUM de pedidos si no existe
+    $db->query("ALTER TABLE pedidos MODIFY COLUMN estado ENUM('PENDIENTE','EN_PREPARACION','FACTURADO','ENVIADO','ELIMINADO') NOT NULL DEFAULT 'PENDIENTE'");
 
     $db->query("CREATE TABLE IF NOT EXISTS pedido_items (
         id INT AUTO_INCREMENT PRIMARY KEY,
@@ -505,12 +512,47 @@ switch ($action) {
         break;
 
     case 'clientes':
-        $data = $_GET;
-        $q = $data['q'] ?? '';
-        $sql = "SELECT c.*, COUNT(p.id) as total_pedidos FROM clientes c LEFT JOIN pedidos p ON p.cliente_id=c.id WHERE 1=1";
-        if ($q) $sql .= " AND (c.nombre LIKE '%" . $db->real_escape_string($q) . "%' OR c.telefono LIKE '%" . $db->real_escape_string($q) . "%')";
+        $q = $_GET['q'] ?? '';
+        $vista = $_GET['vista'] ?? 'activos';
+        $sql = "SELECT c.*, COUNT(CASE WHEN p.estado != 'ELIMINADO' THEN 1 END) as total_pedidos
+                FROM clientes c LEFT JOIN pedidos p ON p.cliente_id=c.id WHERE 1=1";
+        if ($vista === 'activos') $sql .= " AND c.eliminado=0";
+        elseif ($vista === 'eliminados') $sql .= " AND c.eliminado=1";
+        if ($q) $sql .= " AND (c.nombre LIKE '%" . $db->real_escape_string($q) . "%' OR c.telefono LIKE '%" . $db->real_escape_string($q) . "%' OR c.cuit_dni LIKE '%" . $db->real_escape_string($q) . "%')";
         $sql .= " GROUP BY c.id ORDER BY c.nombre";
         echo json_encode($db->query($sql)->fetch_all(MYSQLI_ASSOC));
+        break;
+
+    case 'cliente_crear':
+        $data = json_decode(file_get_contents('php://input'), true);
+        checkAuth($data);
+        $tel = normalizarTel($data['telefono'] ?? '');
+        $nombre = trim($data['nombre'] ?? '');
+        if (!$tel || !$nombre) { http_response_code(400); die(json_encode(['error' => 'Teléfono y nombre son requeridos'])); }
+        $cuit_dni = $data['cuit_dni'] ?? null; $email = $data['email'] ?? null;
+        $domicilio = $data['domicilio'] ?? null; $localidad = $data['localidad'] ?? null;
+        $cp = $data['cp'] ?? null; $provincia = $data['provincia'] ?? null;
+        $transporte = $data['transporte'] ?? null; $notas = $data['notas'] ?? null;
+        $stmt = $db->prepare("INSERT INTO clientes (telefono,nombre,cuit_dni,email,domicilio,localidad,cp,provincia,transporte,notas) VALUES (?,?,?,?,?,?,?,?,?,?)");
+        $stmt->bind_param('ssssssssss', $tel, $nombre, $cuit_dni, $email, $domicilio, $localidad, $cp, $provincia, $transporte, $notas);
+        if ($stmt->execute()) echo json_encode(['ok' => true, 'id' => $db->insert_id]);
+        else { http_response_code(400); echo json_encode(['error' => 'El teléfono ya existe']); }
+        break;
+
+    case 'cliente_eliminar':
+        $data = json_decode(file_get_contents('php://input'), true);
+        checkAuth($data);
+        $id = intval($_GET['id'] ?? 0);
+        $db->query("UPDATE clientes SET eliminado=1 WHERE id=$id");
+        echo json_encode(['ok' => true]);
+        break;
+
+    case 'cliente_restaurar':
+        $data = json_decode(file_get_contents('php://input'), true);
+        checkAuth($data);
+        $id = intval($_GET['id'] ?? 0);
+        $db->query("UPDATE clientes SET eliminado=0 WHERE id=$id");
+        echo json_encode(['ok' => true]);
         break;
 
     case 'cliente_editar':
@@ -556,12 +598,47 @@ switch ($action) {
     case 'pedidos':
         $q = $_GET['q'] ?? '';
         $est = $_GET['estado'] ?? '';
+        $vista = $_GET['vista'] ?? 'activos'; // activos | todos | eliminados
         $sql = "SELECT p.*, c.nombre as cliente_nombre, c.telefono as cliente_tel
                 FROM pedidos p JOIN clientes c ON p.cliente_id=c.id WHERE 1=1";
+        if ($vista === 'activos') $sql .= " AND p.estado != 'ELIMINADO'";
+        elseif ($vista === 'eliminados') $sql .= " AND p.estado = 'ELIMINADO'";
+        // 'todos' no filtra por estado de eliminado
         if ($q) $sql .= " AND (c.nombre LIKE '%" . $db->real_escape_string($q) . "%' OR c.telefono LIKE '%" . $db->real_escape_string($q) . "%')";
-        if ($est) $sql .= " AND p.estado='" . $db->real_escape_string($est) . "'";
+        if ($est && $est !== 'ELIMINADO') $sql .= " AND p.estado='" . $db->real_escape_string($est) . "'";
+        elseif ($est === 'ELIMINADO') $sql .= " AND p.estado='ELIMINADO'";
+        if (!empty($_GET['cliente_id'])) $sql .= " AND p.cliente_id=" . intval($_GET['cliente_id']);
         $sql .= " ORDER BY p.created_at DESC";
         echo json_encode($db->query($sql)->fetch_all(MYSQLI_ASSOC));
+        break;
+
+    case 'pedido_eliminar':
+        $data = json_decode(file_get_contents('php://input'), true);
+        checkAuth($data);
+        $id = intval($_GET['id'] ?? 0);
+        $estado = 'ELIMINADO';
+        $stmt = $db->prepare("UPDATE pedidos SET estado=? WHERE id=?");
+        $stmt->bind_param('si', $estado, $id);
+        $stmt->execute();
+        // Registrar en historial
+        $es = $db->prepare("INSERT INTO pedido_estados (pedido_id,estado) VALUES (?,?)");
+        $es->bind_param('is', $id, $estado);
+        $es->execute();
+        echo json_encode(['ok' => true]);
+        break;
+
+    case 'pedido_restaurar':
+        $data = json_decode(file_get_contents('php://input'), true);
+        checkAuth($data);
+        $id = intval($_GET['id'] ?? 0);
+        $estado = 'PENDIENTE';
+        $stmt = $db->prepare("UPDATE pedidos SET estado=? WHERE id=?");
+        $stmt->bind_param('si', $estado, $id);
+        $stmt->execute();
+        $es = $db->prepare("INSERT INTO pedido_estados (pedido_id,estado) VALUES (?,?)");
+        $es->bind_param('is', $id, $estado);
+        $es->execute();
+        echo json_encode(['ok' => true]);
         break;
 
     case 'pedido_detalle':

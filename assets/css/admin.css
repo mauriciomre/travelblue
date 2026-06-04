@@ -847,6 +847,23 @@ td.editing {
     border-color: var(--blue)
 }
 
+/* LINK BUTTON */
+.link-btn {
+    background: none;
+    border: none;
+    color: var(--blue);
+    font-weight: 700;
+    cursor: pointer;
+    font-size: 13px;
+    padding: 0;
+    text-decoration: underline;
+    text-underline-offset: 2px
+}
+
+.link-btn:hover {
+    color: var(--blue2)
+}
+
 /* SORT TOOLBAR */
 .sort-toolbar {
     display: flex;
