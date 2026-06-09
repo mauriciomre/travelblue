@@ -91,31 +91,25 @@
                     <button class="cls" onclick="closeCart()">×</button>
                 </div>
 
-                <!-- Toggle productos (solo mobile) -->
-                <button
-                    class="cart-section-toggle"
-                    id="toggleItemsBtn"
-                    onclick="toggleCartSection('items')"
-                >
-                    <span id="toggleItemsLabel"
-                        >▼ Ver productos del pedido</span
+                <!-- ZONA SCROLLEABLE: productos + formulario -->
+                <div class="p-scroll">
+                    <!-- Toggle productos (solo mobile) -->
+                    <button
+                        class="cart-section-toggle"
+                        id="toggleItemsBtn"
+                        onclick="toggleCartSection('items')"
                     >
-                </button>
-                <div
-                    class="cart-items-section mobile-collapsed"
-                    id="cartItemsSection"
-                >
-                    <div class="p-items" id="pitems"></div>
-                </div>
-
-                <div class="p-foot">
-                    <div class="total-row">
-                        <span class="total-lbl">Total mayorista:</span
-                        ><span class="total-val" id="ptotal">$ 0</span>
-                    </div>
-                    <button class="continue-btn" onclick="closeCart()">
-                        ← Continuar comprando
+                        <span id="toggleItemsLabel"
+                            >▼ Ver productos del pedido</span
+                        >
                     </button>
+                    <div
+                        class="cart-items-section mobile-collapsed"
+                        id="cartItemsSection"
+                    >
+                        <div id="pitems"></div>
+                    </div>
+
                     <div id="cartToast" class="cart-toast"></div>
 
                     <!-- Toggle formulario (solo mobile) -->
@@ -128,38 +122,11 @@
                         <span id="toggleFormLabel">▼ Datos del pedido</span>
                     </button>
                     <div class="cart-section-body" id="cartFormSection">
-                        <!-- TELÉFONO -->
-                        <div class="field-group">
-                            <label class="field-lbl"
-                                >Teléfono <span class="req">*</span></label
-                            >
-                            <div class="tel-row">
-                                <input
-                                    id="cCaract"
-                                    type="tel"
-                                    placeholder="353"
-                                    maxlength="4"
-                                    oninput="onTelChange()"
-                                />
-                                <input
-                                    id="cNum"
-                                    type="tel"
-                                    placeholder="4140385"
-                                    maxlength="8"
-                                    oninput="onTelChange()"
-                                />
-                            </div>
-                            <div class="field-hint-sm">
-                                Característica sin 0 + número sin 15
-                            </div>
-                        </div>
-
-                        <!-- FORMULARIO CLIENTE (se expande) -->
+                        <!-- FORMULARIO CLIENTE -->
                         <div id="clienteForm" style="display: none">
                             <div class="form-section-title">
                                 Datos del pedido
                             </div>
-
                             <div class="field-group">
                                 <label class="field-lbl"
                                     >Nombre / Razón Social
@@ -189,7 +156,6 @@
                                     />
                                 </div>
                             </div>
-
                             <div class="form-section-title">Datos de envío</div>
                             <div class="field-group">
                                 <label class="field-lbl">Domicilio</label>
@@ -261,7 +227,43 @@
                         </div>
                     </div>
                     <!-- end cartFormSection -->
+                </div>
+                <!-- end p-scroll -->
 
+                <!-- FOOTER FIJO -->
+                <div class="p-foot">
+                    <div class="total-row">
+                        <span class="total-lbl">Total mayorista:</span
+                        ><span class="total-val" id="ptotal">$ 0</span>
+                    </div>
+                    <button class="continue-btn" onclick="closeCart()">
+                        ← Continuar comprando
+                    </button>
+                    <!-- TELÉFONO -->
+                    <div class="field-group" style="margin-top: 8px">
+                        <label class="field-lbl"
+                            >Teléfono <span class="req">*</span></label
+                        >
+                        <div class="tel-row">
+                            <input
+                                id="cCaract"
+                                type="tel"
+                                placeholder="353"
+                                maxlength="4"
+                                oninput="onTelChange()"
+                            />
+                            <input
+                                id="cNum"
+                                type="tel"
+                                placeholder="4140385"
+                                maxlength="8"
+                                oninput="onTelChange()"
+                            />
+                        </div>
+                        <div class="field-hint-sm">
+                            Característica sin 0 + número sin 15
+                        </div>
+                    </div>
                     <button class="wa" onclick="sendWA()">
                         📱 Confirmar y enviar pedido
                     </button>
