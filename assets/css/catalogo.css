@@ -1294,11 +1294,24 @@ header {
     }
 
     .cart-items-section.mobile-collapsed {
-        display: none
+        display: none !important
+    }
+
+    .cart-section-body.collapsed {
+        display: none !important
     }
 }
 
 /* Ocultar toggles en desktop */
 .cart-section-toggle {
     display: none
+}
+
+/* En desktop siempre visible */
+.cart-items-section {
+    display: block !important
+}
+
+.cart-section-body {
+    display: block !important
 }
