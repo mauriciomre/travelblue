@@ -90,7 +90,24 @@
                     <h2>📋 Mi pedido</h2>
                     <button class="cls" onclick="closeCart()">×</button>
                 </div>
-                <div class="p-items" id="pitems"></div>
+
+                <!-- Toggle productos (solo mobile) -->
+                <button
+                    class="cart-section-toggle"
+                    id="toggleItemsBtn"
+                    onclick="toggleCartSection('items')"
+                >
+                    <span id="toggleItemsLabel"
+                        >▼ Ver productos del pedido</span
+                    >
+                </button>
+                <div
+                    class="cart-items-section mobile-collapsed"
+                    id="cartItemsSection"
+                >
+                    <div class="p-items" id="pitems"></div>
+                </div>
+
                 <div class="p-foot">
                     <div class="total-row">
                         <span class="total-lbl">Total mayorista:</span
@@ -101,135 +118,149 @@
                     </button>
                     <div id="cartToast" class="cart-toast"></div>
 
-                    <!-- TELÉFONO -->
-                    <div class="field-group">
-                        <label class="field-lbl"
-                            >Teléfono <span class="req">*</span></label
-                        >
-                        <div class="tel-row">
-                            <input
-                                id="cCaract"
-                                type="tel"
-                                placeholder="353"
-                                maxlength="4"
-                                oninput="onTelChange()"
-                            />
-                            <input
-                                id="cNum"
-                                type="tel"
-                                placeholder="4140385"
-                                maxlength="8"
-                                oninput="onTelChange()"
-                            />
+                    <!-- Toggle formulario (solo mobile) -->
+                    <button
+                        class="cart-section-toggle"
+                        id="toggleFormBtn"
+                        onclick="toggleCartSection('form')"
+                        style="margin-top: 4px"
+                    >
+                        <span id="toggleFormLabel">▼ Datos del pedido</span>
+                    </button>
+                    <div class="cart-section-body" id="cartFormSection">
+                        <!-- TELÉFONO -->
+                        <div class="field-group">
+                            <label class="field-lbl"
+                                >Teléfono <span class="req">*</span></label
+                            >
+                            <div class="tel-row">
+                                <input
+                                    id="cCaract"
+                                    type="tel"
+                                    placeholder="353"
+                                    maxlength="4"
+                                    oninput="onTelChange()"
+                                />
+                                <input
+                                    id="cNum"
+                                    type="tel"
+                                    placeholder="4140385"
+                                    maxlength="8"
+                                    oninput="onTelChange()"
+                                />
+                            </div>
+                            <div class="field-hint-sm">
+                                Característica sin 0 + número sin 15
+                            </div>
                         </div>
-                        <div class="field-hint-sm">
-                            Característica sin 0 + número sin 15
+
+                        <!-- FORMULARIO CLIENTE (se expande) -->
+                        <div id="clienteForm" style="display: none">
+                            <div class="form-section-title">
+                                Datos del pedido
+                            </div>
+
+                            <div class="field-group">
+                                <label class="field-lbl"
+                                    >Nombre / Razón Social
+                                    <span class="req">*</span></label
+                                >
+                                <input
+                                    id="cNombre"
+                                    type="text"
+                                    placeholder="Nombre o razón social"
+                                />
+                            </div>
+                            <div class="field-row">
+                                <div class="field-group">
+                                    <label class="field-lbl">CUIT / DNI</label>
+                                    <input
+                                        id="cCuitDni"
+                                        type="text"
+                                        placeholder="20-12345678-9"
+                                    />
+                                </div>
+                                <div class="field-group">
+                                    <label class="field-lbl">Email</label>
+                                    <input
+                                        id="cEmail"
+                                        type="email"
+                                        placeholder="mail@ejemplo.com"
+                                    />
+                                </div>
+                            </div>
+
+                            <div class="form-section-title">Datos de envío</div>
+                            <div class="field-group">
+                                <label class="field-lbl">Domicilio</label>
+                                <input
+                                    id="cDomicilio"
+                                    type="text"
+                                    placeholder="Calle y número"
+                                />
+                            </div>
+                            <div class="field-row">
+                                <div class="field-group">
+                                    <label class="field-lbl">Localidad</label>
+                                    <input
+                                        id="cLocalidad"
+                                        type="text"
+                                        placeholder="Ciudad"
+                                    />
+                                </div>
+                                <div class="field-group">
+                                    <label class="field-lbl">CP</label>
+                                    <input
+                                        id="cCP"
+                                        type="text"
+                                        placeholder="5000"
+                                    />
+                                </div>
+                            </div>
+                            <div class="field-group">
+                                <label class="field-lbl">Provincia</label>
+                                <input
+                                    id="cProvincia"
+                                    type="text"
+                                    placeholder="Córdoba"
+                                />
+                            </div>
+                            <div class="field-group">
+                                <label class="field-lbl">Transporte</label>
+                                <select
+                                    id="cTransporte"
+                                    onchange="onTransporteChange()"
+                                >
+                                    <option value="">— Seleccioná —</option>
+                                </select>
+                            </div>
+                            <div
+                                class="field-group"
+                                id="cTransporteOtroWrap"
+                                style="display: none"
+                            >
+                                <label class="field-lbl"
+                                    >Especificá el transporte</label
+                                >
+                                <input
+                                    id="cTransporteOtro"
+                                    type="text"
+                                    placeholder="Nombre del transporte"
+                                />
+                            </div>
+                            <div class="field-group">
+                                <label class="field-lbl"
+                                    >Notas / Aclaraciones</label
+                                >
+                                <textarea
+                                    id="cNotas"
+                                    placeholder="Indicaciones especiales..."
+                                    rows="2"
+                                ></textarea>
+                            </div>
                         </div>
                     </div>
-
-                    <!-- FORMULARIO CLIENTE (se expande) -->
-                    <div id="clienteForm" style="display: none">
-                        <div class="form-section-title">Datos del pedido</div>
-
-                        <div class="field-group">
-                            <label class="field-lbl"
-                                >Nombre / Razón Social
-                                <span class="req">*</span></label
-                            >
-                            <input
-                                id="cNombre"
-                                type="text"
-                                placeholder="Nombre o razón social"
-                            />
-                        </div>
-                        <div class="field-row">
-                            <div class="field-group">
-                                <label class="field-lbl">CUIT / DNI</label>
-                                <input
-                                    id="cCuitDni"
-                                    type="text"
-                                    placeholder="20-12345678-9"
-                                />
-                            </div>
-                            <div class="field-group">
-                                <label class="field-lbl">Email</label>
-                                <input
-                                    id="cEmail"
-                                    type="email"
-                                    placeholder="mail@ejemplo.com"
-                                />
-                            </div>
-                        </div>
-
-                        <div class="form-section-title">Datos de envío</div>
-                        <div class="field-group">
-                            <label class="field-lbl">Domicilio</label>
-                            <input
-                                id="cDomicilio"
-                                type="text"
-                                placeholder="Calle y número"
-                            />
-                        </div>
-                        <div class="field-row">
-                            <div class="field-group">
-                                <label class="field-lbl">Localidad</label>
-                                <input
-                                    id="cLocalidad"
-                                    type="text"
-                                    placeholder="Ciudad"
-                                />
-                            </div>
-                            <div class="field-group">
-                                <label class="field-lbl">CP</label>
-                                <input
-                                    id="cCP"
-                                    type="text"
-                                    placeholder="5000"
-                                />
-                            </div>
-                        </div>
-                        <div class="field-group">
-                            <label class="field-lbl">Provincia</label>
-                            <input
-                                id="cProvincia"
-                                type="text"
-                                placeholder="Córdoba"
-                            />
-                        </div>
-                        <div class="field-group">
-                            <label class="field-lbl">Transporte</label>
-                            <select
-                                id="cTransporte"
-                                onchange="onTransporteChange()"
-                            >
-                                <option value="">— Seleccioná —</option>
-                            </select>
-                        </div>
-                        <div
-                            class="field-group"
-                            id="cTransporteOtroWrap"
-                            style="display: none"
-                        >
-                            <label class="field-lbl"
-                                >Especificá el transporte</label
-                            >
-                            <input
-                                id="cTransporteOtro"
-                                type="text"
-                                placeholder="Nombre del transporte"
-                            />
-                        </div>
-                        <div class="field-group">
-                            <label class="field-lbl"
-                                >Notas / Aclaraciones</label
-                            >
-                            <textarea
-                                id="cNotas"
-                                placeholder="Indicaciones especiales..."
-                                rows="2"
-                            ></textarea>
-                        </div>
-                    </div>
+                    <!-- end cartFormSection -->
 
                     <button class="wa" onclick="sendWA()">
                         📱 Confirmar y enviar pedido

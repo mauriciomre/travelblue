@@ -673,8 +673,26 @@ header {
 }
 
 .ci {
-    padding: 12px 0;
-    border-bottom: 1px solid var(--border)
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    gap: 10px;
+    align-items: flex-start
+}
+
+.ci-img {
+    width: 44px;
+    height: 44px;
+    object-fit: contain;
+    border-radius: 6px;
+    background: #f8f9fb;
+    border: 1px solid var(--border);
+    flex-shrink: 0
+}
+
+.ci-body {
+    flex: 1;
+    min-width: 0
 }
 
 .ci-name {
@@ -693,7 +711,7 @@ header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-top: 8px;
+    margin-top: 6px;
     gap: 8px
 }
 
@@ -732,7 +750,8 @@ header {
 .ci-sub {
     font-weight: 800;
     font-size: 14px;
-    color: var(--blue)
+    color: var(--blue);
+    white-space: nowrap
 }
 
 .rm {
@@ -761,19 +780,68 @@ header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 14px
+    margin-bottom: 8px;
+    flex-wrap: nowrap;
+    gap: 8px
 }
 
 .total-lbl {
     font-size: 14px;
     color: var(--muted);
-    font-weight: 600
+    font-weight: 600;
+    white-space: nowrap
 }
 
 .total-val {
     font-size: 22px;
     font-weight: 800;
-    color: var(--blue)
+    color: var(--blue);
+    white-space: nowrap
+}
+
+.fields {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 12px
+}
+
+.fields input {
+    padding: 10px 13px;
+    border: 1.5px solid var(--border);
+    border-radius: 9px;
+    font-size: 14px;
+    outline: none;
+    width: 100%
+}
+
+/* TOGGLE SECTIONS EN CARRITO */
+.cart-section-toggle {
+    width: 100%;
+    background: var(--pale);
+    border: none;
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--blue);
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px
+}
+
+.cart-section-toggle:hover {
+    background: #d4e4f7
+}
+
+.cart-section-body {
+    transition: max-height .3s ease, opacity .3s
+}
+
+.cart-section-body.collapsed {
+    display: none
 }
 
 .fields {
@@ -1219,4 +1287,18 @@ header {
     .list-card {
         display: none
     }
+
+    /* Toggles carrito mobile */
+    .cart-section-toggle {
+        display: flex
+    }
+
+    .cart-items-section.mobile-collapsed {
+        display: none
+    }
+}
+
+/* Ocultar toggles en desktop */
+.cart-section-toggle {
+    display: none
 }

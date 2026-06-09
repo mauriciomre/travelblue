@@ -821,12 +821,18 @@ function updateCart() {
             (parseFloat(item.p.PRECIO_MAYORISTA) || 0) * item.qty,
         );
         total += sub;
+        var imgSrc = getImgSrc(item.p);
+        html += '<div class="ci">';
         html +=
-            '<div class="ci"><div class="ci-name">' +
-            item.p.DESCRIPCION +
-            '</div><div class="ci-code">Cód: ' +
+            '<img class="ci-img" src="' +
+            imgSrc +
+            '" alt="" onerror="this.style.display=\'none\'">';
+        html += '<div class="ci-body">';
+        html += '<div class="ci-name">' + item.p.DESCRIPCION + "</div>";
+        html +=
+            '<div class="ci-code">Cód: ' +
             item.p.CODIGO +
-            (multiplo > 1 ? " · Múltiplo: " + multiplo : "") +
+            (multiplo > 1 ? " · x" + multiplo : "") +
             "</div>";
         html += '<div class="ci-row"><div class="cq">';
         html +=
@@ -847,7 +853,8 @@ function updateCart() {
             fmt(sub) +
             '</span><button class="rm" onclick="rmCart(\'' +
             code +
-            "')\">🗑</button></div></div>";
+            "')\">🗑</button></div>";
+        html += "</div></div>";
     });
     el.innerHTML = html;
     document.getElementById("ptotal").textContent = fmt(total);
@@ -855,12 +862,35 @@ function updateCart() {
 
 function openCart() {
     document.getElementById("overlay").classList.add("open");
+    // En mobile, mostrar productos por defecto al abrir
+    if (window.innerWidth <= 640) {
+        var sec = document.getElementById("cartItemsSection");
+        if (sec) sec.classList.remove("mobile-collapsed");
+        var lbl = document.getElementById("toggleItemsLabel");
+        if (lbl) lbl.textContent = "▲ Ocultar productos";
+    }
 }
 function closeCart() {
     document.getElementById("overlay").classList.remove("open");
 }
 function bgClose(e) {
     if (e.target === document.getElementById("overlay")) closeCart();
+}
+
+function toggleCartSection(which) {
+    if (which === "items") {
+        var sec = document.getElementById("cartItemsSection");
+        var lbl = document.getElementById("toggleItemsLabel");
+        var collapsed = sec.classList.toggle("mobile-collapsed");
+        lbl.textContent = collapsed
+            ? "▼ Ver productos del pedido"
+            : "▲ Ocultar productos";
+    } else {
+        var sec = document.getElementById("cartFormSection");
+        var lbl = document.getElementById("toggleFormLabel");
+        var collapsed = sec.classList.toggle("collapsed");
+        lbl.textContent = collapsed ? "▼ Datos del pedido" : "▲ Ocultar datos";
+    }
 }
 
 // ── CLIENTE ───────────────────────────────────────────────────────────────────
@@ -1050,8 +1080,11 @@ async function sendWA() {
             .value.trim()
             .toUpperCase(),
         transporte,
-        notas: document.getElementById("cNotas").value.trim().toUpperCase(),
     };
+    var notasPedido = document
+        .getElementById("cNotas")
+        .value.trim()
+        .toUpperCase();
     var btn = document.querySelector(".wa");
     btn.disabled = true;
     btn.style.background = "#1a9e52";
@@ -1142,7 +1175,12 @@ async function sendWA() {
     await fetch(API_URL + "?action=pedido_crear", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ cliente_id: clienteId, total, items }),
+        body: JSON.stringify({
+            cliente_id: clienteId,
+            total,
+            items,
+            observaciones: notasPedido,
+        }),
     });
     // Armar mensaje WhatsApp
     var fecha = new Date().toLocaleDateString("es-AR");
