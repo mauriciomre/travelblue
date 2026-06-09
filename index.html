@@ -91,9 +91,9 @@
                     <button class="cls" onclick="closeCart()">×</button>
                 </div>
 
-                <!-- ZONA SCROLLEABLE: productos + formulario -->
-                <div class="p-scroll">
-                    <!-- Toggle productos (solo mobile) -->
+                <!-- ZONA 1: productos (scroll independiente) -->
+                <div class="p-products">
+                    <!-- Toggle (solo mobile) -->
                     <button
                         class="cart-section-toggle"
                         id="toggleItemsBtn"
@@ -109,8 +109,18 @@
                     >
                         <div id="pitems"></div>
                     </div>
+                </div>
 
+                <!-- ZONA 2: total + formulario (scroll independiente) -->
+                <div class="p-form-area">
                     <div id="cartToast" class="cart-toast"></div>
+                    <div class="total-row">
+                        <span class="total-lbl">Total mayorista:</span
+                        ><span class="total-val" id="ptotal">$ 0</span>
+                    </div>
+                    <button class="continue-btn" onclick="closeCart()">
+                        ← Continuar comprando
+                    </button>
 
                     <!-- Toggle formulario (solo mobile) -->
                     <button
@@ -122,6 +132,31 @@
                         <span id="toggleFormLabel">▼ Datos del pedido</span>
                     </button>
                     <div class="cart-section-body" id="cartFormSection">
+                        <!-- TELÉFONO -->
+                        <div class="field-group" style="margin-top: 8px">
+                            <label class="field-lbl"
+                                >Teléfono <span class="req">*</span></label
+                            >
+                            <div class="tel-row">
+                                <input
+                                    id="cCaract"
+                                    type="tel"
+                                    placeholder="353"
+                                    maxlength="4"
+                                    oninput="onTelChange()"
+                                />
+                                <input
+                                    id="cNum"
+                                    type="tel"
+                                    placeholder="4140385"
+                                    maxlength="8"
+                                    oninput="onTelChange()"
+                                />
+                            </div>
+                            <div class="field-hint-sm">
+                                Característica sin 0 + número sin 15
+                            </div>
+                        </div>
                         <!-- FORMULARIO CLIENTE -->
                         <div id="clienteForm" style="display: none">
                             <div class="form-section-title">
@@ -227,47 +262,11 @@
                         </div>
                     </div>
                     <!-- end cartFormSection -->
-                </div>
-                <!-- end p-scroll -->
-
-                <!-- FOOTER FIJO -->
-                <div class="p-foot">
-                    <div class="total-row">
-                        <span class="total-lbl">Total mayorista:</span
-                        ><span class="total-val" id="ptotal">$ 0</span>
-                    </div>
-                    <button class="continue-btn" onclick="closeCart()">
-                        ← Continuar comprando
-                    </button>
-                    <!-- TELÉFONO -->
-                    <div class="field-group" style="margin-top: 8px">
-                        <label class="field-lbl"
-                            >Teléfono <span class="req">*</span></label
-                        >
-                        <div class="tel-row">
-                            <input
-                                id="cCaract"
-                                type="tel"
-                                placeholder="353"
-                                maxlength="4"
-                                oninput="onTelChange()"
-                            />
-                            <input
-                                id="cNum"
-                                type="tel"
-                                placeholder="4140385"
-                                maxlength="8"
-                                oninput="onTelChange()"
-                            />
-                        </div>
-                        <div class="field-hint-sm">
-                            Característica sin 0 + número sin 15
-                        </div>
-                    </div>
                     <button class="wa" onclick="sendWA()">
                         📱 Confirmar y enviar pedido
                     </button>
                 </div>
+                <!-- end p-form-area -->
             </div>
         </div>
 
