@@ -3,16 +3,21 @@ header('Content-Type: application/json; charset=utf-8');
 header('Access-Control-Allow-Origin: *');
 
 define('ADMIN_USER', 'admin');
-define('ADMIN_PASS', 'travelblue2025');
+define('ADMIN_PASS_DEFAULT', 'cindy2120');
 define('IMG_DIR', __DIR__ . '/imgs/');
 define('MAX_SIZE', 5 * 1024 * 1024); // 5MB
 define('IMG_W', 800);
 define('IMG_H', 800);
 
-// Auth
+// Auth — usa contraseña de BD si fue cambiada
 $user = $_POST['_user'] ?? '';
 $pass = $_POST['_pass'] ?? '';
-if ($user !== ADMIN_USER || $pass !== ADMIN_PASS) {
+require_once __DIR__ . '/db.php';
+$db = getDB();
+$r = $db->query("SELECT valor FROM config WHERE clave='admin_pass' LIMIT 1");
+$row = $r ? $r->fetch_assoc() : null;
+$validPass = $row ? $row['valor'] : ADMIN_PASS_DEFAULT;
+if ($user !== ADMIN_USER || $pass !== $validPass) {
     http_response_code(401);
     die(json_encode(['error' => 'No autorizado']));
 }
