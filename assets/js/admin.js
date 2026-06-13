@@ -1894,7 +1894,7 @@ function imprimirPedido() {
     html += "<table><thead><tr>";
     html +=
         '<th>Código</th><th>Descripción</th><th style="text-align:center">Cant.</th>';
-    html += '<th style="text-align:right">Precio / Subtotal</th>';
+    html += '<th style="text-align:left">Precio / Subtotal</th>';
     html += '<th style="text-align:center;width:60px">Central</th>';
     html += '<th style="text-align:center;width:60px">Seppey</th>';
     html += "</tr></thead><tbody>";
