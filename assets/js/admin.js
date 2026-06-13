@@ -1849,29 +1849,32 @@ function imprimirPedido() {
     var p = pedidoActual;
     var fecha = new Date(p.created_at).toLocaleString("es-AR");
     var html = "<html><head><title>Pedido #" + p.id + "</title><style>";
-    html += "body{font-family:Arial,sans-serif;padding:24px;font-size:15px}";
-    html += "h1{font-size:22px;margin-bottom:4px}";
+    html += "body{font-family:Arial,sans-serif;padding:20px;font-size:13px}";
+    html += "h1{font-size:18px;margin-bottom:4px}";
     html +=
-        ".info{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;padding:14px;background:#f5f5f5;border-radius:8px;font-size:15px}";
-    html += "table{width:100%;border-collapse:collapse;margin-bottom:20px}";
+        ".info{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;padding:12px;background:#f5f5f5;border-radius:8px;font-size:13px}";
+    html += "table{width:100%;border-collapse:collapse;margin-bottom:16px}";
     html +=
-        "th{background:#003087;color:#fff;padding:10px;text-align:left;font-size:14px}";
-    html += "td{padding:10px;border-bottom:1px solid #eee;font-size:15px}";
+        "th{background:#003087;color:#fff;padding:7px 8px;text-align:left;font-size:12px}";
     html +=
-        ".check{width:22px;height:22px;border:2px solid #333;display:inline-block;margin-right:8px;vertical-align:middle}";
+        "td{padding:7px 8px;border-bottom:1px solid #eee;font-size:12px;vertical-align:top}";
+    html += "td.desc{max-width:180px;word-wrap:break-word}";
+    html += ".price-cell{white-space:nowrap;font-size:11px}";
+    html += ".price-unit{color:#666}";
+    html += ".price-sub{font-weight:bold;color:#003087}";
     html +=
-        ".total{text-align:right;font-size:20px;font-weight:bold;color:#003087;margin-top:8px}";
+        ".deposit-box{display:inline-block;width:36px;height:26px;border:2px solid #333;vertical-align:middle}";
     html +=
-        ".footer{margin-top:28px;padding-top:18px;border-top:1px solid #ccc;display:grid;grid-template-columns:1fr 1fr;gap:16px}";
+        ".total{text-align:right;font-size:16px;font-weight:bold;color:#003087;margin-top:8px}";
     html +=
-        ".firma{border-top:1px solid #333;margin-top:50px;padding-top:6px;font-size:13px;color:#666}";
+        ".footer{margin-top:24px;padding-top:16px;border-top:1px solid #ccc;display:grid;grid-template-columns:1fr 1fr;gap:16px}";
+    html +=
+        ".firma{border-top:1px solid #333;margin-top:50px;padding-top:6px;font-size:11px;color:#666}";
     html += "@media print{body{padding:10px}}";
-    html +=
-        ".deposit-box{display:inline-block;width:36px;height:28px;border:2px solid #333;vertical-align:middle}";
     html += "</style></head><body>";
     html += "<h1>Pedido #" + p.id + " — Travel Blue Argentina</h1>";
     html +=
-        '<p style="color:#666;font-size:13px;margin-bottom:16px">Fecha: ' +
+        '<p style="color:#666;font-size:12px;margin-bottom:16px">Fecha: ' +
         fecha +
         "</p>";
     html += '<div class="info">';
@@ -1888,19 +1891,32 @@ function imprimirPedido() {
     if (p.provincia) html += p.provincia + "<br>";
     if (p.transporte) html += "<strong>Transporte:</strong> " + p.transporte;
     html += "</div></div>";
+    html += "<table><thead><tr>";
     html +=
-        '<table><thead><tr><th>Código</th><th>Descripción</th><th style="text-align:center">Cant.</th><th style="text-align:center;width:70px">Central</th><th style="text-align:center;width:70px">Seppey</th></tr></thead><tbody>';
+        '<th>Código</th><th>Descripción</th><th style="text-align:center">Cant.</th>';
+    html += '<th style="text-align:right">Precio / Subtotal</th>';
+    html += '<th style="text-align:center;width:60px">Central</th>';
+    html += '<th style="text-align:center;width:60px">Seppey</th>';
+    html += "</tr></thead><tbody>";
     p.items.forEach(function (item) {
-        html +=
-            "<tr><td>" + item.codigo + "</td><td>" + item.descripcion + "</td>";
+        html += "<tr>";
+        html += '<td style="white-space:nowrap">' + item.codigo + "</td>";
+        html += '<td class="desc">' + item.descripcion + "</td>";
         html +=
             '<td style="text-align:center;font-weight:bold">' +
             item.cantidad +
             "</td>";
         html +=
+            '<td class="price-cell"><span class="price-unit">' +
+            fmt(item.precio_unitario) +
+            '</span><br><span class="price-sub">' +
+            fmt(item.subtotal) +
+            "</span></td>";
+        html +=
             '<td style="text-align:center"><span class="deposit-box"></span></td>';
         html +=
-            '<td style="text-align:center"><span class="deposit-box"></span></td></tr>';
+            '<td style="text-align:center"><span class="deposit-box"></span></td>';
+        html += "</tr>";
     });
     html += "</tbody></table>";
     html +=
