@@ -2519,7 +2519,7 @@ function executePrint() {
         descripcion:      { label: 'Descripción',  style: '' },
         precio_mayorista: { label: 'P. Mayorista', style: 'width:90px;text-align:right' },
         pvp:              { label: 'PVP',           style: 'width:80px;text-align:right' },
-        cantidad:         { label: 'Cant.',         style: 'width:40px;text-align:center' },
+        cantidad:         { label: 'Cant.',         style: 'width:50px;text-align:center' },
         estado:           { label: 'Estado',        style: 'width:70px;text-align:center' }
     };
     var theadCells = cols.map(function(c) {
@@ -2529,7 +2529,7 @@ function executePrint() {
 
     function buildRow(p) {
         return cols.map(function(c) {
-            if (c === 'codigo') return '<td><code style="font-size:9px">' + (p.codigo || '') + '</code></td>';
+            if (c === 'codigo') return '<td>' + (p.codigo || '') + '</td>';
             if (c === 'descripcion') return '<td>' + (p.descripcion || '') + '</td>';
             if (c === 'precio_mayorista') return '<td class="precio">' + fmtP(p.precio_mayorista) + '</td>';
             if (c === 'pvp') return '<td class="precio">' + fmtP(p.pvp) + '</td>';
@@ -2542,7 +2542,7 @@ function executePrint() {
     var html = '<!DOCTYPE html><html lang="es"><head><meta charset="utf-8">' +
         '<title>Nota de Pedido Travel Blue — ' + fecha + '</title>' +
         '<style>' +
-        'body{font-family:Arial,sans-serif;font-size:11px;color:#000;margin:0;padding:0}' +
+        'body{font-family:Arial,sans-serif;font-size:13px;color:#000;margin:0;padding:0}' +
         '.page{padding:14mm 12mm;max-width:210mm;margin:0 auto}' +
         '.header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px}' +
         '.header h1{font-size:16px;font-weight:900;letter-spacing:.5px;color:#000;margin:0}' +
@@ -2561,7 +2561,7 @@ function executePrint() {
         'td.precio{text-align:right}' +
         'tr:nth-child(even){background:#f4f4f4}' +
         '.footer{margin-top:14px;border-top:1px solid #aaa;padding-top:6px;font-size:9px;color:#000;text-align:center}' +
-        '@media print{@page{size:A4 portrait;margin:10mm}body{font-size:10px}.page{padding:0;max-width:none}}' +
+        '@media print{@page{size:A4 portrait;margin:10mm}body{font-size:12px}.page{padding:0;max-width:none}}' +
         '</style></head><body><div class="page">' +
         '<div class="header">' +
         '<div><h1>TRAVEL BLUE</h1><div style="font-size:11px;font-weight:600;color:#000;margin-top:2px">NOTA DE PEDIDO MAYORISTA</div></div>' +
