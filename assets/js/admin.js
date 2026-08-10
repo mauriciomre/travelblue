@@ -2228,7 +2228,7 @@ async function guardarClienteEdit() {
 // ── IMPORTACIÓN MASIVA POR EXCEL (SheetJS) ────────────────────────────────────
 
 function openImportModal() {
-    document.getElementById("importModal").classList.remove("hidden");
+    document.getElementById("importModal").classList.add("open");
     document.getElementById("importFileInput").value = "";
     document.getElementById("importPreviewWrap").innerHTML = "";
     document.getElementById("btnImportConfirm").disabled = true;
@@ -2236,7 +2236,7 @@ function openImportModal() {
 }
 
 function closeImportModal() {
-    document.getElementById("importModal").classList.add("hidden");
+    document.getElementById("importModal").classList.remove("open");
 }
 
 function onImportFileChange(e) {
