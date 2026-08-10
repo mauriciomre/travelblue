@@ -2547,20 +2547,20 @@ function executePrint() {
         '.header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px}' +
         '.header h1{font-size:16px;font-weight:900;letter-spacing:.5px;color:#003399;margin:0}' +
         '.header .fecha{font-size:11px;color:#555;text-align:right}' +
-        '.cliente-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px 16px;border:1px solid #888;padding:8px 10px;margin-bottom:10px}' +
-        '.cliente-grid .campo{display:flex;gap:6px;align-items:baseline;border-bottom:1px dotted #ccc;padding:2px 0}' +
+        '.cliente-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px 16px;border:1px solid #000;padding:8px 10px;margin-bottom:10px}' +
+        '.cliente-grid .campo{display:flex;gap:6px;align-items:baseline;border-bottom:1px dotted #000;padding:2px 0}' +
         '.cliente-grid .campo.full{grid-column:1/-1;min-height:28px;align-items:flex-start;padding-top:3px}' +
         '.cliente-grid .campo label{font-size:9px;font-weight:700;text-transform:uppercase;color:#555;white-space:nowrap;min-width:70px}' +
         '.cliente-grid .campo span{flex:1;font-size:11px}' +
         '.cat-title{font-size:12px;font-weight:900;background:#003399;color:#fff;padding:3px 8px;margin:10px 0 0}' +
         'table{width:100%;border-collapse:collapse;margin-bottom:0}' +
         'thead tr{background:#dde6ff}' +
-        'th,td{border:1px solid #ccc;padding:3px 5px;text-align:left;font-size:10px}' +
+        'th,td{border:1px solid #000;padding:3px 5px;text-align:left;font-size:10px}' +
         'th{font-weight:700;font-size:9px;text-transform:uppercase;color:#003}' +
         'td.cant{text-align:center;width:36px}' +
         'td.precio{text-align:right}' +
         'tr:nth-child(even){background:#f8f9ff}' +
-        '.footer{margin-top:14px;border-top:1px solid #bbb;padding-top:6px;font-size:9px;color:#777;text-align:center}' +
+        '.footer{margin-top:14px;border-top:1px solid #000;padding-top:6px;font-size:9px;color:#777;text-align:center}' +
         '@media print{@page{size:A4 portrait;margin:10mm}body{font-size:10px}.page{padding:0;max-width:none}}' +
         '</style></head><body><div class="page">' +
         '<div class="header">' +
