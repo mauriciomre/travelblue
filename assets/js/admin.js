@@ -23,6 +23,7 @@ var COLS = [
     { key: "pvp", label: "PVP", default: true },
     { key: "estado", label: "Estado", default: true },
     { key: "multiplo", label: "Múltiplo", default: true },
+    { key: "barras", label: "Cód. Barras", default: false },
     { key: "colores", label: "Colores", default: true },
     { key: "acciones", label: "Acciones", default: true },
 ];
@@ -104,6 +105,7 @@ async function doLogin() {
             initSidebar();
             loadFavs();
             renderFavbar();
+            checkLastImport();
         } else {
             document.getElementById("lerr").textContent =
                 "Usuario o contraseña incorrectos";
@@ -144,6 +146,7 @@ async function tryAutoLogin() {
             initSidebar();
             loadFavs();
             renderFavbar();
+            checkLastImport();
         } else {
             localStorage.removeItem("tb_admin_user");
             localStorage.removeItem("tb_admin_pass");
@@ -854,6 +857,7 @@ function renderTableHeader() {
     if (col("pvp")) h += "<th>PVP</th>";
     if (col("estado")) h += "<th>Estado</th>";
     if (col("multiplo")) h += "<th>Múltiplo</th>";
+    if (col("barras")) h += "<th>Cód. Barras</th>";
     if (col("colores")) h += "<th>Colores</th>";
     if (col("acciones")) h += "<th>Acciones</th>";
     h += "</tr></thead>";
@@ -952,6 +956,11 @@ function renderTableFromList(list) {
                     '" data-field="multiplo" data-id="' +
                     p.id +
                     '" style="width:60px" min="1"></td>';
+            if (col("barras"))
+                html +=
+                    '<td style="color:var(--muted);font-size:11px">' +
+                    (p.codigo_barras || "—") +
+                    "</td>";
             if (col("colores"))
                 html +=
                     '<td style="color:var(--muted);font-size:11px">' +
@@ -995,6 +1004,11 @@ function renderTableFromList(list) {
                 html +=
                     '<td style="color:var(--muted);font-size:12px">×' +
                     multiplo +
+                    "</td>";
+            if (col("barras"))
+                html +=
+                    '<td style="color:var(--muted);font-size:11px">' +
+                    (p.codigo_barras || "—") +
                     "</td>";
             if (col("colores"))
                 html +=
@@ -1223,6 +1237,7 @@ function openModal(p) {
         : "";
     document.getElementById("fEstado").value = p ? p.estado : "DISPONIBLE";
     document.getElementById("fMultiplo").value = p ? p.multiplo || 1 : 1;
+    document.getElementById("fCodigoBarras").value = p ? (p.codigo_barras || "") : "";
     // Colores
     renderColorSelector();
     var productColores = p
@@ -1362,6 +1377,7 @@ async function saveProduct() {
         1,
         parseInt(document.getElementById("fMultiplo").value) || 1,
     );
+    var codigoBarras = document.getElementById("fCodigoBarras").value.trim() || null;
     if (!codigo || !descripcion || !categoria || !may || !pvp) {
         toast("Todos los campos son obligatorios", "#c62828");
         return;
@@ -1403,6 +1419,7 @@ async function saveProduct() {
         estado: document.getElementById("fEstado").value,
         orden: orden,
         multiplo,
+        codigo_barras: codigoBarras,
         colores,
     };
     var res = await fetch(
@@ -2206,4 +2223,163 @@ async function guardarClienteEdit() {
         closeClienteModal();
         loadClientes();
     } else toast("Error: " + (json.error || "desconocido"), "#c62828");
+}
+
+// ── IMPORTACIÓN MASIVA POR EXCEL (SheetJS) ────────────────────────────────────
+
+function openImportModal() {
+    document.getElementById("importModal").classList.remove("hidden");
+    document.getElementById("importFileInput").value = "";
+    document.getElementById("importPreviewWrap").innerHTML = "";
+    document.getElementById("btnImportConfirm").disabled = true;
+    window._importRows = [];
+}
+
+function closeImportModal() {
+    document.getElementById("importModal").classList.add("hidden");
+}
+
+function onImportFileChange(e) {
+    var file = e.target.files[0];
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function (ev) {
+        try {
+            var wb = XLSX.read(ev.target.result, { type: "binary" });
+            var ws = wb.Sheets[wb.SheetNames[0]];
+            var rows = XLSX.utils.sheet_to_json(ws, { defval: "" });
+            // Normalizar claves a mayúsculas
+            rows = rows.map(function (r) {
+                var obj = {};
+                Object.keys(r).forEach(function (k) { obj[k.toUpperCase().trim()] = String(r[k]).trim(); });
+                return obj;
+            });
+            // Filtrar filas sin CODIGO
+            rows = rows.filter(function (r) { return r["CODIGO"] && r["CODIGO"] !== ""; });
+            window._importRows = rows;
+            renderImportPreview(rows);
+            document.getElementById("btnImportConfirm").disabled = rows.length === 0;
+        } catch (err) {
+            toast("Error leyendo el archivo: " + err.message, "#c62828");
+        }
+    };
+    reader.readAsBinaryString(file);
+}
+
+function renderImportPreview(rows) {
+    if (!rows.length) {
+        document.getElementById("importPreviewWrap").innerHTML = '<p style="color:#c62828">No se encontraron filas con CODIGO.</p>';
+        return;
+    }
+    var FIELDS = ["CODIGO", "CODIGO_BARRAS", "DESCRIPCION", "CATEGORIA", "PRECIO_MAYORISTA", "PVP", "ESTADO"];
+    var html = '<p style="font-size:12px;color:#666;margin-bottom:8px">' + rows.length + ' fila(s) a importar</p>';
+    html += '<div style="overflow-x:auto"><table class="import-preview-table"><thead><tr>';
+    FIELDS.forEach(function (f) { html += "<th>" + f + "</th>"; });
+    html += "</tr></thead><tbody>";
+    rows.slice(0, 20).forEach(function (r) {
+        html += "<tr>";
+        FIELDS.forEach(function (f) { html += "<td>" + (r[f] || "") + "</td>"; });
+        html += "</tr>";
+    });
+    if (rows.length > 20) html += '<tr><td colspan="' + FIELDS.length + '" style="text-align:center;color:#999">... y ' + (rows.length - 20) + ' filas más</td></tr>';
+    html += "</tbody></table></div>";
+    document.getElementById("importPreviewWrap").innerHTML = html;
+}
+
+async function confirmImport() {
+    var rows = window._importRows || [];
+    if (!rows.length) return;
+    var btn = document.getElementById("btnImportConfirm");
+    btn.disabled = true;
+    btn.textContent = "Importando...";
+    try {
+        var res = await fetch(API + "?action=importar_masivo", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ _user: authUser, _pass: authPass, productos: rows }),
+        });
+        var json = await res.json();
+        if (json.ok) {
+            var msg = "✅ " + (json.imported || 0) + " nuevos, " + (json.updated || 0) + " actualizados";
+            if (json.errors && json.errors.length) {
+                msg += " — " + json.errors.length + " error(es): " + json.errors.map(function(e){ return e.codigo + " (" + e.motivo + ")"; }).join(", ");
+            }
+            toast(msg, json.errors && json.errors.length ? "#e65100" : undefined);
+            closeImportModal();
+            loadProducts();
+            // Mostrar banner de "Deshacer" con el import_id devuelto por la API
+            if (json.import_id) showUndoBanner(json.import_id, json.imported, json.updated);
+        } else {
+            toast("Error: " + (json.error || "desconocido"), "#c62828");
+        }
+    } catch (err) {
+        toast("Error de red: " + err.message, "#c62828");
+    }
+    btn.disabled = false;
+    btn.textContent = "Confirmar importación";
+}
+
+// ── DESHACER IMPORTACIÓN ──────────────────────────────────────────────────────
+
+function showUndoBanner(import_id, imported, updated) {
+    var banner = document.getElementById("undoBanner");
+    if (!banner) return;
+    var d = new Date();
+    var hora = d.getHours().toString().padStart(2,"0") + ":" + d.getMinutes().toString().padStart(2,"0");
+    banner.innerHTML =
+        '<span>↩ Última importación (' + hora + '): ' + (imported||0) + ' nuevos + ' + (updated||0) + ' actualizados. ¿Salió mal?</span>' +
+        '<button onclick="undoLastImport(\'' + import_id + '\')">Deshacer importación</button>' +
+        '<button onclick="hideUndoBanner()" style="background:transparent;color:inherit;opacity:.6;margin-left:4px">✕</button>';
+    banner.style.display = "flex";
+    banner._importId = import_id;
+}
+
+function hideUndoBanner() {
+    var banner = document.getElementById("undoBanner");
+    if (banner) banner.style.display = "none";
+}
+
+async function undoLastImport(import_id) {
+    if (!confirm("¿Seguro que querés revertir la última importación? Los productos vuelven al estado anterior.")) return;
+    var banner = document.getElementById("undoBanner");
+    if (banner) banner.innerHTML = '<span>⏳ Revirtiendo...</span>';
+    try {
+        var res = await fetch(API + "?action=import_rollback", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ _user: authUser, _pass: authPass, import_id: import_id }),
+        });
+        var json = await res.json();
+        if (json.ok) {
+            toast("↩ Importación revertida — " + json.restored + " producto(s) restaurado(s)");
+            hideUndoBanner();
+            loadProducts();
+        } else {
+            toast("Error al revertir: " + (json.error || "desconocido"), "#c62828");
+            hideUndoBanner();
+        }
+    } catch (err) {
+        toast("Error de red: " + err.message, "#c62828");
+        hideUndoBanner();
+    }
+}
+
+// Al cargar el admin, verificar si hay una importación reciente que se pueda revertir
+async function checkLastImport() {
+    try {
+        var res = await fetch(API + "?action=import_last");
+        var json = await res.json();
+        if (json.ok && json.import_id) {
+            var banner = document.getElementById("undoBanner");
+            if (!banner) return;
+            var d = new Date(json.created_at);
+            var hora = d.getHours().toString().padStart(2,"0") + ":" + d.getMinutes().toString().padStart(2,"0");
+            var fechaStr = d.toLocaleDateString("es-AR") + " " + hora;
+            banner.innerHTML =
+                '<span>↩ Hay una importación reversible del ' + fechaStr + ' (' + json.n + ' producto(s)).</span>' +
+                '<button onclick="undoLastImport(\'' + json.import_id + '\')">Deshacer</button>' +
+                '<button onclick="hideUndoBanner()" style="background:transparent;color:inherit;opacity:.6;margin-left:4px">✕</button>';
+            banner.style.display = "flex";
+        }
+    } catch (e) { /* silencioso */ }
 }

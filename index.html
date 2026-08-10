@@ -45,6 +45,14 @@
                         </div>
                     </div>
                     <div class="h-right-bottom">
+                        <button
+                            class="cart-btn"
+                            style="background:rgba(255,255,255,.15);font-size:12px;padding:6px 10px"
+                            onclick="printNota()"
+                            title="Imprimir nota de pedido con todos los productos"
+                        >
+                            🖨️ Nota de pedido
+                        </button>
                         <button class="cart-btn" onclick="openCart()">
                             🛒 Mi pedido
                             <div class="cart-n" id="cartN">0</div>
@@ -56,8 +64,9 @@
                 <input
                     type="text"
                     id="srch"
-                    placeholder="🔍  Buscar por nombre o código..."
+                    placeholder="🔍  Buscar por nombre, código o barras..."
                     oninput="doSearch()"
+                    onkeydown="doSearchEnter(event)"
                 />
             </div>
         </header>

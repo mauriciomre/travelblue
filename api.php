@@ -52,6 +52,22 @@ function setupDB($db) {
         $db->query("ALTER TABLE productos ADD COLUMN multiplo INT DEFAULT 1");
     }
 
+    $colCheck = $db->query("SHOW COLUMNS FROM productos LIKE 'codigo_barras'");
+    if ($colCheck && $colCheck->num_rows === 0) {
+        $db->query("ALTER TABLE productos ADD COLUMN codigo_barras VARCHAR(50) DEFAULT NULL");
+        $db->query("ALTER TABLE productos ADD INDEX idx_codigo_barras (codigo_barras)");
+    }
+
+    $db->query("CREATE TABLE IF NOT EXISTS import_snapshots (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        import_id VARCHAR(50) NOT NULL,
+        codigo VARCHAR(50) NOT NULL,
+        accion ENUM('updated','inserted') NOT NULL,
+        datos_anteriores TEXT DEFAULT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_import_id (import_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
     $db->query("CREATE TABLE IF NOT EXISTS config (
         clave VARCHAR(50) PRIMARY KEY,
         valor VARCHAR(255) NOT NULL
@@ -152,12 +168,14 @@ setupDB($db);
 switch ($action) {
 
     case 'productos':
-        $cat = $_GET['categoria'] ?? '';
-        $q   = $_GET['q'] ?? '';
+        $cat     = $_GET['categoria'] ?? '';
+        $q       = $_GET['q'] ?? '';
+        $barcode = $_GET['barcode'] ?? '';
         $sql = "SELECT p.*, COALESCE(c.orden, 0) as cat_orden FROM productos p LEFT JOIN categorias c ON p.categoria = c.nombre WHERE 1=1";
         $params = []; $types = '';
-        if ($cat) { $sql .= " AND p.categoria = ?"; $params[] = $cat; $types .= 's'; }
-        if ($q)   { $sql .= " AND (p.descripcion LIKE ? OR p.codigo LIKE ?)"; $like = "%$q%"; $params[] = $like; $params[] = $like; $types .= 'ss'; }
+        if ($cat)     { $sql .= " AND p.categoria = ?"; $params[] = $cat; $types .= 's'; }
+        if ($barcode) { $sql .= " AND p.codigo_barras = ?"; $params[] = $barcode; $types .= 's'; }
+        elseif ($q)   { $sql .= " AND (p.descripcion LIKE ? OR p.codigo LIKE ? OR p.codigo_barras LIKE ?)"; $like = "%$q%"; $params[] = $like; $params[] = $like; $params[] = $like; $types .= 'sss'; }
         $sql .= " ORDER BY COALESCE(c.orden, 0), p.orden, p.codigo";
         $stmt = $db->prepare($sql);
         if ($params) $stmt->bind_param($types, ...$params);
@@ -210,8 +228,9 @@ switch ($action) {
         $pvp = isset($data['pvp']) && $data['pvp'] !== '' ? floatval($data['pvp']) : null;
         $orden = intval($data['orden'] ?? 0);
         $multiplo = max(1, intval($data['multiplo'] ?? 1));
-        $stmt = $db->prepare("INSERT INTO productos (codigo,descripcion,categoria,precio_mayorista,pvp,foto,estado,orden,multiplo) VALUES (?,?,?,?,?,?,?,?,?)");
-        $stmt->bind_param('sssddssii', $data['codigo'], $data['descripcion'], $data['categoria'], $data['precio_mayorista'], $pvp, $data['foto'], $data['estado'], $orden, $multiplo);
+        $codigoBarras = isset($data['codigo_barras']) && $data['codigo_barras'] !== '' ? trim($data['codigo_barras']) : null;
+        $stmt = $db->prepare("INSERT INTO productos (codigo,descripcion,categoria,precio_mayorista,pvp,foto,estado,orden,multiplo,codigo_barras) VALUES (?,?,?,?,?,?,?,?,?,?)");
+        $stmt->bind_param('sssddssiis', $data['codigo'], $data['descripcion'], $data['categoria'], $data['precio_mayorista'], $pvp, $data['foto'], $data['estado'], $orden, $multiplo, $codigoBarras);
         if ($stmt->execute()) {
             $newId = $db->insert_id;
             // Guardar colores
@@ -232,11 +251,12 @@ switch ($action) {
         checkAuth($data);
         $pvp = isset($data['pvp']) && $data['pvp'] !== '' ? floatval($data['pvp']) : null;
         $multiplo = max(1, intval($data['multiplo'] ?? 1));
+        $codigoBarras = isset($data['codigo_barras']) && $data['codigo_barras'] !== '' ? trim($data['codigo_barras']) : null;
         // Mantener el orden actual si no se pasa uno
         $ordenActual = $db->query("SELECT orden FROM productos WHERE id=$id")->fetch_assoc();
         $orden = isset($data['orden']) && $data['orden'] !== '' ? intval($data['orden']) : ($ordenActual['orden'] ?? 0);
-        $stmt = $db->prepare("UPDATE productos SET codigo=?,descripcion=?,categoria=?,precio_mayorista=?,pvp=?,foto=?,estado=?,orden=?,multiplo=? WHERE id=?");
-        $stmt->bind_param('sssddssiii', $data['codigo'], $data['descripcion'], $data['categoria'], $data['precio_mayorista'], $pvp, $data['foto'], $data['estado'], $orden, $multiplo, $id);
+        $stmt = $db->prepare("UPDATE productos SET codigo=?,descripcion=?,categoria=?,precio_mayorista=?,pvp=?,foto=?,estado=?,orden=?,multiplo=?,codigo_barras=? WHERE id=?");
+        $stmt->bind_param('sssddssiisi', $data['codigo'], $data['descripcion'], $data['categoria'], $data['precio_mayorista'], $pvp, $data['foto'], $data['estado'], $orden, $multiplo, $codigoBarras, $id);
         if ($stmt->execute()) {
             // Solo actualizar colores si el campo viene en el request
             if (isset($data['colores'])) {
@@ -321,12 +341,129 @@ switch ($action) {
             $pvp = isset($p['PVP']) && $p['PVP'] !== '' ? floatval($p['PVP']) : null;
             $foto = $p['FOTO'] ?? null; $o = 0; $multiplo = 1;
             $estado = strtoupper($p['ESTADO'] ?? 'DISPONIBLE');
-            $stmt = $db->prepare("INSERT IGNORE INTO productos (codigo,descripcion,categoria,precio_mayorista,pvp,foto,estado,orden,multiplo) VALUES (?,?,?,?,?,?,?,?,?)");
-            $stmt->bind_param('sssddssii', $p['CODIGO'], $p['DESCRIPCION'], $p['CATEGORIA'], $p['PRECIO_MAYORISTA'], $pvp, $foto, $estado, $o, $multiplo);
+            $codigoBarras = isset($p['CODIGO_BARRAS']) && $p['CODIGO_BARRAS'] !== '' ? trim($p['CODIGO_BARRAS']) : null;
+            $stmt = $db->prepare("INSERT IGNORE INTO productos (codigo,descripcion,categoria,precio_mayorista,pvp,foto,estado,orden,multiplo,codigo_barras) VALUES (?,?,?,?,?,?,?,?,?,?)");
+            $stmt->bind_param('sssddssiis', $p['CODIGO'], $p['DESCRIPCION'], $p['CATEGORIA'], $p['PRECIO_MAYORISTA'], $pvp, $foto, $estado, $o, $multiplo, $codigoBarras);
             if ($stmt->execute()) $imported++;
             else $errors[] = $p['CODIGO'];
         }
         echo json_encode(['ok' => true, 'imported' => $imported, 'errors' => $errors]);
+        break;
+
+    case 'importar_masivo':
+        $data = json_decode(file_get_contents('php://input'), true);
+        checkAuth($data);
+        $productos = $data['productos'] ?? [];
+        if (empty($productos)) { http_response_code(400); die(json_encode(['error' => 'Sin productos'])); }
+        $imported = 0; $updated = 0; $errors = [];
+
+        // ID único para este lote — permite identificar y revertir la importación
+        $import_id = 'imp_' . date('Ymd_His') . '_' . substr(uniqid(), -4);
+
+        // Limpiar snapshots con más de 30 días
+        $db->query("DELETE FROM import_snapshots WHERE created_at < DATE_SUB(NOW(), INTERVAL 30 DAY)");
+
+        // Asegurar que las categorías nuevas existan
+        $cats = array_unique(array_column($productos, 'CATEGORIA'));
+        $cats = array_filter($cats);
+        foreach (array_values($cats) as $i => $cat) {
+            $stmt = $db->prepare("INSERT IGNORE INTO categorias (nombre, orden) VALUES (?, ?)");
+            $stmt->bind_param('si', $cat, $i);
+            $stmt->execute();
+        }
+
+        foreach ($productos as $p) {
+            $codigo = trim($p['CODIGO'] ?? '');
+            if (!$codigo) { $errors[] = ['codigo' => '(vacío)', 'motivo' => 'CODIGO obligatorio']; continue; }
+
+            // ¿Existe el producto?
+            $chk = $db->prepare("SELECT codigo,descripcion,categoria,precio_mayorista,pvp,estado,codigo_barras FROM productos WHERE codigo=?");
+            $chk->bind_param('s', $codigo); $chk->execute();
+            $existing = $chk->get_result()->fetch_assoc();
+
+            if ($existing) {
+                // Guardar snapshot ANTES de modificar
+                $prevJson = json_encode($existing, JSON_UNESCAPED_UNICODE);
+                $snapStmt = $db->prepare("INSERT INTO import_snapshots (import_id, codigo, accion, datos_anteriores) VALUES (?,?,'updated',?)");
+                $snapStmt->bind_param('sss', $import_id, $codigo, $prevJson);
+                $snapStmt->execute();
+
+                // UPDATE — solo sobreescribir campos no vacíos
+                $sets = []; $params = []; $types = '';
+                if (isset($p['DESCRIPCION'])    && $p['DESCRIPCION']    !== '') { $sets[] = 'descripcion=?';      $params[] = trim($p['DESCRIPCION']);           $types .= 's'; }
+                if (isset($p['CATEGORIA'])      && $p['CATEGORIA']      !== '') { $sets[] = 'categoria=?';        $params[] = trim($p['CATEGORIA']);             $types .= 's'; }
+                if (isset($p['PRECIO_MAYORISTA']) && $p['PRECIO_MAYORISTA'] !== '') { $sets[] = 'precio_mayorista=?'; $params[] = floatval($p['PRECIO_MAYORISTA']); $types .= 'd'; }
+                if (isset($p['PVP'])            && $p['PVP']            !== '') { $sets[] = 'pvp=?';              $params[] = floatval($p['PVP']);               $types .= 'd'; }
+                if (isset($p['ESTADO'])         && $p['ESTADO']         !== '') { $sets[] = 'estado=?';           $params[] = strtoupper(trim($p['ESTADO']));    $types .= 's'; }
+                if (isset($p['CODIGO_BARRAS'])  && $p['CODIGO_BARRAS']  !== '') { $sets[] = 'codigo_barras=?';    $params[] = trim($p['CODIGO_BARRAS']);          $types .= 's'; }
+                if (empty($sets)) { $updated++; continue; }
+                $params[] = $codigo; $types .= 's';
+                $stmt = $db->prepare("UPDATE productos SET " . implode(',', $sets) . " WHERE codigo=?");
+                $stmt->bind_param($types, ...$params);
+                if ($stmt->execute()) $updated++;
+                else $errors[] = ['codigo' => $codigo, 'motivo' => $db->error];
+            } else {
+                // INSERT — guardar snapshot de tipo 'inserted' (para poder eliminarlo al revertir)
+                $snapStmt = $db->prepare("INSERT INTO import_snapshots (import_id, codigo, accion, datos_anteriores) VALUES (?,?,'inserted',NULL)");
+                $snapStmt->bind_param('ss', $import_id, $codigo);
+                $snapStmt->execute();
+
+                $desc   = trim($p['DESCRIPCION'] ?? '');
+                $cat    = trim($p['CATEGORIA']   ?? '');
+                $may    = floatval($p['PRECIO_MAYORISTA'] ?? 0);
+                $pvp    = isset($p['PVP']) && $p['PVP'] !== '' ? floatval($p['PVP']) : null;
+                $estado = strtoupper(trim($p['ESTADO'] ?? 'DISPONIBLE'));
+                $cb     = isset($p['CODIGO_BARRAS']) && $p['CODIGO_BARRAS'] !== '' ? trim($p['CODIGO_BARRAS']) : null;
+                if (!$desc || !$cat) { $errors[] = ['codigo' => $codigo, 'motivo' => 'DESCRIPCION y CATEGORIA obligatorias para producto nuevo']; continue; }
+                $o = 0; $multiplo = 1;
+                $stmt = $db->prepare("INSERT INTO productos (codigo,descripcion,categoria,precio_mayorista,pvp,estado,orden,multiplo,codigo_barras) VALUES (?,?,?,?,?,?,?,?,?)");
+                $stmt->bind_param('sssddsiis', $codigo, $desc, $cat, $may, $pvp, $estado, $o, $multiplo, $cb);
+                if ($stmt->execute()) $imported++;
+                else $errors[] = ['codigo' => $codigo, 'motivo' => $db->error];
+            }
+        }
+        echo json_encode(['ok' => true, 'imported' => $imported, 'updated' => $updated, 'errors' => $errors, 'import_id' => $import_id]);
+        break;
+
+    case 'import_last':
+        // Devuelve metadatos de la importación más reciente (para mostrar el botón Deshacer al cargar la página)
+        $r = $db->query("SELECT import_id, created_at, COUNT(*) as n FROM import_snapshots GROUP BY import_id, created_at ORDER BY created_at DESC LIMIT 1");
+        $row = $r ? $r->fetch_assoc() : null;
+        echo json_encode($row ? ['ok' => true, 'import_id' => $row['import_id'], 'created_at' => $row['created_at'], 'n' => intval($row['n'])] : ['ok' => true, 'import_id' => null]);
+        break;
+
+    case 'import_rollback':
+        $data = json_decode(file_get_contents('php://input'), true);
+        checkAuth($data);
+        $import_id = trim($data['import_id'] ?? '');
+        if (!$import_id) { http_response_code(400); die(json_encode(['error' => 'import_id requerido'])); }
+
+        $r = $db->prepare("SELECT codigo, accion, datos_anteriores FROM import_snapshots WHERE import_id=?");
+        $r->bind_param('s', $import_id); $r->execute();
+        $rows = $r->get_result()->fetch_all(MYSQLI_ASSOC);
+        if (empty($rows)) { http_response_code(404); die(json_encode(['error' => 'No se encontró esa importación'])); }
+
+        $restored = 0; $errors = [];
+        foreach ($rows as $row) {
+            if ($row['accion'] === 'updated') {
+                $prev = json_decode($row['datos_anteriores'], true);
+                $pvp = isset($prev['pvp']) && $prev['pvp'] !== null ? floatval($prev['pvp']) : null;
+                $cb  = $prev['codigo_barras'] ?? null;
+                $stmt = $db->prepare("UPDATE productos SET descripcion=?,categoria=?,precio_mayorista=?,pvp=?,estado=?,codigo_barras=? WHERE codigo=?");
+                $stmt->bind_param('ssddsss', $prev['descripcion'], $prev['categoria'], floatval($prev['precio_mayorista']), $pvp, $prev['estado'], $cb, $row['codigo']);
+                if ($stmt->execute()) $restored++;
+                else $errors[] = ['codigo' => $row['codigo'], 'motivo' => $db->error];
+            } elseif ($row['accion'] === 'inserted') {
+                $del = $db->prepare("DELETE FROM productos WHERE codigo=?");
+                $del->bind_param('s', $row['codigo']); $del->execute();
+                $restored++;
+            }
+        }
+        // Eliminar el snapshot ya usado
+        $del = $db->prepare("DELETE FROM import_snapshots WHERE import_id=?");
+        $del->bind_param('s', $import_id); $del->execute();
+
+        echo json_encode(['ok' => true, 'restored' => $restored, 'errors' => $errors]);
         break;
 
     case 'categorias':

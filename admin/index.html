@@ -183,7 +183,45 @@
                             >
                                 + Nuevo producto
                             </button>
+                            <button
+                                class="btn"
+                                style="background:#198754;color:#fff"
+                                onclick="openImportModal()"
+                            >
+                                📊 Importar Excel
+                            </button>
                         </div>
+                        <!-- Banner "Deshacer última importación" -->
+                        <div
+                            id="undoBanner"
+                            style="
+                                display: none;
+                                align-items: center;
+                                gap: 12px;
+                                background: #fff3cd;
+                                border: 1px solid #ffc107;
+                                border-radius: 6px;
+                                padding: 8px 14px;
+                                font-size: 13px;
+                                margin-bottom: 10px;
+                            "
+                        >
+                            <!-- contenido inyectado por JS -->
+                        </div>
+                        <style>
+                            #undoBanner button {
+                                background: #856404;
+                                color: #fff;
+                                border: none;
+                                border-radius: 5px;
+                                padding: 4px 10px;
+                                font-size: 12px;
+                                cursor: pointer;
+                                font-weight: 600;
+                            }
+                            #undoBanner button:hover { background: #6a4f03; }
+                        </style>
+
                         <!-- Toolbar de ordenamiento automático (solo en modo edición) -->
                         <div
                             class="sort-toolbar"
@@ -843,6 +881,18 @@
                                 </div>
                             </div>
                             <div class="field">
+                                <label>Código de barras</label>
+                                <input
+                                    id="fCodigoBarras"
+                                    type="text"
+                                    placeholder="Ej: 5052006358328"
+                                    autocomplete="off"
+                                />
+                                <div style="font-size:11px;color:var(--muted);margin-top:4px">
+                                    Se puede escanear con el lector de barras
+                                </div>
+                            </div>
+                            <div class="field">
                                 <label>Colores disponibles</label>
                                 <div
                                     style="
@@ -1147,6 +1197,42 @@
         </div>
         <!-- end appWrap -->
 
+        <!-- ── Modal Importar Excel ────────────────────────────────────────── -->
+        <div class="modal-bg hidden" id="importModal" onclick="if(event.target===this)closeImportModal()">
+            <div class="modal" style="max-width:700px;width:95%">
+                <div class="modal-head">
+                    <h2>📊 Importar productos desde Excel</h2>
+                    <button class="modal-close" onclick="closeImportModal()">✕</button>
+                </div>
+                <div style="padding:20px 24px">
+                    <p style="font-size:13px;color:#555;margin-bottom:12px">
+                        El archivo debe tener una hoja con encabezados en la primera fila.
+                        Columnas soportadas: <strong>CODIGO</strong> (obligatorio), CODIGO_BARRAS, DESCRIPCION, CATEGORIA, PRECIO_MAYORISTA, PVP, ESTADO.
+                        Si una celda está vacía, el valor actual no se sobreescribe.
+                    </p>
+                    <input
+                        type="file"
+                        id="importFileInput"
+                        accept=".xlsx,.xls,.csv"
+                        onchange="onImportFileChange(event)"
+                        style="margin-bottom:16px;display:block"
+                    />
+                    <style>
+                        .import-preview-table { border-collapse: collapse; font-size: 12px; width: 100%; }
+                        .import-preview-table th { background: #f0f4ff; padding: 5px 8px; text-align: left; font-weight: 700; border: 1px solid #dde; }
+                        .import-preview-table td { padding: 4px 8px; border: 1px solid #eee; }
+                        .import-preview-table tr:nth-child(even) { background: #fafafa; }
+                    </style>
+                    <div id="importPreviewWrap" style="max-height:320px;overflow-y:auto"></div>
+                </div>
+                <div class="modal-foot">
+                    <button class="btn" style="background:#eee" onclick="closeImportModal()">Cancelar</button>
+                    <button id="btnImportConfirm" class="btn btn-primary" disabled onclick="confirmImport()">Confirmar importación</button>
+                </div>
+            </div>
+        </div>
+
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
         <script src="../assets/js/admin.js"></script>
         <script>
             var DATA_INICIAL = [
