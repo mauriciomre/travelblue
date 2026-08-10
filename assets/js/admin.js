@@ -2549,6 +2549,7 @@ function executePrint() {
         '.header .fecha{font-size:11px;color:#555;text-align:right}' +
         '.cliente-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px 16px;border:1px solid #888;padding:8px 10px;margin-bottom:10px}' +
         '.cliente-grid .campo{display:flex;gap:6px;align-items:baseline;border-bottom:1px dotted #ccc;padding:2px 0}' +
+        '.cliente-grid .campo.full{grid-column:1/-1;min-height:28px;align-items:flex-start;padding-top:3px}' +
         '.cliente-grid .campo label{font-size:9px;font-weight:700;text-transform:uppercase;color:#555;white-space:nowrap;min-width:70px}' +
         '.cliente-grid .campo span{flex:1;font-size:11px}' +
         '.cat-title{font-size:12px;font-weight:900;background:#003399;color:#fff;padding:3px 8px;margin:10px 0 0}' +
@@ -2571,7 +2572,8 @@ function executePrint() {
     if (clientFields.length) {
         html += '<div class="cliente-grid">';
         clientFields.forEach(function(f) {
-            html += '<div class="campo"><label>' + f.label + '</label><span>&nbsp;</span></div>';
+            var extraClass = (f.value === 'observaciones') ? ' full' : '';
+            html += '<div class="campo' + extraClass + '"><label>' + f.label + '</label><span>&nbsp;</span></div>';
         });
         html += '</div>';
     }
