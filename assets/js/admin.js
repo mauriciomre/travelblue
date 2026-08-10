@@ -2512,7 +2512,8 @@ function executePrint() {
         descripcion:      { label: 'Descripción',  style: '' },
         precio_mayorista: { label: 'P. Mayorista', style: 'width:90px;text-align:right' },
         pvp:              { label: 'PVP',           style: 'width:80px;text-align:right' },
-        cantidad:         { label: 'Cant.',         style: 'width:40px;text-align:center' }
+        cantidad:         { label: 'Cant.',         style: 'width:40px;text-align:center' },
+        estado:           { label: 'Estado',        style: 'width:70px;text-align:center' }
     };
     var theadCells = cols.map(function(c) {
         var d = colDefs[c] || { label: c, style: '' };
@@ -2526,6 +2527,7 @@ function executePrint() {
             if (c === 'precio_mayorista') return '<td class="precio">' + fmtP(p.precio_mayorista) + '</td>';
             if (c === 'pvp') return '<td class="precio">' + fmtP(p.pvp) + '</td>';
             if (c === 'cantidad') return '<td class="cant"></td>';
+            if (c === 'estado') return '<td style="text-align:center;font-size:9px">' + (p.estado || '') + '</td>';
             return '<td></td>';
         }).join('');
     }

@@ -1321,13 +1321,14 @@
                             <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" name="pCol" value="precio_mayorista" checked> Precio mayorista</label>
                             <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" name="pCol" value="pvp" checked> PVP</label>
                             <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" name="pCol" value="cantidad" checked> Cantidad</label>
+                            <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" name="pCol" value="estado"> Estado</label>
                         </div>
                     </div>
 
                 </div>
                 <div class="modal-foot" style="display:flex;justify-content:flex-end;gap:10px;padding:12px 20px;border-top:1px solid #eee">
-                    <button class="btn-sec" onclick="closePrintConfigModal()">Cancelar</button>
-                    <button class="btn-pri" onclick="executePrint()">🖨️ Imprimir</button>
+                    <button class="btn" style="background:#eee" onclick="closePrintConfigModal()">Cancelar</button>
+                    <button class="btn btn-primary" onclick="executePrint()">🖨️ Imprimir</button>
                 </div>
             </div>
         </div>
