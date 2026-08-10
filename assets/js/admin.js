@@ -2364,27 +2364,6 @@ async function undoLastImport(import_id) {
     }
 }
 
-// ── Submenús de Configuración ────────────────────────────────────────────────
-function showCfgTab(tab) {
-    var tabs = ['General', 'Importacion', 'Herramientas'];
-    tabs.forEach(function(t) {
-        var panel = document.getElementById('cfgPanel' + t);
-        var btn   = document.getElementById('cfgTabBtn' + t);
-        if (!panel || !btn) return;
-        if (t === tab) {
-            panel.style.display = '';
-            btn.style.background = 'var(--blue)';
-            btn.style.color = '#fff';
-            btn.style.borderBottom = '2px solid var(--blue)';
-        } else {
-            panel.style.display = 'none';
-            btn.style.background = '#f0f4ff';
-            btn.style.color = 'var(--blue)';
-            btn.style.borderBottom = '2px solid transparent';
-        }
-    });
-}
-
 // ── Exportar plantilla vacía ──────────────────────────────────────────────────
 function exportTemplate() {
     if (typeof XLSX === 'undefined') { alert('Cargando SheetJS, intentá de nuevo.'); return; }
