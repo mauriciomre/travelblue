@@ -6,6 +6,27 @@
         <title>Admin — Travel Blue Argentina</title>
         <link rel="stylesheet" href="../assets/css/admin.css" />
         <style>
+            /* ── Modal header / close button ── */
+            .modal-head {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                padding: 14px 20px;
+                border-bottom: 1px solid #eee;
+            }
+            .modal-head h2 { margin: 0; font-size: 16px; }
+            .modal-close {
+                background: none;
+                border: none;
+                font-size: 20px;
+                cursor: pointer;
+                color: #888;
+                padding: 2px 8px;
+                border-radius: 4px;
+                line-height: 1;
+            }
+            .modal-close:hover { background: #f0f0f0; color: #333; }
+
             /* ── Print config modal: category list items ── */
             .pcat-item {
                 display: flex;
