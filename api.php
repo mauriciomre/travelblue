@@ -438,32 +438,59 @@ switch ($action) {
         $import_id = trim($data['import_id'] ?? '');
         if (!$import_id) { http_response_code(400); die(json_encode(['error' => 'import_id requerido'])); }
 
-        $r = $db->prepare("SELECT codigo, accion, datos_anteriores FROM import_snapshots WHERE import_id=?");
-        $r->bind_param('s', $import_id); $r->execute();
-        $rows = $r->get_result()->fetch_all(MYSQLI_ASSOC);
-        if (empty($rows)) { http_response_code(404); die(json_encode(['error' => 'No se encontró esa importación'])); }
+        try {
+            $r = $db->prepare("SELECT codigo, accion, datos_anteriores FROM import_snapshots WHERE import_id=?");
+            if (!$r) throw new Exception("prepare SELECT falló: " . $db->error);
+            $r->bind_param('s', $import_id);
+            $r->execute();
+            $res = $r->get_result();
+            if (!$res) throw new Exception("get_result falló: " . $db->error);
+            $rows = $res->fetch_all(MYSQLI_ASSOC);
+            $r->close();
 
-        $restored = 0; $errors = [];
-        foreach ($rows as $row) {
-            if ($row['accion'] === 'updated') {
-                $prev = json_decode($row['datos_anteriores'], true);
-                $pvp = isset($prev['pvp']) && $prev['pvp'] !== null ? floatval($prev['pvp']) : null;
-                $cb  = $prev['codigo_barras'] ?? null;
-                $stmt = $db->prepare("UPDATE productos SET descripcion=?,categoria=?,precio_mayorista=?,pvp=?,estado=?,codigo_barras=? WHERE codigo=?");
-                $stmt->bind_param('ssddsss', $prev['descripcion'], $prev['categoria'], floatval($prev['precio_mayorista']), $pvp, $prev['estado'], $cb, $row['codigo']);
-                if ($stmt->execute()) $restored++;
-                else $errors[] = ['codigo' => $row['codigo'], 'motivo' => $db->error];
-            } elseif ($row['accion'] === 'inserted') {
-                $del = $db->prepare("DELETE FROM productos WHERE codigo=?");
-                $del->bind_param('s', $row['codigo']); $del->execute();
-                $restored++;
+            if (empty($rows)) { http_response_code(404); die(json_encode(['error' => 'No se encontró esa importación'])); }
+
+            $restored = 0; $errors = [];
+            foreach ($rows as $row) {
+                if ($row['accion'] === 'updated') {
+                    $prev = json_decode($row['datos_anteriores'], true);
+                    if (!$prev) { $errors[] = ['codigo' => $row['codigo'], 'motivo' => 'snapshot JSON inválido']; continue; }
+                    $desc  = $prev['descripcion']     ?? '';
+                    $cat   = $prev['categoria']       ?? '';
+                    $pmay  = floatval($prev['precio_mayorista'] ?? 0);
+                    $pvp   = isset($prev['pvp']) && $prev['pvp'] !== null ? floatval($prev['pvp']) : null;
+                    $est   = $prev['estado']          ?? 'DISPONIBLE';
+                    $cb    = isset($prev['codigo_barras']) && $prev['codigo_barras'] !== null ? strval($prev['codigo_barras']) : null;
+                    $cod   = $row['codigo'];
+
+                    $stmt = $db->prepare("UPDATE productos SET descripcion=?,categoria=?,precio_mayorista=?,pvp=?,estado=?,codigo_barras=? WHERE codigo=?");
+                    if (!$stmt) throw new Exception("prepare UPDATE falló para " . $cod . ": " . $db->error);
+                    $stmt->bind_param('ssddsss', $desc, $cat, $pmay, $pvp, $est, $cb, $cod);
+                    if ($stmt->execute()) $restored++;
+                    else $errors[] = ['codigo' => $cod, 'motivo' => $stmt->error];
+                    $stmt->close();
+                } elseif ($row['accion'] === 'inserted') {
+                    $cod = $row['codigo'];
+                    $del = $db->prepare("DELETE FROM productos WHERE codigo=?");
+                    if (!$del) throw new Exception("prepare DELETE falló para " . $cod . ": " . $db->error);
+                    $del->bind_param('s', $cod);
+                    $del->execute();
+                    $del->close();
+                    $restored++;
+                }
             }
-        }
-        // Eliminar el snapshot ya usado
-        $del = $db->prepare("DELETE FROM import_snapshots WHERE import_id=?");
-        $del->bind_param('s', $import_id); $del->execute();
+            // Eliminar snapshots ya usados
+            $delSnap = $db->prepare("DELETE FROM import_snapshots WHERE import_id=?");
+            if (!$delSnap) throw new Exception("prepare DELETE snapshots falló: " . $db->error);
+            $delSnap->bind_param('s', $import_id);
+            $delSnap->execute();
+            $delSnap->close();
 
-        echo json_encode(['ok' => true, 'restored' => $restored, 'errors' => $errors]);
+            echo json_encode(['ok' => true, 'restored' => $restored, 'errors' => $errors]);
+        } catch (Exception $e) {
+            http_response_code(500);
+            echo json_encode(['error' => 'import_rollback: ' . $e->getMessage()]);
+        }
         break;
 
     case 'categorias':
