@@ -5,6 +5,31 @@
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <title>Admin — Travel Blue Argentina</title>
         <link rel="stylesheet" href="../assets/css/admin.css" />
+        <style>
+            /* ── Print config modal: category list items ── */
+            .pcat-item {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                background: #fff;
+                border: 1px solid #d0d8f0;
+                border-radius: 4px;
+                padding: 5px 10px;
+                font-size: 13px;
+            }
+            .pcat-item .pcat-name { flex: 1; }
+            .pcat-item .pcat-btns { display: flex; gap: 4px; }
+            .pcat-item .pcat-btns button {
+                background: #e8edf8;
+                border: 1px solid #b0bcde;
+                border-radius: 3px;
+                padding: 1px 7px;
+                cursor: pointer;
+                font-size: 11px;
+                line-height: 1.4;
+            }
+            .pcat-item .pcat-btns button:hover { background: #003399; color: #fff; }
+        </style>
     </head>
     <body>
         <div class="login-wrap" id="loginWrap">
@@ -1212,6 +1237,79 @@
             <!-- end admin-layout -->
         </div>
         <!-- end appWrap -->
+
+        <!-- ── Modal Configuración Impresión Nota de Pedido ───────────────── -->
+        <div class="modal-bg" id="printConfigModal" onclick="if(event.target===this)closePrintConfigModal()">
+            <div class="modal" style="max-width:680px;width:96%">
+                <div class="modal-head">
+                    <h2>🖨️ Configurar impresión</h2>
+                    <button class="modal-close" onclick="closePrintConfigModal()">✕</button>
+                </div>
+                <div class="modal-body" style="padding:16px 20px;display:grid;gap:18px">
+
+                    <!-- Campos del cliente -->
+                    <div>
+                        <div style="font-weight:700;font-size:13px;margin-bottom:8px;color:#003399">Datos del cliente a mostrar</div>
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 16px">
+                            <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" name="pclientField" value="nombre" data-label="Nombre / Razón social" checked> Nombre / Razón social</label>
+                            <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" name="pclientField" value="cuit" data-label="CUIT" checked> CUIT</label>
+                            <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" name="pclientField" value="condicion_fiscal" data-label="Condición fiscal" checked> Condición fiscal</label>
+                            <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" name="pclientField" value="direccion" data-label="Dirección" checked> Dirección</label>
+                            <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" name="pclientField" value="localidad" data-label="Localidad" checked> Localidad</label>
+                            <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" name="pclientField" value="provincia" data-label="Provincia" checked> Provincia</label>
+                            <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" name="pclientField" value="telefono" data-label="Teléfono" checked> Teléfono</label>
+                            <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" name="pclientField" value="email" data-label="Email" checked> Email</label>
+                            <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" name="pclientField" value="transporte" data-label="Transporte" checked> Transporte</label>
+                            <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" name="pclientField" value="observaciones" data-label="Observaciones" checked> Observaciones</label>
+                        </div>
+                    </div>
+
+                    <!-- Orden de productos -->
+                    <div>
+                        <label style="font-weight:700;font-size:13px;color:#003399;display:block;margin-bottom:6px">Orden de productos</label>
+                        <select id="pSortOrder" style="padding:6px 10px;border:1px solid #ccc;border-radius:4px;font-size:13px">
+                            <option value="codigo">Por código (por defecto)</option>
+                            <option value="descripcion">Por descripción</option>
+                            <option value="precio_mayorista">Por precio mayorista</option>
+                        </select>
+                    </div>
+
+                    <!-- Agrupación por categoría -->
+                    <div>
+                        <div style="font-weight:700;font-size:13px;margin-bottom:8px;color:#003399">Agrupación</div>
+                        <div style="display:flex;gap:20px;margin-bottom:10px">
+                            <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+                                <input type="radio" name="pGroupBy" value="categoria" checked onchange="togglePrintCatOrder(this)"> Separar por categoría
+                            </label>
+                            <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+                                <input type="radio" name="pGroupBy" value="none" onchange="togglePrintCatOrder(this)"> Sin agrupación
+                            </label>
+                        </div>
+                        <div id="pCatOrderWrap" style="border:1px solid #dde;border-radius:6px;padding:8px 10px;background:#f8f9ff">
+                            <div style="font-size:11px;color:#666;margin-bottom:6px">Arrastrá con ▲▼ para cambiar el orden de las categorías:</div>
+                            <div id="pCatList" style="display:flex;flex-direction:column;gap:4px"></div>
+                        </div>
+                    </div>
+
+                    <!-- Columnas -->
+                    <div>
+                        <div style="font-weight:700;font-size:13px;margin-bottom:8px;color:#003399">Columnas a mostrar</div>
+                        <div style="display:flex;flex-wrap:wrap;gap:8px 20px">
+                            <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" name="pCol" value="codigo" checked> Código</label>
+                            <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" name="pCol" value="descripcion" checked> Descripción</label>
+                            <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" name="pCol" value="precio_mayorista" checked> Precio mayorista</label>
+                            <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" name="pCol" value="pvp" checked> PVP</label>
+                            <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" name="pCol" value="cantidad" checked> Cantidad</label>
+                        </div>
+                    </div>
+
+                </div>
+                <div class="modal-foot" style="display:flex;justify-content:flex-end;gap:10px;padding:12px 20px;border-top:1px solid #eee">
+                    <button class="btn-sec" onclick="closePrintConfigModal()">Cancelar</button>
+                    <button class="btn-pri" onclick="executePrint()">🖨️ Imprimir</button>
+                </div>
+            </div>
+        </div>
 
         <!-- ── Modal Importar Excel ────────────────────────────────────────── -->
         <div class="modal-bg" id="importModal" onclick="if(event.target===this)closeImportModal()">

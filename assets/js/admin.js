@@ -2383,19 +2383,19 @@ function exportTemplate() {
 async function exportCatalog() {
     if (typeof XLSX === 'undefined') { alert('Cargando SheetJS, intentá de nuevo.'); return; }
     try {
-        var res  = await fetch(API + '?action=list&limit=9999');
+        var res  = await fetch(API + '?action=productos');
         var json = await res.json();
-        if (!json.data || !json.data.length) { alert('No hay productos para exportar.'); return; }
+        if (!Array.isArray(json) || !json.length) { alert('No hay productos para exportar.'); return; }
         var headers = ['CODIGO', 'CODIGO_BARRAS', 'DESCRIPCION', 'CATEGORIA', 'PRECIO_MAYORISTA', 'PVP', 'ESTADO'];
-        var rows = json.data.map(function(p) {
+        var rows = json.map(function(p) {
             return [
-                p.CODIGO        || '',
-                p.CODIGO_BARRAS || '',
-                p.DESCRIPCION   || '',
-                p.CATEGORIA     || '',
-                p.PRECIO_MAYORISTA != null ? Number(p.PRECIO_MAYORISTA) : '',
-                p.PVP           != null    ? Number(p.PVP)              : '',
-                p.ESTADO        || ''
+                p.codigo        || '',
+                p.codigo_barras || '',
+                p.descripcion   || '',
+                p.categoria     || '',
+                p.precio_mayorista != null ? Number(p.precio_mayorista) : '',
+                p.pvp           != null    ? Number(p.pvp)              : '',
+                p.estado        || ''
             ];
         });
         var wb = XLSX.utils.book_new();
@@ -2415,107 +2415,187 @@ async function exportCatalog() {
 // ── Imprimir nota de pedido (admin — carga desde API) ────────────────────────
 async function printNotaAdmin() {
     try {
-        var res  = await fetch(API + '?action=list&limit=9999');
+        var res  = await fetch(API + '?action=productos');
         var json = await res.json();
-        if (!json.data || !json.data.length) { alert('No hay productos para imprimir.'); return; }
-
-        var disponibles = json.data.filter(function(p) { return p.ESTADO === 'DISPONIBLE'; });
+        if (!Array.isArray(json) || !json.length) { alert('No hay productos para imprimir.'); return; }
+        var disponibles = json.filter(function(p) { return p.estado === 'DISPONIBLE'; });
         if (!disponibles.length) { alert('No hay productos disponibles para imprimir.'); return; }
-
-        // Función local para formatear precios
-        function fmtP(v) {
-            if (v == null || v === '') return '—';
-            return '$ ' + Number(v).toLocaleString('es-AR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
-        }
-
-        // Agrupar por categoría
-        var cats = {};
-        disponibles.forEach(function(p) {
-            var c = p.CATEGORIA || 'SIN CATEGORÍA';
-            if (!cats[c]) cats[c] = { orden: p.CAT_ORDEN || 0, prods: [] };
-            cats[c].prods.push(p);
-        });
-        var catsSorted = Object.keys(cats).sort(function(a, b) {
-            return cats[a].orden - cats[b].orden || a.localeCompare(b);
-        });
-
-        var fecha = new Date().toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
-
-        var html = '<!DOCTYPE html><html lang="es"><head><meta charset="utf-8">' +
-            '<title>Nota de Pedido Travel Blue — ' + fecha + '</title>' +
-            '<style>' +
-            'body{font-family:Arial,sans-serif;font-size:11px;color:#000;margin:0;padding:0}' +
-            '.page{padding:14mm 12mm;max-width:210mm;margin:0 auto}' +
-            '.header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px}' +
-            '.header h1{font-size:16px;font-weight:900;letter-spacing:.5px;color:#003399;margin:0}' +
-            '.header .fecha{font-size:11px;color:#555;text-align:right}' +
-            '.cliente-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px 16px;border:1px solid #888;padding:8px 10px;margin-bottom:10px}' +
-            '.cliente-grid .campo{display:flex;gap:6px;align-items:baseline;border-bottom:1px dotted #ccc;padding:2px 0}' +
-            '.cliente-grid .campo label{font-size:9px;font-weight:700;text-transform:uppercase;color:#555;white-space:nowrap;min-width:70px}' +
-            '.cliente-grid .campo span{flex:1;border-bottom:none;font-size:11px}' +
-            '.cat-title{font-size:12px;font-weight:900;background:#003399;color:#fff;padding:3px 8px;margin:10px 0 0}' +
-            'table{width:100%;border-collapse:collapse;margin-bottom:0}' +
-            'thead tr{background:#dde6ff}' +
-            'th,td{border:1px solid #ccc;padding:3px 5px;text-align:left;font-size:10px}' +
-            'th{font-weight:700;font-size:9px;text-transform:uppercase;color:#003}' +
-            'td.cant{text-align:center;width:36px}' +
-            'td.precio{text-align:right}' +
-            'tr:nth-child(even){background:#f8f9ff}' +
-            '.footer{margin-top:14px;border-top:1px solid #bbb;padding-top:6px;font-size:9px;color:#777;text-align:center}' +
-            '@media print{@page{size:A4 portrait;margin:10mm}body{font-size:10px}.page{padding:0;max-width:none}}' +
-            '</style></head><body><div class="page">' +
-            '<div class="header">' +
-            '<div><h1>TRAVEL BLUE</h1><div style="font-size:11px;font-weight:600;color:#555;margin-top:2px">NOTA DE PEDIDO MAYORISTA</div></div>' +
-            '<div class="fecha">Fecha: ' + fecha + '<br><span style="font-size:9px;color:#999">Precios al momento de impresión</span></div>' +
-            '</div>' +
-            '<div class="cliente-grid">' +
-            '<div class="campo"><label>Empresa / Nombre</label><span>&nbsp;</span></div>' +
-            '<div class="campo"><label>CUIT / DNI</label><span>&nbsp;</span></div>' +
-            '<div class="campo"><label>Dirección</label><span>&nbsp;</span></div>' +
-            '<div class="campo"><label>Localidad</label><span>&nbsp;</span></div>' +
-            '<div class="campo"><label>Provincia</label><span>&nbsp;</span></div>' +
-            '<div class="campo"><label>CP</label><span>&nbsp;</span></div>' +
-            '<div class="campo"><label>Teléfono</label><span>&nbsp;</span></div>' +
-            '<div class="campo"><label>Email</label><span>&nbsp;</span></div>' +
-            '<div class="campo"><label>Transporte</label><span>&nbsp;</span></div>' +
-            '<div class="campo"><label>Observaciones</label><span>&nbsp;</span></div>' +
-            '</div>';
-
-        catsSorted.forEach(function(cat) {
-            html += '<div class="cat-title">' + cat + '</div>' +
-                '<table><thead><tr>' +
-                '<th style="width:60px">Código</th><th>Descripción</th>' +
-                '<th class="precio" style="width:90px">P. Mayorista</th>' +
-                '<th class="precio" style="width:80px">PVP</th>' +
-                '<th class="cant">Cant.</th>' +
-                '</tr></thead><tbody>';
-            cats[cat].prods.forEach(function(p) {
-                html += '<tr>' +
-                    '<td><code style="font-size:9px">' + p.CODIGO + '</code></td>' +
-                    '<td>' + p.DESCRIPCION + '</td>' +
-                    '<td class="precio">' + fmtP(p.PRECIO_MAYORISTA) + '</td>' +
-                    '<td class="precio">' + fmtP(p.PVP) + '</td>' +
-                    '<td class="cant"></td>' +
-                    '</tr>';
-            });
-            html += '</tbody></table>';
-        });
-
-        html += '<div class="footer">Travel Blue Argentina — Bags Store SRL — Catálogo Mayorista</div>' +
-            '</div></body></html>';
-
-        var win = window.open('', '_blank', 'width=900,height=700');
-        if (!win) { alert('Habilitá las ventanas emergentes para imprimir.'); return; }
-        win.document.write(html);
-        win.document.close();
-        win.focus();
-        setTimeout(function() { win.print(); }, 400);
-
+        window._printProducts = disponibles;
+        openPrintConfigModal();
     } catch(e) {
         alert('Error al cargar los productos: ' + e.message);
     }
 }
 
+function openPrintConfigModal() {
+    var prods = window._printProducts || [];
+    // Armar lista de categorías únicas ordenadas por cat_orden
+    var catMap = {};
+    prods.forEach(function(p) {
+        var c = p.categoria || 'SIN CATEGORÍA';
+        if (!catMap[c]) catMap[c] = p.cat_orden != null ? Number(p.cat_orden) : 999;
+    });
+    var cats = Object.keys(catMap).sort(function(a, b) {
+        return catMap[a] - catMap[b] || a.localeCompare(b);
+    });
+    var list = document.getElementById('pCatList');
+    list.innerHTML = '';
+    cats.forEach(function(cat) {
+        var div = document.createElement('div');
+        div.className = 'pcat-item';
+        div.dataset.cat = cat;
+        div.innerHTML = '<span class="pcat-name">' + cat + '</span>' +
+            '<span class="pcat-btns">' +
+            '<button type="button" onclick="movePrintCat(this,-1)" title="Subir">▲</button>' +
+            '<button type="button" onclick="movePrintCat(this,1)" title="Bajar">▼</button>' +
+            '</span>';
+        list.appendChild(div);
+    });
+    document.getElementById('printConfigModal').classList.add('open');
+}
+
+function closePrintConfigModal() {
+    document.getElementById('printConfigModal').classList.remove('open');
+}
+
+function togglePrintCatOrder(radio) {
+    document.getElementById('pCatOrderWrap').style.display =
+        (radio.value === 'categoria') ? '' : 'none';
+}
+
+function movePrintCat(btn, dir) {
+    var item = btn.closest('.pcat-item');
+    var list = item.parentNode;
+    if (dir === -1 && item.previousElementSibling) {
+        list.insertBefore(item, item.previousElementSibling);
+    } else if (dir === 1 && item.nextElementSibling) {
+        list.insertBefore(item.nextElementSibling, item);
+    }
+}
+
+function executePrint() {
+    var prods = window._printProducts || [];
+
+    // Columnas seleccionadas
+    var colChecks = document.querySelectorAll('input[name="pCol"]:checked');
+    var cols = Array.from(colChecks).map(function(c) { return c.value; });
+    if (!cols.length) { alert('Seleccioná al menos una columna.'); return; }
+
+    // Orden de productos
+    var sortOrder = document.getElementById('pSortOrder').value;
+    var sorted = prods.slice().sort(function(a, b) {
+        if (sortOrder === 'descripcion') return (a.descripcion || '').localeCompare(b.descripcion || '');
+        if (sortOrder === 'precio_mayorista') return (Number(a.precio_mayorista) || 0) - (Number(b.precio_mayorista) || 0);
+        return (a.codigo || '').localeCompare(b.codigo || '');
+    });
+
+    // Agrupacion
+    var groupBy = document.querySelector('input[name="pGroupBy"]:checked').value;
+
+    // Campos de cliente
+    var clientChecks = document.querySelectorAll('input[name="pclientField"]:checked');
+    var clientFields = Array.from(clientChecks).map(function(c) {
+        return { value: c.value, label: c.dataset.label };
+    });
+
+    // Formato moneda
+    function fmtP(v) {
+        if (v == null || v === '') return '—';
+        return '$ ' + Number(v).toLocaleString('es-AR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+    }
+
+    var fecha = new Date().toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+
+    // Cabecera de tabla segun columnas
+    var colDefs = {
+        codigo:           { label: 'Código',       style: 'width:60px' },
+        descripcion:      { label: 'Descripción',  style: '' },
+        precio_mayorista: { label: 'P. Mayorista', style: 'width:90px;text-align:right' },
+        pvp:              { label: 'PVP',           style: 'width:80px;text-align:right' },
+        cantidad:         { label: 'Cant.',         style: 'width:40px;text-align:center' }
+    };
+    var theadCells = cols.map(function(c) {
+        var d = colDefs[c] || { label: c, style: '' };
+        return '<th style="' + d.style + '">' + d.label + '</th>';
+    }).join('');
+
+    function buildRow(p) {
+        return cols.map(function(c) {
+            if (c === 'codigo') return '<td><code style="font-size:9px">' + (p.codigo || '') + '</code></td>';
+            if (c === 'descripcion') return '<td>' + (p.descripcion || '') + '</td>';
+            if (c === 'precio_mayorista') return '<td class="precio">' + fmtP(p.precio_mayorista) + '</td>';
+            if (c === 'pvp') return '<td class="precio">' + fmtP(p.pvp) + '</td>';
+            if (c === 'cantidad') return '<td class="cant"></td>';
+            return '<td></td>';
+        }).join('');
+    }
+
+    var html = '<!DOCTYPE html><html lang="es"><head><meta charset="utf-8">' +
+        '<title>Nota de Pedido Travel Blue — ' + fecha + '</title>' +
+        '<style>' +
+        'body{font-family:Arial,sans-serif;font-size:11px;color:#000;margin:0;padding:0}' +
+        '.page{padding:14mm 12mm;max-width:210mm;margin:0 auto}' +
+        '.header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px}' +
+        '.header h1{font-size:16px;font-weight:900;letter-spacing:.5px;color:#003399;margin:0}' +
+        '.header .fecha{font-size:11px;color:#555;text-align:right}' +
+        '.cliente-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px 16px;border:1px solid #888;padding:8px 10px;margin-bottom:10px}' +
+        '.cliente-grid .campo{display:flex;gap:6px;align-items:baseline;border-bottom:1px dotted #ccc;padding:2px 0}' +
+        '.cliente-grid .campo label{font-size:9px;font-weight:700;text-transform:uppercase;color:#555;white-space:nowrap;min-width:70px}' +
+        '.cliente-grid .campo span{flex:1;font-size:11px}' +
+        '.cat-title{font-size:12px;font-weight:900;background:#003399;color:#fff;padding:3px 8px;margin:10px 0 0}' +
+        'table{width:100%;border-collapse:collapse;margin-bottom:0}' +
+        'thead tr{background:#dde6ff}' +
+        'th,td{border:1px solid #ccc;padding:3px 5px;text-align:left;font-size:10px}' +
+        'th{font-weight:700;font-size:9px;text-transform:uppercase;color:#003}' +
+        'td.cant{text-align:center;width:36px}' +
+        'td.precio{text-align:right}' +
+        'tr:nth-child(even){background:#f8f9ff}' +
+        '.footer{margin-top:14px;border-top:1px solid #bbb;padding-top:6px;font-size:9px;color:#777;text-align:center}' +
+        '@media print{@page{size:A4 portrait;margin:10mm}body{font-size:10px}.page{padding:0;max-width:none}}' +
+        '</style></head><body><div class="page">' +
+        '<div class="header">' +
+        '<div><h1>TRAVEL BLUE</h1><div style="font-size:11px;font-weight:600;color:#555;margin-top:2px">NOTA DE PEDIDO MAYORISTA</div></div>' +
+        '<div class="fecha">Fecha: ' + fecha + '<br><span style="font-size:9px;color:#999">Precios al momento de impresión</span></div>' +
+        '</div>';
+
+    // Campos del cliente
+    if (clientFields.length) {
+        html += '<div class="cliente-grid">';
+        clientFields.forEach(function(f) {
+            html += '<div class="campo"><label>' + f.label + '</label><span>&nbsp;</span></div>';
+        });
+        html += '</div>';
+    }
+
+    // Productos
+    if (groupBy === 'categoria') {
+        var catItems = document.querySelectorAll('#pCatList .pcat-item');
+        var catOrder = Array.from(catItems).map(function(el) { return el.dataset.cat; });
+        catOrder.forEach(function(cat) {
+            var catProds = sorted.filter(function(p) { return (p.categoria || 'SIN CATEGORÍA') === cat; });
+            if (!catProds.length) return;
+            html += '<div class="cat-title">' + cat + '</div>' +
+                '<table><thead><tr>' + theadCells + '</tr></thead><tbody>';
+            catProds.forEach(function(p) { html += '<tr>' + buildRow(p) + '</tr>'; });
+            html += '</tbody></table>';
+        });
+    } else {
+        html += '<table><thead><tr>' + theadCells + '</tr></thead><tbody>';
+        sorted.forEach(function(p) { html += '<tr>' + buildRow(p) + '</tr>'; });
+        html += '</tbody></table>';
+    }
+
+    html += '<div class="footer">Travel Blue Argentina — Bags Store SRL — Catálogo Mayorista</div>' +
+        '</div></body></html>';
+
+    closePrintConfigModal();
+    var win = window.open('', '_blank', 'width=900,height=700');
+    if (!win) { alert('Habilitá las ventanas emergentes para imprimir.'); return; }
+    win.document.write(html);
+    win.document.close();
+    win.focus();
+    setTimeout(function() { win.print(); }, 400);
+}
 // Al cargar el admin, verificar si hay una importación reciente que se pueda revertir
 async function checkLastImport() {
     try {
