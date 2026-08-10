@@ -2548,26 +2548,26 @@ function executePrint() {
         'body{font-family:Arial,sans-serif;font-size:' + fontSize + 'px;color:#000;margin:0;padding:0}' +
         '.page{padding:14mm 12mm;max-width:210mm;margin:0 auto}' +
         '.header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px}' +
-        '.header h1{font-size:16px;font-weight:900;letter-spacing:.5px;color:#000;margin:0}' +
-        '.header .fecha{font-size:11px;color:#000;text-align:right}' +
+        '.header h1{font-size:1.4em;font-weight:900;letter-spacing:.5px;color:#000;margin:0}' +
+        '.header .fecha{font-size:1em;color:#000;text-align:right}' +
         '.cliente-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px 16px;border:1px solid #888;padding:8px 10px;margin-bottom:10px}' +
         '.cliente-grid .campo{display:flex;gap:6px;align-items:baseline;border-bottom:1px dotted #aaa;padding:2px 0}' +
-        '.cliente-grid .campo.full{grid-column:1/-1;min-height:28px;align-items:flex-start;padding-top:3px}' +
-        '.cliente-grid .campo label{font-size:9px;font-weight:700;text-transform:uppercase;color:#000;white-space:nowrap;min-width:70px}' +
-        '.cliente-grid .campo span{flex:1;font-size:11px}' +
-        '.cat-title{font-size:12px;font-weight:900;background:#003399;color:#fff;padding:3px 8px;margin:10px 0 0}' +
+        '.cliente-grid .campo.full{grid-column:1/-1;min-height:2em;align-items:flex-start;padding-top:3px}' +
+        '.cliente-grid .campo label{font-size:0.75em;font-weight:700;text-transform:uppercase;color:#000;white-space:nowrap;min-width:70px}' +
+        '.cliente-grid .campo span{flex:1}' +
+        '.cat-title{font-size:1em;font-weight:900;background:#003399;color:#fff;padding:3px 8px;margin:10px 0 0}' +
         'table{width:100%;border-collapse:collapse;margin-bottom:0}' +
         'thead tr{background:#dde6ff}' +
-        'th,td{border:1px solid #aaa;padding:3px 5px;text-align:left;font-size:10px}' +
-        'th{font-weight:700;font-size:9px;text-transform:uppercase;color:#000}' +
+        'th,td{border:1px solid #aaa;padding:3px 5px;text-align:left;font-size:1em}' +
+        'th{font-weight:700;font-size:0.85em;text-transform:uppercase;color:#000}' +
         'td.cant{text-align:center;width:36px}' +
         'td.precio{text-align:right}' +
         'tr:nth-child(even){background:#f4f4f4}' +
-        '.footer{margin-top:14px;border-top:1px solid #aaa;padding-top:6px;font-size:9px;color:#000;text-align:center}' +
+        '.footer{margin-top:14px;border-top:1px solid #aaa;padding-top:6px;font-size:0.85em;color:#000;text-align:center}' +
         '@media print{@page{size:A4 portrait;margin:10mm}body{font-size:' + fontSize + 'px}.page{padding:0;max-width:none}}' +
         '</style></head><body><div class="page">' +
         '<div class="header">' +
-        '<div><h1>TRAVEL BLUE</h1><div style="font-size:11px;font-weight:600;color:#000;margin-top:2px">NOTA DE PEDIDO MAYORISTA</div></div>' +
+        '<div><h1>TRAVEL BLUE</h1><div style="font-size:1em;font-weight:600;color:#000;margin-top:2px">NOTA DE PEDIDO MAYORISTA</div></div>' +
         '<div class="fecha">Fecha: ' + fecha + '<br><span style="font-size:9px;color:#000">Precios al momento de impresión</span></div>' +
         '</div>';
 
