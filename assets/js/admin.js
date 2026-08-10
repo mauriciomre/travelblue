@@ -2418,9 +2418,9 @@ async function printNotaAdmin() {
         var res  = await fetch(API + '?action=productos');
         var json = await res.json();
         if (!Array.isArray(json) || !json.length) { alert('No hay productos para imprimir.'); return; }
-        var disponibles = json.filter(function(p) { return p.estado === 'DISPONIBLE'; });
-        if (!disponibles.length) { alert('No hay productos disponibles para imprimir.'); return; }
-        window._printProducts = disponibles;
+        // Guardamos todos (disponibles + agotados); el modal decide qué mostrar
+        window._printProducts = json.filter(function(p) { return p.estado === 'DISPONIBLE' || p.estado === 'AGOTADO'; });
+        if (!window._printProducts.length) { alert('No hay productos para imprimir.'); return; }
         openPrintConfigModal();
     } catch(e) {
         alert('Error al cargar los productos: ' + e.message);
@@ -2475,6 +2475,13 @@ function movePrintCat(btn, dir) {
 
 function executePrint() {
     var prods = window._printProducts || [];
+
+    // Filtrar agotados según toggle
+    var showAgotados = document.getElementById('pShowAgotados').checked;
+    if (!showAgotados) {
+        prods = prods.filter(function(p) { return p.estado === 'DISPONIBLE'; });
+    }
+    if (!prods.length) { alert('No hay productos para imprimir con los filtros seleccionados.'); return; }
 
     // Columnas seleccionadas
     var colChecks = document.querySelectorAll('input[name="pCol"]:checked');
