@@ -813,7 +813,8 @@ function getFiltered() {
         (p) =>
             (!q ||
                 p.descripcion.toLowerCase().includes(q) ||
-                p.codigo.toLowerCase().includes(q)) &&
+                p.codigo.toLowerCase().includes(q) ||
+                (p.codigo_barras && p.codigo_barras.toLowerCase().includes(q))) &&
             (!cat || p.categoria === cat) &&
             (!est || p.estado === est),
     );
@@ -2518,7 +2519,7 @@ function executePrint() {
 
     // Cabecera de tabla segun columnas
     var colDefs = {
-        codigo:           { label: 'Código',       style: 'width:60px' },
+        codigo:           { label: 'Código',       style: 'width:64px' },
         descripcion:      { label: 'Descripción',  style: '' },
         precio_mayorista: { label: 'P. Mayorista', style: 'width:90px;text-align:right' },
         pvp:              { label: 'PVP',           style: 'width:80px;text-align:right' },
@@ -2617,6 +2618,40 @@ function executePrint() {
     }, 400);
 }
 // Al cargar el admin, verificar si hay una importación reciente que se pueda revertir
+// ── Barcode scanner ──────────────────────────────────────────────
+var barcodeScanner = null;
+function openBarcodeScanner(callback) {
+    var modal = document.getElementById("scannerModal");
+    if (!modal) return;
+    modal.classList.add("open");
+    document.getElementById("scannerStatus").textContent = "Iniciando cámara…";
+    barcodeScanner = new Html5Qrcode("scannerReader");
+    barcodeScanner.start(
+        { facingMode: "environment" },
+        { fps: 10, qrbox: { width: 260, height: 120 } },
+        function(decodedText) {
+            closeBarcodeScanner();
+            if (typeof callback === "function") callback(decodedText.trim());
+        },
+        function() { /* frame errors ignored */ }
+    ).then(function() {
+        document.getElementById("scannerStatus").textContent = "Apuntá la cámara al código de barras";
+    }).catch(function(err) {
+        document.getElementById("scannerStatus").textContent = "Error al iniciar cámara: " + err;
+    });
+}
+function closeBarcodeScanner() {
+    var modal = document.getElementById("scannerModal");
+    if (modal) modal.classList.remove("open");
+    if (barcodeScanner) {
+        barcodeScanner.stop().catch(function() {});
+        barcodeScanner = null;
+        // html5-qrcode leaves a <video> inside the reader div — limpiarlo
+        var r = document.getElementById("scannerReader");
+        if (r) r.innerHTML = "";
+    }
+}
+
 async function checkLastImport() {
     try {
         var res = await fetch(API + "?action=import_last");

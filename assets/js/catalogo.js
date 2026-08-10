@@ -1385,3 +1385,36 @@ function printNota() {
     win.focus();
     setTimeout(function () { win.print(); }, 400);
 }
+
+// ── Barcode scanner ──────────────────────────────────────────────
+var barcodeScanner = null;
+function openBarcodeScanner(callback) {
+    var modal = document.getElementById("scannerModal");
+    if (!modal) return;
+    modal.classList.add("open");
+    document.getElementById("scannerStatus").textContent = "Iniciando cámara…";
+    barcodeScanner = new Html5Qrcode("scannerReader");
+    barcodeScanner.start(
+        { facingMode: "environment" },
+        { fps: 10, qrbox: { width: 260, height: 120 } },
+        function(decodedText) {
+            closeBarcodeScanner();
+            if (typeof callback === "function") callback(decodedText.trim());
+        },
+        function() { /* frame errors ignored */ }
+    ).then(function() {
+        document.getElementById("scannerStatus").textContent = "Apuntá la cámara al código de barras";
+    }).catch(function(err) {
+        document.getElementById("scannerStatus").textContent = "Error al iniciar cámara: " + err;
+    });
+}
+function closeBarcodeScanner() {
+    var modal = document.getElementById("scannerModal");
+    if (modal) modal.classList.remove("open");
+    if (barcodeScanner) {
+        barcodeScanner.stop().catch(function() {});
+        barcodeScanner = null;
+        var r = document.getElementById("scannerReader");
+        if (r) r.innerHTML = "";
+    }
+}

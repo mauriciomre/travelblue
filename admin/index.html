@@ -205,6 +205,12 @@
                                 placeholder="🔍 Buscar..."
                                 oninput="filterTable()"
                             />
+                            <button
+                                class="btn"
+                                style="padding:6px 10px;font-size:1.1em;line-height:1"
+                                onclick="openBarcodeScanner(function(code){document.getElementById('srch').value=code;filterTable();})"
+                                title="Escanear código de barras"
+                            >📷</button>
                             <select id="filtCat" onchange="filterTable()">
                                 <option value="">Todas las categorías</option>
                             </select>
@@ -2304,5 +2310,20 @@
                 },
             ];
         </script>
+
+        <!-- BARCODE SCANNER MODAL -->
+        <div class="modal-bg" id="scannerModal" onclick="if(event.target===this)closeBarcodeScanner()">
+            <div class="modal" style="max-width:400px;padding:0;border-radius:10px;overflow:hidden">
+                <div class="modal-head">
+                    <span>📷 Escanear código de barras</span>
+                    <button class="modal-close" onclick="closeBarcodeScanner()">✕</button>
+                </div>
+                <div style="padding:16px 16px 20px">
+                    <div id="scannerReader" style="width:100%"></div>
+                    <div id="scannerStatus" style="text-align:center;margin-top:10px;font-size:0.85em;color:#666">Apuntá la cámara al código de barras</div>
+                </div>
+            </div>
+        </div>
+        <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
     </body>
 </html>

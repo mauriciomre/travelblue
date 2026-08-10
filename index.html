@@ -8,6 +8,60 @@
         />
         <title>Travel Blue Argentina — Catálogo Mayorista</title>
         <link rel="stylesheet" href="assets/css/catalogo.css" />
+        <style>
+            /* ── Botón de escaneo en barra de búsqueda ── */
+            .search { display: flex; align-items: center; gap: 6px; padding: 6px 10px; }
+            .search input { flex: 1; }
+            .scan-btn {
+                flex-shrink: 0;
+                background: rgba(255,255,255,0.15);
+                border: 1.5px solid rgba(255,255,255,0.4);
+                border-radius: 8px;
+                color: #fff;
+                font-size: 1.15em;
+                padding: 6px 10px;
+                cursor: pointer;
+                line-height: 1;
+            }
+            .scan-btn:active { background: rgba(255,255,255,0.3); }
+            /* ── Modal escáner ── */
+            .scanner-modal-bg {
+                display: none;
+                position: fixed; inset: 0;
+                background: rgba(0,0,0,0.7);
+                z-index: 9999;
+                align-items: center;
+                justify-content: center;
+                padding: 16px;
+            }
+            .scanner-modal-bg.open { display: flex; }
+            .scanner-modal {
+                background: #fff;
+                border-radius: 12px;
+                overflow: hidden;
+                width: 100%;
+                max-width: 400px;
+            }
+            .scanner-modal-head {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                padding: 12px 16px;
+                background: #262C63;
+                color: #fff;
+                font-weight: 700;
+                font-size: 0.95em;
+            }
+            .scanner-modal-head button {
+                background: none;
+                border: none;
+                color: #fff;
+                font-size: 1.2em;
+                cursor: pointer;
+                line-height: 1;
+                padding: 0 2px;
+            }
+        </style>
     </head>
     <body>
         <header>
@@ -60,6 +114,11 @@
                     oninput="doSearch()"
                     onkeydown="doSearchEnter(event)"
                 />
+                <button
+                    class="scan-btn"
+                    onclick="openBarcodeScanner(function(code){document.getElementById('srch').value=code;doSearchEnter({key:'Enter'});})"
+                    title="Escanear código de barras"
+                >📷</button>
             </div>
         </header>
 
@@ -271,6 +330,21 @@
             </div>
         </div>
 
+        <!-- BARCODE SCANNER MODAL -->
+        <div class="scanner-modal-bg" id="scannerModal" onclick="if(event.target===this)closeBarcodeScanner()">
+            <div class="scanner-modal">
+                <div class="scanner-modal-head">
+                    <span>📷 Escanear código de barras</span>
+                    <button onclick="closeBarcodeScanner()">✕</button>
+                </div>
+                <div style="padding:16px 16px 20px">
+                    <div id="scannerReader" style="width:100%"></div>
+                    <div id="scannerStatus" style="text-align:center;margin-top:10px;font-size:0.85em;color:#888">Apuntá la cámara al código de barras</div>
+                </div>
+            </div>
+        </div>
+
+        <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
         <script src="assets/js/catalogo.js"></script>
     </body>
 </html>
