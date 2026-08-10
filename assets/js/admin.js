@@ -2598,12 +2598,18 @@ function executePrint() {
         '</div></body></html>';
 
     closePrintConfigModal();
-    var win = window.open('', '_blank', 'width=900,height=700');
-    if (!win) { alert('Habilitá las ventanas emergentes para imprimir.'); return; }
-    win.document.write(html);
-    win.document.close();
-    win.focus();
-    setTimeout(function() { win.print(); }, 400);
+    // Usamos un iframe oculto para evitar que el navegador muestre "about:blank" en el pie de página
+    var iframe = document.createElement('iframe');
+    iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;border:none';
+    document.body.appendChild(iframe);
+    iframe.contentDocument.open();
+    iframe.contentDocument.write(html);
+    iframe.contentDocument.close();
+    iframe.contentWindow.focus();
+    setTimeout(function() {
+        iframe.contentWindow.print();
+        setTimeout(function() { document.body.removeChild(iframe); }, 2000);
+    }, 400);
 }
 // Al cargar el admin, verificar si hay una importación reciente que se pueda revertir
 async function checkLastImport() {
