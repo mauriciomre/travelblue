@@ -1334,10 +1334,13 @@ header {
 }
 /* ── Barcode scanner flash ─────────────────────────────────────────── */
 @keyframes barcodeFlash {
-    0%   { outline: 3px solid #0d6efd; box-shadow: 0 0 0 4px rgba(13,110,253,.25); }
-    50%  { outline: 3px solid #0d6efd; box-shadow: 0 0 0 8px rgba(13,110,253,.15); }
-    100% { outline: none; box-shadow: none; }
+    0%   { outline: 3px solid #0d6efd; box-shadow: 0 0 0 8px rgba(13,110,253,.30); }
+    60%  { outline: 3px solid #0d6efd; box-shadow: 0 0 0 4px rgba(13,110,253,.15); }
+    100% { outline: 3px solid #0d6efd; box-shadow: 0 0 0 4px rgba(13,110,253,.10); }
 }
+/* Estado persistente: el "pulso" termina y queda el borde activo */
 .barcode-flash {
-    animation: barcodeFlash 1.8s ease-out forwards;
+    animation: barcodeFlash 1s ease-out forwards;
+    outline: 3px solid #0d6efd;
+    box-shadow: 0 0 0 4px rgba(13,110,253,.10);
 }

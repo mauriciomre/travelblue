@@ -232,13 +232,42 @@ document.addEventListener("click", function (e) {
 });
 
 function setTab(c) {
+    clearHighlight();
     activeCat = c;
     renderTabs();
     renderProds();
 }
 function doSearch() {
+    clearHighlight();
     query = document.getElementById("srch").value.toLowerCase().trim();
     renderProds();
+}
+
+// ── Highlight persistente tras escaneo ────────────────────────────
+var highlightedCard = null;
+var highlightScrollRef = 0;
+var HIGHLIGHT_SCROLL_THRESHOLD = 80;  // px para considerar "scrolleó manualmente"
+
+function clearHighlight() {
+    if (highlightedCard) {
+        highlightedCard.classList.remove("barcode-flash");
+        highlightedCard = null;
+    }
+    window.removeEventListener("scroll", onHighlightScroll, { passive: true });
+}
+
+function onHighlightScroll() {
+    if (Math.abs(window.scrollY - highlightScrollRef) >= HIGHLIGHT_SCROLL_THRESHOLD) {
+        clearHighlight();
+    }
+}
+
+function setHighlight(card) {
+    clearHighlight();   // limpia cualquier highlight previo primero
+    highlightedCard = card;
+    card.classList.add("barcode-flash");
+    highlightScrollRef = window.scrollY;
+    window.addEventListener("scroll", onHighlightScroll, { passive: true });
 }
 
 // Handler para el lector de código de barras (funciona como teclado: escribe el código y Enter)
@@ -258,16 +287,16 @@ function doSearchEnter(e) {
         activeCat = "TODOS";
         renderTabs();
         renderProds();
-        // Scroll + flash al producto
+        // Scroll + highlight persistente
         setTimeout(function () {
             var card = document.querySelector('[data-codigo="' + exact.CODIGO + '"]');
             if (!card) return;
             card.scrollIntoView({ behavior: "smooth", block: "center" });
-            card.classList.add("barcode-flash");
-            setTimeout(function () { card.classList.remove("barcode-flash"); }, 1800);
+            setHighlight(card);
         }, 80);
     } else {
         // No hay exacto: dejar el filtro de texto corriente (ya renderizado por oninput)
+        clearHighlight();
         doSearch();
     }
 }
@@ -1388,18 +1417,35 @@ function printNota() {
 
 // ── Barcode scanner ──────────────────────────────────────────────
 var barcodeScanner = null;
+var SCAN_CONFIRM_NEEDED = 3;   // lecturas consecutivas iguales para confirmar
 function openBarcodeScanner(callback) {
     var modal = document.getElementById("scannerModal");
     if (!modal) return;
     modal.classList.add("open");
     document.getElementById("scannerStatus").textContent = "Iniciando cámara…";
     barcodeScanner = new Html5Qrcode("scannerReader");
+
+    var lastCode = null, confirmCount = 0;
+
     barcodeScanner.start(
         { facingMode: "environment" },
         { fps: 10, qrbox: { width: 260, height: 120 } },
         function(decodedText) {
-            closeBarcodeScanner();
-            if (typeof callback === "function") callback(decodedText.trim());
+            var code = decodedText.trim();
+            if (code === lastCode) {
+                confirmCount++;
+            } else {
+                lastCode = code;
+                confirmCount = 1;
+            }
+            var statusEl = document.getElementById("scannerStatus");
+            if (confirmCount >= SCAN_CONFIRM_NEEDED) {
+                closeBarcodeScanner();
+                if (typeof callback === "function") callback(code);
+            } else {
+                if (statusEl) statusEl.textContent =
+                    "Verificando… " + confirmCount + "/" + SCAN_CONFIRM_NEEDED + " — mantené la cámara quieta";
+            }
         },
         function() { /* frame errors ignored */ }
     ).then(function() {

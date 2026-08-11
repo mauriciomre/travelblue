@@ -2983,18 +2983,35 @@ function executePrint() {
 // Al cargar el admin, verificar si hay una importación reciente que se pueda revertir
 // ── Barcode scanner ──────────────────────────────────────────────
 var barcodeScanner = null;
+var SCAN_CONFIRM_NEEDED = 3;   // lecturas consecutivas iguales para confirmar
 function openBarcodeScanner(callback) {
     var modal = document.getElementById("scannerModal");
     if (!modal) return;
     modal.classList.add("open");
     document.getElementById("scannerStatus").textContent = "Iniciando cámara…";
     barcodeScanner = new Html5Qrcode("scannerReader");
+
+    var lastCode = null, confirmCount = 0;
+
     barcodeScanner.start(
         { facingMode: "environment" },
         { fps: 10, qrbox: { width: 260, height: 120 } },
         function(decodedText) {
-            closeBarcodeScanner();
-            if (typeof callback === "function") callback(decodedText.trim());
+            var code = decodedText.trim();
+            if (code === lastCode) {
+                confirmCount++;
+            } else {
+                lastCode = code;
+                confirmCount = 1;
+            }
+            var statusEl = document.getElementById("scannerStatus");
+            if (confirmCount >= SCAN_CONFIRM_NEEDED) {
+                closeBarcodeScanner();
+                if (typeof callback === "function") callback(code);
+            } else {
+                if (statusEl) statusEl.textContent =
+                    "Verificando… " + confirmCount + "/" + SCAN_CONFIRM_NEEDED + " — mantené la cámara quieta";
+            }
         },
         function() { /* frame errors ignored */ }
     ).then(function() {
