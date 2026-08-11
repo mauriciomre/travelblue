@@ -266,8 +266,14 @@ function setHighlight(card) {
     clearHighlight();   // limpia cualquier highlight previo primero
     highlightedCard = card;
     card.classList.add("barcode-flash");
-    highlightScrollRef = window.scrollY;
-    window.addEventListener("scroll", onHighlightScroll, { passive: true });
+    // Adjuntamos el listener DESPUÉS de que termine el scroll animado de scrollIntoView
+    // (que dura ~600 ms). Si lo adjuntamos antes, el propio scroll programático
+    // dispara onHighlightScroll y borra el highlight al instante.
+    setTimeout(function () {
+        if (highlightedCard !== card) return;  // fue limpiado mientras esperábamos
+        highlightScrollRef = window.scrollY;
+        window.addEventListener("scroll", onHighlightScroll, { passive: true });
+    }, 700);
 }
 
 // Handler para el lector de código de barras (funciona como teclado: escribe el código y Enter)
