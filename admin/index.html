@@ -414,137 +414,127 @@
 
                     <!-- HERRAMIENTAS -->
                     <div class="wrap section" id="secHerramientas">
-                        <h2
-                            style="
-                                font-size: 16px;
-                                font-weight: 800;
-                                color: var(--blue);
-                                margin-bottom: 16px;
-                            "
-                        >
-                            Herramientas
-                        </h2>
-                        <div class="config-box" style="margin-bottom:16px">
-                            <h3>📥 Importar productos</h3>
-                            <p style="font-size:13px;color:var(--muted);margin-bottom:12px">
-                                Cargá un archivo Excel para actualizar o agregar productos al catálogo.
-                                Columnas soportadas: <strong>CODIGO</strong> (obligatorio), CODIGO_BARRAS,
-                                DESCRIPCION, CATEGORIA, PRECIO_MAYORISTA, PVP, ESTADO.
-                            </p>
-                            <button class="btn" style="background:#198754;color:#fff" onclick="openImportModal()">
-                                📊 Importar Excel
-                            </button>
-                        </div>
-                        <div class="config-box" style="margin-bottom:16px">
-                            <h3>📋 Descargar plantilla</h3>
-                            <p style="font-size:13px;color:var(--muted);margin-bottom:12px">
-                                Descargá una plantilla Excel vacía con los encabezados correctos
-                                para completar y luego importar.
-                            </p>
-                            <button class="btn" style="background:#0d6efd;color:#fff" onclick="exportTemplate()">
-                                ⬇️ Descargar plantilla vacía
-                            </button>
-                        </div>
-                        <div class="config-box" style="margin-bottom:16px">
-                            <h3>📦 Exportar catálogo completo</h3>
-                            <p style="font-size:13px;color:var(--muted);margin-bottom:12px">
-                                Descargá todos los productos actuales del catálogo en formato Excel.
-                                Útil como respaldo o para editar en masa.
-                            </p>
-                            <button class="btn" style="background:#6c757d;color:#fff" onclick="exportCatalog()">
-                                ⬇️ Exportar catálogo actual
-                            </button>
-                        </div>
-                        <div class="config-box" style="margin-bottom:16px">
-                            <h3>🖼️ Importar imágenes</h3>
-                            <p style="font-size:13px;color:var(--muted);margin-bottom:12px">
-                                Subí múltiples imágenes o un archivo ZIP para asignarlas masivamente.
-                                Nombrá cada imagen con el <strong>código del producto</strong> (ej: <code>33020.jpg</code>).
-                            </p>
-                            <button class="btn" style="background:#6f42c1;color:#fff" onclick="openImgImportModal()">
-                                🖼️ Importar imágenes
-                            </button>
-                        </div>
-                        <div class="config-box">
-                            <h3>🖨️ Nota de pedido</h3>
-                            <p style="font-size:13px;color:var(--muted);margin-bottom:12px">
-                                Imprimí una hoja A4 con todos los productos disponibles del catálogo,
-                                agrupados por categoría, para usar como referencia de precios.
-                            </p>
-                            <button class="btn" style="background:#495057;color:#fff" onclick="printNotaAdmin()">
-                                🖨️ Imprimir nota de pedido
-                            </button>
+                        <h2 style="font-size:16px;font-weight:800;color:var(--blue);margin-bottom:12px">Herramientas</h2>
+                        <input type="search" class="tools-search" placeholder="🔍 Buscar herramienta…"
+                            oninput="filterTools(this,'herramientasGrid')">
+                        <div class="tools-grid" id="herramientasGrid">
+                            <div class="config-box" data-keywords="importar productos excel actualizar agregar">
+                                <h3>📥 Importar productos</h3>
+                                <p style="font-size:13px;color:var(--muted);margin-bottom:12px">
+                                    Cargá un archivo Excel para actualizar o agregar productos al catálogo.
+                                    Columnas soportadas: <strong>CODIGO</strong> (obligatorio), CODIGO_BARRAS,
+                                    DESCRIPCION, CATEGORIA, PRECIO_MAYORISTA, PVP, ESTADO.
+                                </p>
+                                <button class="btn" style="background:#198754;color:#fff" onclick="openImportModal()">
+                                    📊 Importar Excel
+                                </button>
+                            </div>
+                            <div class="config-box" data-keywords="descargar plantilla excel encabezados vacía">
+                                <h3>📋 Descargar plantilla</h3>
+                                <p style="font-size:13px;color:var(--muted);margin-bottom:12px">
+                                    Descargá una plantilla Excel vacía con los encabezados correctos
+                                    para completar y luego importar.
+                                </p>
+                                <button class="btn" style="background:#0d6efd;color:#fff" onclick="exportTemplate()">
+                                    ⬇️ Descargar plantilla vacía
+                                </button>
+                            </div>
+                            <div class="config-box" data-keywords="exportar catálogo excel respaldo backup completo">
+                                <h3>📦 Exportar catálogo completo</h3>
+                                <p style="font-size:13px;color:var(--muted);margin-bottom:12px">
+                                    Descargá todos los productos actuales del catálogo en formato Excel.
+                                    Útil como respaldo o para editar en masa.
+                                </p>
+                                <button class="btn" style="background:#6c757d;color:#fff" onclick="exportCatalog()">
+                                    ⬇️ Exportar catálogo actual
+                                </button>
+                            </div>
+                            <div class="config-box" data-keywords="importar imágenes fotos zip masivo subir">
+                                <h3>🖼️ Importar imágenes</h3>
+                                <p style="font-size:13px;color:var(--muted);margin-bottom:12px">
+                                    Subí múltiples imágenes o un archivo ZIP para asignarlas masivamente.
+                                    Nombrá cada imagen con el <strong>código del producto</strong> (ej: <code>33020.jpg</code>).
+                                </p>
+                                <button class="btn" style="background:#6f42c1;color:#fff" onclick="openImgImportModal()">
+                                    🖼️ Importar imágenes
+                                </button>
+                            </div>
+                            <div class="config-box" data-keywords="imprimir nota pedido precios categoría a4">
+                                <h3>🖨️ Nota de pedido</h3>
+                                <p style="font-size:13px;color:var(--muted);margin-bottom:12px">
+                                    Imprimí una hoja A4 con todos los productos disponibles del catálogo,
+                                    agrupados por categoría, para usar como referencia de precios.
+                                </p>
+                                <button class="btn" style="background:#495057;color:#fff" onclick="printNotaAdmin()">
+                                    🖨️ Imprimir nota de pedido
+                                </button>
+                            </div>
                         </div>
                     </div>
 
                     <!-- CONFIGURACIÓN -->
                     <div class="wrap section" id="secConfiguracion">
-                        <h2
-                            style="
-                                font-size: 16px;
-                                font-weight: 800;
-                                color: var(--blue);
-                                margin-bottom: 16px;
-                            "
-                        >
-                            Configuración
-                        </h2>
-                        <div class="config-box" style="margin-bottom: 16px">
-                            <h3>🚚 Transportes</h3>
-                            <p style="font-size:13px;color:var(--muted);margin-bottom:12px">
-                                Lista de transportes disponibles para los
-                                clientes al confirmar un pedido.
-                            </p>
-                            <div class="cat-inline" style="margin-bottom: 12px">
-                                <input
-                                    type="text"
-                                    id="newTransNombre"
-                                    placeholder="Nombre del transporte"
-                                    style="flex: 1"
-                                    oninput="this.value = this.value.toUpperCase()"
-                                />
-                                <button class="btn btn-primary" onclick="crearTransporte()">
-                                    + Agregar
+                        <h2 style="font-size:16px;font-weight:800;color:var(--blue);margin-bottom:12px">Configuración</h2>
+                        <input type="search" class="tools-search" placeholder="🔍 Buscar configuración…"
+                            oninput="filterTools(this,'configuracionGrid')">
+                        <div class="tools-grid" id="configuracionGrid">
+                            <div class="config-box" data-keywords="transportes envío flota correo logística">
+                                <h3>🚚 Transportes</h3>
+                                <p style="font-size:13px;color:var(--muted);margin-bottom:12px">
+                                    Lista de transportes disponibles para los
+                                    clientes al confirmar un pedido.
+                                </p>
+                                <div class="cat-inline" style="margin-bottom: 12px">
+                                    <input
+                                        type="text"
+                                        id="newTransNombre"
+                                        placeholder="Nombre del transporte"
+                                        style="flex: 1"
+                                        oninput="this.value = this.value.toUpperCase()"
+                                    />
+                                    <button class="btn btn-primary" onclick="crearTransporte()">
+                                        + Agregar
+                                    </button>
+                                </div>
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>Nombre</th>
+                                            <th>Acciones</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="transTbody"></tbody>
+                                </table>
+                            </div>
+                            <div class="config-box" data-keywords="whatsapp número teléfono pedidos contacto">
+                                <h3>📱 WhatsApp</h3>
+                                <p style="font-size:13px;color:var(--muted);margin-bottom:12px">
+                                    Número completo con código de país, sin espacios
+                                    ni signos. Ej: <code>5493535697188</code>
+                                </p>
+                                <div class="config-row">
+                                    <input type="text" id="cfgWA" placeholder="5493535697188" />
+                                    <button class="btn btn-primary" onclick="saveWA()">Guardar</button>
+                                </div>
+                            </div>
+                            <div class="config-box" data-keywords="contraseña password seguridad cambiar acceso clave">
+                                <h3>🔒 Cambiar contraseña</h3>
+                                <div class="field" style="margin-top: 12px">
+                                    <label>Contraseña actual</label>
+                                    <input type="password" id="cfgPassActual" placeholder="••••••••" />
+                                </div>
+                                <div class="field">
+                                    <label>Nueva contraseña</label>
+                                    <input type="password" id="cfgPassNueva" placeholder="••••••••" />
+                                </div>
+                                <div class="field">
+                                    <label>Confirmar nueva contraseña</label>
+                                    <input type="password" id="cfgPassConfirma" placeholder="••••••••" />
+                                </div>
+                                <button class="btn btn-primary" onclick="savePassword()">
+                                    Cambiar contraseña
                                 </button>
                             </div>
-                            <table>
-                                <thead>
-                                    <tr>
-                                        <th>Nombre</th>
-                                        <th>Acciones</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="transTbody"></tbody>
-                            </table>
-                        </div>
-                        <div class="config-box" style="margin-bottom: 16px">
-                            <h3>📱 WhatsApp</h3>
-                            <p style="font-size:13px;color:var(--muted);margin-bottom:12px">
-                                Número completo con código de país, sin espacios
-                                ni signos. Ej: <code>5493535697188</code>
-                            </p>
-                            <div class="config-row">
-                                <input type="text" id="cfgWA" placeholder="5493535697188" />
-                                <button class="btn btn-primary" onclick="saveWA()">Guardar</button>
-                            </div>
-                        </div>
-                        <div class="config-box">
-                            <h3>🔒 Cambiar contraseña</h3>
-                            <div class="field" style="margin-top: 12px">
-                                <label>Contraseña actual</label>
-                                <input type="password" id="cfgPassActual" placeholder="••••••••" />
-                            </div>
-                            <div class="field">
-                                <label>Nueva contraseña</label>
-                                <input type="password" id="cfgPassNueva" placeholder="••••••••" />
-                            </div>
-                            <div class="field">
-                                <label>Confirmar nueva contraseña</label>
-                                <input type="password" id="cfgPassConfirma" placeholder="••••••••" />
-                            </div>
-                            <button class="btn btn-primary" onclick="savePassword()">
-                                Cambiar contraseña
-                            </button>
                         </div>
                     </div>
 

@@ -964,6 +964,46 @@ td.editing {
     margin-bottom: 16px
 }
 
+/* ── Grid de herramientas / configuración ── */
+.tools-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 16px;
+    align-items: start;
+}
+.tools-grid .config-box {
+    max-width: none;
+    margin-bottom: 0 !important;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    box-sizing: border-box;
+}
+.tools-grid .config-box p {
+    flex: 1;   /* empuja el botón al fondo del card */
+}
+.tools-grid .config-box .btn {
+    align-self: flex-start;
+    margin-top: 4px;
+}
+
+/* Buscador de herramientas */
+.tools-search {
+    width: 100%;
+    padding: 10px 14px;
+    border: 1.5px solid var(--border);
+    border-radius: 10px;
+    font-size: 14px;
+    margin-bottom: 16px;
+    outline: none;
+    box-sizing: border-box;
+    max-width: 360px;
+}
+.tools-search:focus { border-color: var(--blue); }
+
+/* Card oculto por el buscador */
+.tools-grid .config-box.tools-hidden { display: none; }
+
 .config-row {
     display: flex;
     gap: 10px;

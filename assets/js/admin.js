@@ -3349,3 +3349,16 @@ function escHtml(s) {
     if (!s) return "";
     return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
 }
+
+// ── Buscador de herramientas / configuración ─────────────────────
+function filterTools(inputEl, gridId) {
+    var q = inputEl.value.toLowerCase().trim();
+    var grid = document.getElementById(gridId);
+    if (!grid) return;
+    Array.from(grid.querySelectorAll(".config-box")).forEach(function(box) {
+        var text = (box.querySelector("h3") ? box.querySelector("h3").textContent : "") +
+                   " " + (box.dataset.keywords || "");
+        var match = !q || text.toLowerCase().indexOf(q) !== -1;
+        box.classList.toggle("tools-hidden", !match);
+    });
+}
