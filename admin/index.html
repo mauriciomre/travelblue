@@ -2367,6 +2367,25 @@
             </div>
         </div>
 
+        <style>
+            @keyframes focusPulse {
+                0%   { transform: scale(1.4); opacity: 1; }
+                60%  { transform: scale(1);   opacity: 1; }
+                100% { transform: scale(1);   opacity: 0; }
+            }
+            .focus-indicator {
+                position: fixed;
+                width: 56px; height: 56px;
+                border: 2px solid #fff;
+                border-radius: 4px;
+                pointer-events: none;
+                z-index: 99999;
+                transform-origin: center;
+                animation: focusPulse 0.6s ease-out forwards;
+                box-shadow: 0 0 0 1px rgba(0,0,0,0.3);
+            }
+        </style>
+
         <!-- BARCODE SCANNER MODAL -->
         <div class="modal-bg" id="scannerModal" onclick="if(event.target===this)closeBarcodeScanner()">
             <div class="modal" style="max-width:400px;padding:0;border-radius:10px;overflow:hidden">

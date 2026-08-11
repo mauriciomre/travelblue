@@ -1425,6 +1425,40 @@ function printNota() {
 var barcodeScanner = null;
 var SCAN_CONFIRM_NEEDED = 3;   // lecturas consecutivas iguales para confirmar
 
+function showFocusIndicator(clientX, clientY) {
+    var el = document.createElement("div");
+    el.className = "focus-indicator";
+    el.style.left = (clientX - 28) + "px";
+    el.style.top  = (clientY - 28) + "px";
+    document.body.appendChild(el);
+    setTimeout(function() { el.remove(); }, 650);
+}
+
+function setupTapToFocus(readerEl) {
+    readerEl.addEventListener("click", function(e) {
+        var video = readerEl.querySelector("video");
+        if (!video || !video.srcObject) return;
+        var track = video.srcObject.getVideoTracks()[0];
+        if (!track) return;
+
+        showFocusIndicator(e.clientX, e.clientY);
+
+        var cap = track.getCapabilities ? track.getCapabilities() : {};
+        if (cap.pointsOfInterest) {
+            var rect = video.getBoundingClientRect();
+            var x = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+            var y = Math.max(0, Math.min(1, (e.clientY - rect.top)  / rect.height));
+            track.applyConstraints({
+                advanced: [{ focusMode: "manual", pointsOfInterest: [{ x: x, y: y }] }]
+            }).catch(function() {
+                track.applyConstraints({ advanced: [{ focusMode: "continuous" }] }).catch(function(){});
+            });
+        }
+        // En iOS el tap sobre el video ya dispara el foco nativo del OS;
+        // el indicador visual igual aparece para dar feedback al usuario.
+    });
+}
+
 function scannerBeep() {
     try {
         var ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -1473,6 +1507,7 @@ function openBarcodeScanner(callback) {
         function() { /* frame errors ignored */ }
     ).then(function() {
         document.getElementById("scannerStatus").textContent = "Apuntá la cámara al código de barras";
+        setupTapToFocus(document.getElementById("scannerReader"));
     }).catch(function(err) {
         document.getElementById("scannerStatus").textContent = "Error al iniciar cámara: " + err;
     });
