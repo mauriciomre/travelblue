@@ -1424,6 +1424,22 @@ function printNota() {
 // ── Barcode scanner ──────────────────────────────────────────────
 var barcodeScanner = null;
 var SCAN_CONFIRM_NEEDED = 3;   // lecturas consecutivas iguales para confirmar
+
+function scannerBeep() {
+    try {
+        var ctx = new (window.AudioContext || window.webkitAudioContext)();
+        var osc  = ctx.createOscillator();
+        var gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.frequency.value = 1800;
+        gain.gain.setValueAtTime(0.3, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
+        osc.start(ctx.currentTime);
+        osc.stop(ctx.currentTime + 0.15);
+    } catch(e) { /* navegador sin soporte, ignorar */ }
+}
+
 function openBarcodeScanner(callback) {
     var modal = document.getElementById("scannerModal");
     if (!modal) return;
@@ -1446,6 +1462,7 @@ function openBarcodeScanner(callback) {
             }
             var statusEl = document.getElementById("scannerStatus");
             if (confirmCount >= SCAN_CONFIRM_NEEDED) {
+                scannerBeep();
                 closeBarcodeScanner();
                 if (typeof callback === "function") callback(code);
             } else {
