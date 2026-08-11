@@ -3033,3 +3033,285 @@ async function checkLastImport() {
         }
     } catch (e) { /* silencioso */ }
 }
+
+// ── Image bulk import ─────────────────────────────────────────────────────────
+var imgFilesToUpload = [];   // Array de {file, codigo, isZip, matchStatus}
+
+function openImgImportModal() {
+    imgFilesToUpload = [];
+    var modal = document.getElementById("imgImportModal");
+    if (!modal) return;
+    modal.classList.add("open");
+    document.getElementById("imgPreviewWrap").innerHTML = "";
+    document.getElementById("imgFileInput").value = "";
+    document.getElementById("btnImgUpload").style.display = "none";
+    var zone = document.getElementById("imgDropZone");
+    if (zone) zone.classList.remove("dragover");
+}
+
+function closeImgImportModal() {
+    var modal = document.getElementById("imgImportModal");
+    if (modal) modal.classList.remove("open");
+    imgFilesToUpload = [];
+}
+
+function imgDragOver(event) {
+    event.preventDefault();
+    document.getElementById("imgDropZone").classList.add("dragover");
+}
+
+function imgDragLeave(event) {
+    document.getElementById("imgDropZone").classList.remove("dragover");
+}
+
+function imgDrop(event) {
+    event.preventDefault();
+    document.getElementById("imgDropZone").classList.remove("dragover");
+    var files = event.dataTransfer.files;
+    if (files && files.length > 0) imgFilesSelected(files);
+}
+
+async function imgFilesSelected(files) {
+    if (!files || !files.length) return;
+    document.getElementById("imgPreviewWrap").innerHTML =
+        '<p style="color:#888;padding:16px 0">Analizando archivos…</p>';
+    document.getElementById("btnImgUpload").style.display = "none";
+
+    // Separar ZIP de imágenes individuales
+    var zipFiles = [], imgFiles = [];
+    Array.from(files).forEach(function(f) {
+        var ext = f.name.split(".").pop().toLowerCase();
+        if (ext === "zip") { zipFiles.push(f); }
+        else if (["jpg","jpeg","png","webp"].indexOf(ext) !== -1) { imgFiles.push(f); }
+    });
+
+    imgFilesToUpload = [];
+    var codigos = [];
+
+    // Para imágenes individuales: extraer CODIGO del nombre y verificar en BD
+    imgFiles.forEach(function(f) {
+        var codigo = f.name.replace(/\.[^.]+$/, "");  // nombre sin extensión
+        codigos.push(codigo);
+        imgFilesToUpload.push({ file: f, codigo: codigo, isZip: false, matchStatus: "checking" });
+    });
+
+    // ZIPs: no podemos leer contenido client-side sin lib extra, mostramos como pendiente
+    zipFiles.forEach(function(f) {
+        imgFilesToUpload.push({ file: f, codigo: null, isZip: true, matchStatus: "zip" });
+    });
+
+    // Verificar CODIGOs de imágenes individuales contra la BD
+    if (codigos.length > 0) {
+        try {
+            var resp = await fetch(API, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ action: "check_codigos", _user: authUser, _pass: authPass, codigos: codigos })
+            });
+            var json = await resp.json();
+            var found = json.produtos || json.productos || {};
+            imgFilesToUpload.forEach(function(item) {
+                if (item.isZip) return;
+                item.matchStatus = found[item.codigo] ? "found" : "not_found";
+                item.productData = found[item.codigo] || null;
+            });
+        } catch(e) {
+            imgFilesToUpload.forEach(function(item) {
+                if (!item.isZip) item.matchStatus = "error";
+            });
+        }
+    }
+
+    renderImgPreview();
+}
+
+function renderImgPreview() {
+    var wrap = document.getElementById("imgPreviewWrap");
+    if (!imgFilesToUpload.length) { wrap.innerHTML = ""; return; }
+
+    var found    = imgFilesToUpload.filter(function(i) { return i.matchStatus === "found"; }).length;
+    var notFound = imgFilesToUpload.filter(function(i) { return i.matchStatus === "not_found"; }).length;
+    var zips     = imgFilesToUpload.filter(function(i) { return i.isZip; }).length;
+    var total    = imgFilesToUpload.length;
+
+    // Stat tiles
+    var html = '<div style="display:flex;gap:12px;margin-bottom:14px;flex-wrap:wrap">';
+    html += imgStatTile(total,    "Total",         "#1565c0","#e3f2fd");
+    if (zips)     html += imgStatTile(zips,     "ZIP",           "#6a1b9a","#f3e5f5");
+    if (found)    html += imgStatTile(found,    "Producto OK",   "#2e7d32","#e8f5e9");
+    if (notFound) html += imgStatTile(notFound, "No encontrado", "#c62828","#ffebee");
+    html += '</div>';
+
+    // Tabla de imágenes individuales
+    var imgItems = imgFilesToUpload.filter(function(i) { return !i.isZip; });
+    var zipItems = imgFilesToUpload.filter(function(i) { return i.isZip; });
+
+    if (zipItems.length) {
+        html += '<div style="margin-bottom:14px">';
+        html += '<div style="font-weight:600;margin-bottom:8px;color:#555">📦 Archivos ZIP</div>';
+        zipItems.forEach(function(item) {
+            var mb = (item.file.size / 1024 / 1024).toFixed(2);
+            html += '<div style="display:flex;align-items:center;gap:10px;padding:8px 12px;' +
+                'background:#f3e5f5;border-radius:8px;margin-bottom:6px">' +
+                '<span style="font-size:1.4rem">📦</span>' +
+                '<div><div style="font-weight:600">' + escHtml(item.file.name) + '</div>' +
+                '<div style="font-size:.8rem;color:#888">' + mb + ' MB — el servidor procesará las imágenes según el nombre de archivo</div></div>' +
+                '</div>';
+        });
+        html += '</div>';
+    }
+
+    if (imgItems.length) {
+        html += '<div style="font-weight:600;margin-bottom:8px;color:#555">🖼 Imágenes individuales</div>';
+        html += '<div id="imgThumbGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px">';
+        imgItems.forEach(function(item, idx) {
+            var statusColor = item.matchStatus === "found"     ? "#2e7d32" :
+                              item.matchStatus === "not_found" ? "#c62828" : "#f57c00";
+            var statusBg    = item.matchStatus === "found"     ? "#e8f5e9" :
+                              item.matchStatus === "not_found" ? "#ffebee" : "#fff3e0";
+            var statusLabel = item.matchStatus === "found"     ? "✔ OK" :
+                              item.matchStatus === "not_found" ? "✗ No encontrado" : "⚠ Error";
+            html += '<div id="imgCard_' + idx + '" style="border:1px solid #e0e0e0;border-radius:10px;' +
+                'overflow:hidden;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.07)">' +
+                '<div style="height:120px;background:#f5f5f5;display:flex;align-items:center;justify-content:center">' +
+                '<img id="imgThumb_' + idx + '" src="" alt="" ' +
+                'style="max-width:100%;max-height:120px;object-fit:contain;display:none">' +
+                '<span id="imgThumbIcon_' + idx + '" style="font-size:2rem">🖼</span>' +
+                '</div>' +
+                '<div style="padding:8px 10px">' +
+                '<div style="font-size:.78rem;font-weight:600;color:#333;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="' + escHtml(item.file.name) + '">' +
+                escHtml(item.codigo) + '</div>' +
+                '<div style="display:inline-block;font-size:.7rem;padding:2px 8px;border-radius:99px;' +
+                'background:' + statusBg + ';color:' + statusColor + ';margin-top:4px;font-weight:600">' +
+                statusLabel + '</div>' +
+                '</div></div>';
+        });
+        html += '</div>';
+    }
+
+    wrap.innerHTML = html;
+
+    // Cargar thumbnails con FileReader (async, uno por uno)
+    imgItems.forEach(function(item, idx) {
+        var reader = new FileReader();
+        reader.onload = function(e) {
+            var thumb = document.getElementById("imgThumb_" + idx);
+            var icon  = document.getElementById("imgThumbIcon_" + idx);
+            if (thumb) { thumb.src = e.target.result; thumb.style.display = "block"; }
+            if (icon)  { icon.style.display = "none"; }
+        };
+        reader.readAsDataURL(item.file);
+    });
+
+    // Mostrar botón de subida solo si hay algo que subir
+    var uploadable = imgFilesToUpload.filter(function(i) {
+        return i.isZip || i.matchStatus === "found";
+    }).length;
+    var btn = document.getElementById("btnImgUpload");
+    if (uploadable > 0) {
+        btn.style.display = "";
+        btn.disabled = false;
+        btn.textContent = "Subir " + uploadable + " imagen" + (uploadable !== 1 ? "s" : "");
+    } else {
+        btn.style.display = "none";
+        btn.disabled = true;
+    }
+}
+
+function imgStatTile(n, label, color, bg) {
+    return '<div style="flex:1;min-width:90px;background:' + bg + ';border-radius:10px;' +
+        'padding:12px 16px;text-align:center">' +
+        '<div style="font-size:1.5rem;font-weight:700;color:' + color + '">' + n + '</div>' +
+        '<div style="font-size:.75rem;color:#555;margin-top:2px">' + label + '</div>' +
+        '</div>';
+}
+
+async function uploadImages() {
+    var btn = document.getElementById("btnImgUpload");
+    btn.disabled = true;
+    btn.textContent = "Subiendo…";
+
+    var BULK_URL = "../upload_bulk.php";
+    var allResults = [];
+
+    // Separar ZIPs e imágenes individuales
+    var zipItems = imgFilesToUpload.filter(function(i) { return i.isZip; });
+    var imgItems = imgFilesToUpload.filter(function(i) { return !i.isZip && i.matchStatus === "found"; });
+
+    // Subir imágenes individuales en un solo POST (multi-file)
+    if (imgItems.length > 0) {
+        var fd = new FormData();
+        fd.append("_user", authUser);
+        fd.append("_pass", authPass);
+        imgItems.forEach(function(item) {
+            fd.append("images[]", item.file, item.file.name);
+        });
+        try {
+            var resp = await fetch(BULK_URL, { method: "POST", body: fd });
+            var json = await resp.json();
+            if (json.ok && json.results) allResults = allResults.concat(json.results);
+        } catch(e) {
+            allResults.push({ status: "error", msg: "Error de red al subir imágenes" });
+        }
+    }
+
+    // Subir cada ZIP por separado
+    for (var i = 0; i < zipItems.length; i++) {
+        var zitem = zipItems[i];
+        var fdz = new FormData();
+        fdz.append("_user", authUser);
+        fdz.append("_pass", authPass);
+        fdz.append("zipfile", zitem.file, zitem.file.name);
+        try {
+            var respZ = await fetch(BULK_URL, { method: "POST", body: fdz });
+            var jsonZ = await respZ.json();
+            if (jsonZ.ok && jsonZ.results) allResults = allResults.concat(jsonZ.results);
+        } catch(e) {
+            allResults.push({ codigo: zitem.file.name, status: "error", msg: "Error de red" });
+        }
+    }
+
+    // Mostrar resultados
+    var updated   = allResults.filter(function(r) { return r.status === "updated"; }).length;
+    var notFound  = allResults.filter(function(r) { return r.status === "not_found"; }).length;
+    var errors    = allResults.filter(function(r) { return r.status === "error"; }).length;
+
+    var resHtml = '<div style="display:flex;gap:12px;margin-bottom:14px;flex-wrap:wrap">';
+    resHtml += imgStatTile(updated,  "Actualizadas", "#2e7d32","#e8f5e9");
+    if (notFound) resHtml += imgStatTile(notFound, "No encontrado", "#c62828","#ffebee");
+    if (errors)   resHtml += imgStatTile(errors,   "Errores",       "#e65100","#fff3e0");
+    resHtml += '</div>';
+
+    if (allResults.length > 0) {
+        resHtml += '<table style="width:100%;border-collapse:collapse;font-size:.85rem">' +
+            '<thead><tr style="background:#f5f5f5">' +
+            '<th style="text-align:left;padding:6px 10px">Código</th>' +
+            '<th style="text-align:left;padding:6px 10px">Estado</th>' +
+            '<th style="text-align:left;padding:6px 10px">Detalle</th>' +
+            '</tr></thead><tbody>';
+        allResults.forEach(function(r) {
+            var statusColor = r.status === "updated"   ? "#2e7d32" :
+                              r.status === "not_found" ? "#c62828" : "#e65100";
+            var statusLabel = r.status === "updated"   ? "✔ Actualizada" :
+                              r.status === "not_found" ? "✗ No encontrado" : "⚠ Error";
+            resHtml += '<tr style="border-bottom:1px solid #f0f0f0">' +
+                '<td style="padding:6px 10px;font-weight:600">' + escHtml(r.codigo || "-") + '</td>' +
+                '<td style="padding:6px 10px;color:' + statusColor + ';font-weight:600">' + statusLabel + '</td>' +
+                '<td style="padding:6px 10px;color:#666">' + escHtml(r.filename || r.msg || "") + '</td>' +
+                '</tr>';
+        });
+        resHtml += '</tbody></table>';
+    }
+
+    document.getElementById("imgPreviewWrap").innerHTML = resHtml;
+    btn.disabled = false;
+    btn.style.display = "none";
+
+    // Recargar productos para que las imágenes nuevas se vean en la tabla
+    if (updated > 0) loadProducts();
+}
+
+function escHtml(s) {
+    if (!s) return "";
+    return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
