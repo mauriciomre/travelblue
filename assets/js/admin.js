@@ -2230,65 +2230,428 @@ async function guardarClienteEdit() {
 
 function openImportModal() {
     document.getElementById("importModal").classList.add("open");
-    document.getElementById("importFileInput").value = "";
-    document.getElementById("importPreviewWrap").innerHTML = "";
-    document.getElementById("btnImportConfirm").disabled = true;
-    window._importRows = [];
 }
 
 function closeImportModal() {
     document.getElementById("importModal").classList.remove("open");
+    // Resetear estado completo
+    document.getElementById("importMappingWrap").style.display = "none";
+    document.getElementById("importMappingWrap").innerHTML = "";
+    document.getElementById("importPreviewWrap").innerHTML = "";
+    document.getElementById("importStep1Wrap").style.display = "";
+    var fi = document.getElementById("importFileInput");
+    if (fi) fi.value = "";
+    document.getElementById("btnImportConfirm").disabled = true;
+    setImportStep(1);
+    _importFilter = "todos";
+    window._importRows = [];
+    window._importRawRows = [];
+    window._importMapping = {};
+    window._importEnrichedRows = [];
+    window._importExistingData = {};
 }
 
+// ── Constantes de importación ──────────────────────────────────────────────
+var _importFilter = "todos";
+
+var SYSTEM_FIELDS = [
+    { key: "CODIGO",           label: "Código",           required: true },
+    { key: "CODIGO_BARRAS",    label: "Código de barras", required: false },
+    { key: "DESCRIPCION",      label: "Descripción",      required: false },
+    { key: "CATEGORIA",        label: "Categoría",        required: false },
+    { key: "PRECIO_MAYORISTA", label: "Precio mayorista", required: false },
+    { key: "PVP",              label: "PVP",              required: false },
+    { key: "ESTADO",           label: "Estado",           required: false },
+];
+
+var FIELD_ALIASES = {
+    "CODIGO":           ["CODIGO", "COD", "CODE", "SKU", "ARTICULO", "ITEM"],
+    "CODIGO_BARRAS":    ["CODIGO_BARRAS", "CODIGOBARRAS", "BARRAS", "EAN", "EAN13", "BARCODE", "GTIN"],
+    "DESCRIPCION":      ["DESCRIPCION", "DESC", "NOMBRE", "PRODUCTO", "NAME", "DESCRIPTION", "DETALLE"],
+    "CATEGORIA":        ["CATEGORIA", "CAT", "CATEGORY", "RUBRO", "LINEA", "FAMILIA"],
+    "PRECIO_MAYORISTA": ["PRECIO_MAYORISTA", "PRECIO", "PRECIO_MAY", "MAYORISTA", "PRICE", "COSTO", "PRECIO_COSTO"],
+    "PVP":              ["PVP", "PRECIO_VENTA", "PRECIO_PUBLICO", "RETAIL", "PRECIO_SUGERIDO"],
+    "ESTADO":           ["ESTADO", "STATUS", "STATE", "DISPONIBILIDAD", "ACTIVO"],
+};
+
+function normalizeHeader(h) {
+    return h.toUpperCase().trim()
+        .normalize("NFD").replace(/[̀-ͯ]/g, "")
+        .replace(/\s+/g, "_");
+}
+
+function autoMap(header) {
+    var h = normalizeHeader(header);
+    for (var field in FIELD_ALIASES) {
+        if (FIELD_ALIASES[field].indexOf(h) >= 0) return field;
+    }
+    return "";
+}
+
+function setImportStep(n) {
+    [1, 2, 3].forEach(function(i) {
+        var el = document.getElementById("importStep" + i);
+        if (!el) return;
+        el.style.background = i === n ? "#263494" : "#e8eaf6";
+        el.style.color      = i === n ? "#fff"    : "#999";
+    });
+}
+
+// ── PASO 1 → 2: parsear Excel y mostrar mapeo ──────────────────────────────
 function onImportFileChange(e) {
     var file = e.target.files[0];
     if (!file) return;
     var reader = new FileReader();
-    reader.onload = function (ev) {
+    reader.onload = function(ev) {
         try {
-            var wb = XLSX.read(ev.target.result, { type: "binary" });
-            var ws = wb.Sheets[wb.SheetNames[0]];
-            var rows = XLSX.utils.sheet_to_json(ws, { defval: "" });
-            // Normalizar claves a mayúsculas
-            rows = rows.map(function (r) {
+            var wb   = XLSX.read(ev.target.result, { type: "binary" });
+            var ws   = wb.Sheets[wb.SheetNames[0]];
+            var rawRows = XLSX.utils.sheet_to_json(ws, { defval: "" });
+
+            // Normalizar keys (mayúsculas + sin tildes + guiones bajos)
+            rawRows = rawRows.map(function(r) {
                 var obj = {};
-                Object.keys(r).forEach(function (k) { obj[k.toUpperCase().trim()] = String(r[k]).trim(); });
+                Object.keys(r).forEach(function(k) {
+                    obj[normalizeHeader(k)] = String(r[k]).trim();
+                });
                 return obj;
             });
-            // Filtrar filas sin CODIGO
-            rows = rows.filter(function (r) { return r["CODIGO"] && r["CODIGO"] !== ""; });
-            window._importRows = rows;
-            renderImportPreview(rows);
-            document.getElementById("btnImportConfirm").disabled = rows.length === 0;
-        } catch (err) {
+
+            var headers = rawRows.length > 0 ? Object.keys(rawRows[0]) : [];
+            if (!headers.length) { toast("El archivo no tiene columnas reconocibles.", "#c62828"); return; }
+
+            window._importRawRows = rawRows;
+            window._importHeaders = headers;
+
+            renderMappingStep(headers, rawRows);
+        } catch(err) {
             toast("Error leyendo el archivo: " + err.message, "#c62828");
         }
     };
     reader.readAsBinaryString(file);
 }
 
-function renderImportPreview(rows) {
-    if (!rows.length) {
-        document.getElementById("importPreviewWrap").innerHTML = '<p style="color:#c62828">No se encontraron filas con CODIGO.</p>';
-        return;
-    }
-    var FIELDS = ["CODIGO", "CODIGO_BARRAS", "DESCRIPCION", "CATEGORIA", "PRECIO_MAYORISTA", "PVP", "ESTADO"];
-    var html = '<p style="font-size:12px;color:#666;margin-bottom:8px">' + rows.length + ' fila(s) a importar</p>';
-    html += '<div style="overflow-x:auto"><table class="import-preview-table"><thead><tr>';
-    FIELDS.forEach(function (f) { html += "<th>" + f + "</th>"; });
-    html += "</tr></thead><tbody>";
-    rows.slice(0, 20).forEach(function (r) {
-        html += "<tr>";
-        FIELDS.forEach(function (f) { html += "<td>" + (r[f] || "") + "</td>"; });
-        html += "</tr>";
+// ── PASO 2: mapeo de columnas ─────────────────────────────────────────────
+function renderMappingStep(headers, rawRows) {
+    setImportStep(2);
+    document.getElementById("importStep1Wrap").style.display = "none";
+
+    // Auto-mapear
+    var mapping = {};
+    headers.forEach(function(h) { mapping[h] = autoMap(h); });
+    window._importMapping = mapping;
+
+    var html = '<p style="font-size:13px;color:#555;margin-bottom:12px">'
+        + 'Asigná cada columna de tu archivo al campo del sistema correspondiente. '
+        + 'Campos con <strong style="color:#c62828">*</strong> son obligatorios para productos nuevos.</p>';
+
+    html += '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px">'
+        + '<thead><tr>'
+        + '<th style="text-align:left;padding:7px 10px;border-bottom:2px solid #eee;color:#888;font-size:11px;text-transform:uppercase;white-space:nowrap">Columna en tu archivo</th>'
+        + '<th style="text-align:left;padding:7px 10px;border-bottom:2px solid #eee;color:#888;font-size:11px;text-transform:uppercase">Muestra</th>'
+        + '<th style="text-align:left;padding:7px 10px;border-bottom:2px solid #eee;color:#888;font-size:11px;text-transform:uppercase">Campo del sistema</th>'
+        + '</tr></thead><tbody>';
+
+    headers.forEach(function(h) {
+        var sample = rawRows.slice(0, 3)
+            .map(function(r) { return r[h]; })
+            .filter(Boolean).join(" · ").slice(0, 50);
+        var mapped  = mapping[h] || "";
+        var hEsc    = h.replace(/'/g, "\\'");
+
+        html += '<tr style="border-bottom:1px solid #f5f5f5">'
+            + '<td style="padding:8px 10px;font-weight:600;white-space:nowrap">' + esc(h) + '</td>'
+            + '<td style="padding:8px 10px;color:#999;font-size:12px">' + esc(sample) + '</td>'
+            + '<td style="padding:8px 10px">'
+            + '<select style="width:100%;padding:5px 8px;border:1px solid #ddd;border-radius:6px;font-size:13px"'
+            + ' onchange="window._importMapping[\'' + hEsc + '\']=this.value">'
+            + '<option value="">— No importar —</option>';
+        SYSTEM_FIELDS.forEach(function(f) {
+            var sel = mapped === f.key ? " selected" : "";
+            html += '<option value="' + f.key + '"' + sel + '>'
+                 + f.label + (f.required ? " *" : "") + '</option>';
+        });
+        html += '</select></td></tr>';
     });
-    if (rows.length > 20) html += '<tr><td colspan="' + FIELDS.length + '" style="text-align:center;color:#999">... y ' + (rows.length - 20) + ' filas más</td></tr>';
-    html += "</tbody></table></div>";
+
+    html += '</tbody></table></div>'
+        + '<button class="btn btn-primary" style="margin-top:16px;width:100%" onclick="applyMapping()">Continuar → Vista previa</button>';
+
+    var wrap = document.getElementById("importMappingWrap");
+    wrap.innerHTML = html;
+    wrap.style.display = "";
+    document.getElementById("btnImportConfirm").disabled = true;
+}
+
+// ── PASO 2 → 3: aplicar mapeo y pedir check al servidor ──────────────────
+function applyMapping() {
+    var mapping = window._importMapping || {};
+    var rawRows = window._importRawRows || [];
+
+    // Validar que CODIGO esté mapeado
+    var codigoMapped = Object.values(mapping).indexOf("CODIGO") >= 0;
+    if (!codigoMapped) { toast("Debés asignar la columna CODIGO antes de continuar.", "#c62828"); return; }
+
+    // Transformar filas usando el mapeo
+    var rows = rawRows.map(function(r) {
+        var obj = {};
+        Object.keys(mapping).forEach(function(h) {
+            if (mapping[h]) obj[mapping[h]] = r[h] !== undefined ? String(r[h]).trim() : "";
+        });
+        return obj;
+    }).filter(function(r) { return r["CODIGO"] && r["CODIGO"] !== ""; });
+
+    if (!rows.length) { toast("No hay filas con CODIGO después de aplicar el mapeo.", "#c62828"); return; }
+    window._importRows = rows;
+
+    // Ocultar mapeo, mostrar loading
+    document.getElementById("importMappingWrap").style.display = "none";
+    setImportStep(3);
+    document.getElementById("importPreviewWrap").innerHTML =
+        '<p style="text-align:center;padding:24px;color:#666">⏳ Analizando productos…</p>';
+
+    // Llamar check_codigos
+    var codigos = rows.map(function(r) { return r["CODIGO"]; });
+    fetch(API + "?action=check_codigos", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ _user: authUser, _pass: authPass, codigos: codigos })
+    })
+    .then(function(res) { return res.json(); })
+    .then(function(json) {
+        if (json.ok) {
+            renderImportPreview(rows, json.productos || {});
+        } else {
+            toast("Error verificando productos: " + (json.error || ""), "#c62828");
+            document.getElementById("importPreviewWrap").innerHTML = "";
+        }
+    })
+    .catch(function(err) {
+        toast("Error de conexión: " + err.message, "#c62828");
+        document.getElementById("importPreviewWrap").innerHTML = "";
+    });
+}
+
+// ── PASO 3: preview enriquecido ───────────────────────────────────────────
+function getRowStatus(row, existingData) {
+    var codigo   = row["CODIGO"];
+    var existing = existingData[codigo] || null;
+    var errors   = [];
+
+    // Validaciones
+    if (!existing) {
+        if (!row["DESCRIPCION"]) errors.push("DESCRIPCION requerida");
+        if (!row["CATEGORIA"])   errors.push("CATEGORIA requerida");
+    }
+    if (row["PRECIO_MAYORISTA"] && isNaN(parseFloat(row["PRECIO_MAYORISTA"])))
+        errors.push("PRECIO_MAYORISTA no es un número");
+
+    if (errors.length) return { status: "ERROR", errors: errors, existing: existing };
+    if (!existing)     return { status: "NUEVO",       errors: [], existing: null };
+
+    // ¿Hay cambios reales?
+    var fieldMap = {
+        DESCRIPCION:      "descripcion",
+        CATEGORIA:        "categoria",
+        PRECIO_MAYORISTA: "precio_mayorista",
+        PVP:              "pvp",
+        ESTADO:           "estado",
+        CODIGO_BARRAS:    "codigo_barras",
+    };
+    var changed = false;
+    Object.keys(fieldMap).forEach(function(k) {
+        if (row[k] === undefined || row[k] === "") return;
+        var newV = String(row[k]).trim();
+        var oldV = String(existing[fieldMap[k]] || "").trim();
+        if (k === "PRECIO_MAYORISTA" || k === "PVP") {
+            if (Math.round(parseFloat(newV) * 100) !== Math.round(parseFloat(oldV) * 100)) changed = true;
+        } else if (k === "ESTADO") {
+            if (newV.toUpperCase() !== oldV.toUpperCase()) changed = true;
+        } else {
+            if (newV !== oldV) changed = true;
+        }
+    });
+
+    return { status: changed ? "ACTUALIZA" : "SIN_CAMBIOS", errors: [], existing: existing };
+}
+
+var STATUS_COLORS = {
+    NUEVO:       { bg: "#f1f8e9", badge: "#2e7d32", badgeBg: "#c8e6c9" },
+    ACTUALIZA:   { bg: "#e3f2fd", badge: "#1565c0", badgeBg: "#bbdefb" },
+    ERROR:       { bg: "#ffebee", badge: "#c62828", badgeBg: "#ffcdd2" },
+    SIN_CAMBIOS: { bg: "#fafafa", badge: "#757575", badgeBg: "#eeeeee" },
+};
+
+function renderImportPreview(rows, existingData) {
+    window._importExistingData = existingData;
+
+    // Calcular estado por fila
+    var enriched = rows.map(function(r) {
+        return Object.assign({}, r, { _status: getRowStatus(r, existingData) });
+    });
+    window._importEnrichedRows = enriched;
+
+    // Contar por estado
+    var counts = { NUEVO: 0, ACTUALIZA: 0, ERROR: 0, SIN_CAMBIOS: 0 };
+    enriched.forEach(function(r) { counts[r._status.status]++; });
+
+    // Detectar qué campos vinieron en el archivo
+    var ORDERED = ["CODIGO","CODIGO_BARRAS","DESCRIPCION","CATEGORIA","PRECIO_MAYORISTA","PVP","ESTADO"];
+    var activeFields = ORDERED.filter(function(f) {
+        return rows.some(function(r) { return r[f] !== undefined && r[f] !== ""; });
+    });
+    window._importFields = activeFields;
+
+    var html = buildImportPreviewHTML(enriched, counts, activeFields);
     document.getElementById("importPreviewWrap").innerHTML = html;
+
+    var importable = counts.NUEVO + counts.ACTUALIZA;
+    document.getElementById("btnImportConfirm").disabled = importable === 0;
+}
+
+function buildImportPreviewHTML(enriched, counts, activeFields) {
+    // Filtrar según tab activo
+    var visible = _importFilter === "todos"
+        ? enriched
+        : enriched.filter(function(r) { return r._status.status === _importFilter; });
+
+    var fieldMap = {
+        DESCRIPCION: "descripcion", CATEGORIA: "categoria",
+        PRECIO_MAYORISTA: "precio_mayorista", PVP: "pvp",
+        ESTADO: "estado", CODIGO_BARRAS: "codigo_barras",
+    };
+
+    var html = "";
+
+    // ── Stat tiles ──
+    html += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px">';
+    html += importStatTile("✅ Nuevos",      counts.NUEVO,       "#1b5e20", "#e8f5e9");
+    html += importStatTile("🔄 Actualizan", counts.ACTUALIZA,   "#0d47a1", "#e3f2fd");
+    html += importStatTile("❌ Errores",    counts.ERROR,        "#b71c1c", "#ffebee");
+    html += importStatTile("⏭ Sin cambios",counts.SIN_CAMBIOS,  "#555",    "#f5f5f5");
+    html += '</div>';
+
+    // ── Filter tabs ──
+    html += '<div style="display:flex;gap:5px;margin-bottom:10px;flex-wrap:wrap">';
+    html += importFilterTab("todos",       "Todos",        enriched.length, counts);
+    html += importFilterTab("NUEVO",       "Nuevos",       counts.NUEVO,    counts);
+    html += importFilterTab("ACTUALIZA",   "Actualizan",   counts.ACTUALIZA,counts);
+    html += importFilterTab("ERROR",       "Errores",      counts.ERROR,    counts);
+    html += importFilterTab("SIN_CAMBIOS", "Sin cambios",  counts.SIN_CAMBIOS,counts);
+    html += '</div>';
+
+    // ── Tabla con sticky header ──
+    html += '<div style="overflow:auto;max-height:320px;border:1px solid #e0e0e0;border-radius:8px">';
+    html += '<table class="import-preview-table" style="min-width:100%"><thead><tr>';
+    html += '<th style="min-width:90px">Estado</th>';
+    activeFields.forEach(function(f) { html += '<th>' + f + '</th>'; });
+    html += '</tr></thead><tbody>';
+
+    if (!visible.length) {
+        html += '<tr><td colspan="' + (activeFields.length + 1) + '" style="text-align:center;padding:20px;color:#999">Sin filas en este filtro</td></tr>';
+    }
+
+    visible.slice(0, 100).forEach(function(r) {
+        var st      = r._status;
+        var colors  = STATUS_COLORS[st.status];
+        var labelMap = { NUEVO: "NUEVO", ACTUALIZA: "ACTUALIZA", ERROR: "ERROR", SIN_CAMBIOS: "SIN CAMBIOS" };
+
+        html += '<tr style="background:' + colors.bg + '">';
+        // Badge + errores
+        html += '<td style="padding:6px 8px;vertical-align:top">'
+            + '<span class="imp-badge" style="background:' + colors.badgeBg + ';color:' + colors.badge + '">'
+            + labelMap[st.status] + '</span>';
+        if (st.errors.length) {
+            html += '<div style="font-size:10px;color:#c62828;margin-top:3px;line-height:1.4">'
+                + st.errors.map(function(e) { return "⚠ " + e; }).join("<br>") + '</div>';
+        }
+        html += '</td>';
+
+        // Celdas de datos
+        activeFields.forEach(function(f) {
+            var val    = r[f] !== undefined ? String(r[f]) : "";
+            var dbKey  = fieldMap[f];
+            var oldVal = (st.existing && dbKey) ? String(st.existing[dbKey] || "").trim() : "";
+            var cellBg = "";
+
+            // Celda de error: requerida vacía en producto nuevo
+            if (st.status === "ERROR" && !val && (f === "DESCRIPCION" || f === "CATEGORIA") && !st.existing) {
+                html += '<td style="background:#ffcdd2;color:#c62828;font-size:11px;padding:6px 8px">⚠ vacío</td>';
+                return;
+            }
+
+            // Before/after en actualizaciones
+            if (st.status === "ACTUALIZA" && val && dbKey && oldVal && oldVal !== val) {
+                var numFields = ["PRECIO_MAYORISTA", "PVP"];
+                var reallyChanged = numFields.indexOf(f) >= 0
+                    ? Math.round(parseFloat(val) * 100) !== Math.round(parseFloat(oldVal) * 100)
+                    : val.toUpperCase() !== oldVal.toUpperCase();
+                if (reallyChanged) {
+                    html += '<td style="padding:6px 8px;font-size:12px">'
+                        + '<span style="text-decoration:line-through;color:#aaa">' + esc(oldVal) + '</span>'
+                        + ' → <strong>' + esc(val) + '</strong></td>';
+                    return;
+                }
+            }
+
+            html += '<td style="padding:6px 8px">' + esc(val) + '</td>';
+        });
+
+        html += '</tr>';
+    });
+
+    if (visible.length > 100) {
+        html += '<tr><td colspan="' + (activeFields.length + 1) + '" style="text-align:center;padding:10px;color:#999;font-size:12px">… y '
+            + (visible.length - 100) + ' filas más</td></tr>';
+    }
+
+    html += '</tbody></table></div>';
+
+    if (counts.ERROR > 0) {
+        html += '<p style="font-size:12px;color:#c62828;margin-top:8px">⚠ Las '
+            + counts.ERROR + ' fila(s) con error no serán importadas.</p>';
+    }
+    if (counts.SIN_CAMBIOS > 0) {
+        html += '<p style="font-size:12px;color:#888;margin-top:4px">⏭ Las '
+            + counts.SIN_CAMBIOS + ' fila(s) sin cambios serán omitidas.</p>';
+    }
+
+    return html;
+}
+
+function importStatTile(label, count, color, bg) {
+    return '<div style="background:' + bg + ';border-radius:8px;padding:10px 6px;text-align:center">'
+        + '<div style="font-size:20px;font-weight:900;color:' + color + '">' + count + '</div>'
+        + '<div style="font-size:10px;color:' + color + ';margin-top:2px;font-weight:600;line-height:1.2">' + label + '</div>'
+        + '</div>';
+}
+
+function importFilterTab(value, label, count, counts) {
+    var isActive = _importFilter === value;
+    var cls = "imp-tab" + (isActive ? " active" : "");
+    return '<button class="' + cls + '" onclick="setImportFilter(\'' + value + '\')">'
+        + label + ' (' + count + ')</button>';
+}
+
+function setImportFilter(value) {
+    _importFilter = value;
+    var enriched = window._importEnrichedRows || [];
+    var counts = { NUEVO: 0, ACTUALIZA: 0, ERROR: 0, SIN_CAMBIOS: 0 };
+    enriched.forEach(function(r) { counts[r._status.status]++; });
+    document.getElementById("importPreviewWrap").innerHTML =
+        buildImportPreviewHTML(enriched, counts, window._importFields || []);
 }
 
 async function confirmImport() {
-    var rows = window._importRows || [];
+    var enriched = window._importEnrichedRows || [];
+    // Solo importar filas NUEVO y ACTUALIZA
+    var rows = enriched
+        .filter(function(r) { return r._status.status === "NUEVO" || r._status.status === "ACTUALIZA"; })
+        .map(function(r) {
+            var clean = Object.assign({}, r);
+            delete clean._status;
+            return clean;
+        });
     if (!rows.length) return;
     var btn = document.getElementById("btnImportConfirm");
     btn.disabled = true;
@@ -2303,12 +2666,12 @@ async function confirmImport() {
         if (json.ok) {
             var msg = "✅ " + (json.imported || 0) + " nuevos, " + (json.updated || 0) + " actualizados";
             if (json.errors && json.errors.length) {
-                msg += " — " + json.errors.length + " error(es): " + json.errors.map(function(e){ return e.codigo + " (" + e.motivo + ")"; }).join(", ");
+                msg += " — " + json.errors.length + " error(es): "
+                    + json.errors.map(function(e){ return e.codigo + " (" + e.motivo + ")"; }).join(", ");
             }
             toast(msg, json.errors && json.errors.length ? "#e65100" : undefined);
             closeImportModal();
             loadProducts();
-            // Mostrar banner de "Deshacer" con el import_id devuelto por la API
             if (json.import_id) showUndoBanner(json.import_id, json.imported, json.updated);
         } else {
             toast("Error: " + (json.error || "desconocido"), "#c62828");

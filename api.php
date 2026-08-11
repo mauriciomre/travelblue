@@ -432,6 +432,23 @@ switch ($action) {
         echo json_encode($row ? ['ok' => true, 'import_id' => $row['import_id'], 'created_at' => $row['created_at'], 'n' => intval($row['n'])] : ['ok' => true, 'import_id' => null]);
         break;
 
+
+    case 'check_codigos':
+        $data = json_decode(file_get_contents('php://input'), true);
+        checkAuth($data);
+        $codigos = array_values(array_filter(array_map('trim', $data['codigos'] ?? []), 'strlen'));
+        if (!$codigos) { echo json_encode(['ok' => true, 'productos' => (object)[]]); break; }
+        $ph = implode(',', array_fill(0, count($codigos), '?'));
+        $types = str_repeat('s', count($codigos));
+        $stmt = $db->prepare("SELECT codigo, descripcion, categoria, precio_mayorista, pvp, estado, codigo_barras FROM productos WHERE codigo IN ($ph)");
+        $stmt->bind_param($types, ...$codigos);
+        $stmt->execute();
+        $res = $stmt->get_result();
+        $productos = [];
+        while ($row = $res->fetch_assoc()) { $productos[$row['codigo']] = $row; }
+        echo json_encode(['ok' => true, 'productos' => $productos ?: (object)[]]);
+        break;
+
     case 'import_rollback':
         $data = json_decode(file_get_contents('php://input'), true);
         checkAuth($data);
