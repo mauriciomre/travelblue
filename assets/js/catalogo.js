@@ -758,6 +758,7 @@ function toggleRemove(code) {
 }
 
 function manualQty(code, val) {
+    var multiplo = getMultiplo(code);
     var num = parseInt(val) || multiplo;
     var snapped = snapToMultiplo(num, multiplo);
     var id = sid(code);
