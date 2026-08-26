@@ -255,7 +255,7 @@ switch ($action) {
         // Mantener el orden actual si no se pasa uno
         $ordenActual = $db->query("SELECT orden FROM productos WHERE id=$id")->fetch_assoc();
         $orden = isset($data['orden']) && $data['orden'] !== '' ? intval($data['orden']) : ($ordenActual['orden'] ?? 0);
-        $stmt = $db->prepare("UPDATE productos SET codigo=?,descripcion=?,categoria=?,precio_mayorista=?,pvp=?,foto=?,estado=?,orden=?,multiplo=?,codigo_barras=? WHERE id=?");
+        $stmt = $db->prepare("UPDATE productos SET codigo=?,descripcion=?,categoria=?,precio_mayorista=?,pvp=?,foto=?,estado=?,orden=?,multiplo=?,codigo_barras=?,updated_at=NOW() WHERE id=?");
         $stmt->bind_param('sssddssiisi', $data['codigo'], $data['descripcion'], $data['categoria'], $data['precio_mayorista'], $pvp, $data['foto'], $data['estado'], $orden, $multiplo, $codigoBarras, $id);
         if ($stmt->execute()) {
             // Solo actualizar colores si el campo viene en el request
