@@ -987,6 +987,12 @@ td.editing {
     margin-top: 4px;
 }
 
+/* Configuración: Transportes puede crecer mucho (tabla dinámica) — no estirar
+   las cards vecinas (WhatsApp, Cambiar contraseña) a su misma altura */
+#configuracionGrid .config-box {
+    height: auto;
+}
+
 /* Buscador de herramientas */
 .tools-search {
     width: 100%;

@@ -599,7 +599,13 @@ switch ($action) {
         break;
 
     case 'config_get':
-        $r = $db->query("SELECT clave, valor FROM config");
+        // Solo claves públicas — nunca exponer admin_pass ni nada sensible sin auth
+        $clavesPublicas = ['whatsapp'];
+        $ph = implode(',', array_fill(0, count($clavesPublicas), '?'));
+        $stmt = $db->prepare("SELECT clave, valor FROM config WHERE clave IN ($ph)");
+        $stmt->bind_param(str_repeat('s', count($clavesPublicas)), ...$clavesPublicas);
+        $stmt->execute();
+        $r = $stmt->get_result();
         $cfg = [];
         while ($row = $r->fetch_assoc()) $cfg[$row['clave']] = $row['valor'];
         echo json_encode($cfg);
