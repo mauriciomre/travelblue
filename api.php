@@ -611,6 +611,46 @@ switch ($action) {
         echo json_encode($cfg);
         break;
 
+    // ── DIAGNÓSTICO: conectividad saliente hacia Manager2Max ───────────────────
+    // Endpoint de solo lectura contra Manager (EchoPing, sin login) para
+    // confirmar que este hosting deja salir HTTP hacia la IP de Manager antes
+    // de construir el sync completo. Queda como utilidad permanente de diagnóstico.
+    case 'manager_test_conexion':
+        $data = json_decode(file_get_contents('php://input'), true);
+        checkAuth($data);
+
+        $resultado = [
+            'curl_disponible' => extension_loaded('curl'),
+            'allow_url_fopen' => (bool) ini_get('allow_url_fopen'),
+            'max_execution_time' => ini_get('max_execution_time'),
+        ];
+
+        $url = 'http://190.123.85.167:2022/Api/MaxWeb/EchoPing';
+        $inicio = microtime(true);
+
+        if (extension_loaded('curl')) {
+            $resultado['metodo'] = 'curl';
+            $ch = curl_init($url);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 15);
+            $respuesta = curl_exec($ch);
+            $resultado['error_curl'] = curl_error($ch) ?: null;
+            $resultado['http_code'] = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
+        } else {
+            $resultado['metodo'] = 'file_get_contents';
+            $ctx = stream_context_create(['http' => ['timeout' => 15, 'ignore_errors' => true]]);
+            $respuesta = @file_get_contents($url, false, $ctx);
+            $resultado['http_response_header'] = $http_response_header ?? null;
+        }
+
+        $resultado['tiempo_segundos'] = round(microtime(true) - $inicio, 3);
+        $resultado['respuesta_cruda'] = $respuesta !== false ? $respuesta : null;
+        $resultado['ok'] = !empty($respuesta);
+        echo json_encode($resultado);
+        break;
+
     case 'config_set':
         $data = json_decode(file_get_contents('php://input'), true);
         checkAuth($data);
