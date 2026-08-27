@@ -106,6 +106,7 @@ async function doLogin() {
             loadFavs();
             renderFavbar();
             checkLastImport();
+            loadPendientesManagerBadge();
         } else {
             document.getElementById("lerr").textContent =
                 "Usuario o contraseña incorrectos";
@@ -147,6 +148,7 @@ async function tryAutoLogin() {
             loadFavs();
             renderFavbar();
             checkLastImport();
+            loadPendientesManagerBadge();
         } else {
             localStorage.removeItem("tb_admin_user");
             localStorage.removeItem("tb_admin_pass");
@@ -284,6 +286,8 @@ function showSection(s, btn) {
     if (s === "colores") renderColoresTable();
     if (s === "pedidos") loadPedidos();
     if (s === "clientes") loadClientes();
+    if (s === "pendientesManager") loadPendientesManager();
+    if (s === "configuracion") loadSyncStatus();
 }
 
 // ── CONFIGURACIÓN ─────────────────────────────────────────────────────────────
@@ -3102,6 +3106,242 @@ async function checkLastImport() {
             banner.style.display = "flex";
         }
     } catch (e) { /* silencioso */ }
+}
+
+// ── Sync con Manager2Max ─────────────────────────────────────────────────────
+var syncPreviewDiff = null;
+
+async function loadSyncStatus() {
+    try {
+        var res = await fetch(API + "?action=manager_sync_log_ultimo", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ _user: authUser, _pass: authPass }),
+        });
+        var json = await res.json();
+        if (!json.ok) return;
+        var radio = document.querySelector('input[name="syncMode"][value="' + json.modo + '"]');
+        if (radio) radio.checked = true;
+        var line = document.getElementById("syncStatusLine");
+        if (!line) return;
+        if (!json.run_id) {
+            line.textContent = "Todavía no se corrió ninguna sincronización.";
+            return;
+        }
+        var partes = json.filas.map(function (f) {
+            var estado = f.ok == 1 ? "OK" : "FALLÓ" + (f.mensaje ? " (" + f.mensaje + ")" : "");
+            var detalle = f.ok == 1 ? " (" + f.actualizados + " act., " + f.nuevos + " nuevos)" : "";
+            return f.marca + " " + estado + detalle;
+        });
+        var d = new Date(json.filas[0].created_at.replace(" ", "T"));
+        var fechaStr = d.toLocaleDateString("es-AR") + " " + d.getHours().toString().padStart(2, "0") + ":" + d.getMinutes().toString().padStart(2, "0");
+        line.innerHTML = "Última sync: " + fechaStr + " — " + partes.join(", ");
+    } catch (e) {}
+}
+
+async function setSyncMode(modo) {
+    var res = await fetch(API + "?action=config_set", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ _user: authUser, _pass: authPass, clave: "manager_sync_mode", valor: modo }),
+    });
+    var json = await res.json();
+    if (json.ok) toast("Modo de sincronización actualizado");
+}
+
+async function sincronizarManagerAhora() {
+    var modoSel = document.querySelector('input[name="syncMode"]:checked');
+    modoSel = modoSel ? modoSel.value : "manual";
+    var btn = document.getElementById("btnSyncNow");
+    btn.disabled = true;
+    btn.textContent = "Consultando Manager...";
+    try {
+        if (modoSel === "manual") {
+            var res = await fetch(API + "?action=manager_sync_preview", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ _user: authUser, _pass: authPass }),
+            });
+            var json = await res.json();
+            if (!json.ok) { toast("Error: " + json.error, "#c62828"); return; }
+            renderSyncPreview(json);
+            document.getElementById("syncPreviewModal").classList.add("open");
+        } else {
+            var res2 = await fetch(API + "?action=manager_sync_apply", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ _user: authUser, _pass: authPass }),
+            });
+            var json2 = await res2.json();
+            if (!json2.ok) { toast("Error: " + json2.error, "#c62828"); return; }
+            toast(
+                "Sync aplicada: " + json2.actualizados + " actualizados, " + json2.nuevos_creados + " nuevos" +
+                (json2.nuevos_pendientes ? ", " + json2.nuevos_pendientes + " pendientes de aprobar" : "")
+            );
+            loadSyncStatus();
+            loadPendientesManagerBadge();
+            await loadProducts();
+        }
+    } catch (e) {
+        toast("Error de conexión con Manager", "#c62828");
+    } finally {
+        btn.disabled = false;
+        btn.textContent = "🔄 Sincronizar ahora";
+    }
+}
+
+function renderSyncPreview(diff) {
+    syncPreviewDiff = diff;
+    var stats = document.getElementById("syncPreviewStats");
+    var partesMarca = Object.keys(diff.por_marca).map(function (m) {
+        var r = diff.por_marca[m];
+        return m + ": " + (r.ok ? r.cantidad + " artículos" : "FALLÓ (" + r.mensaje + ")");
+    });
+    stats.innerHTML =
+        "<strong>" + diff.actualiza.length + "</strong> productos van a actualizar precio/estado/descripción, " +
+        "<strong>" + diff.nuevos.length + "</strong> productos nuevos se van a crear.<br>" +
+        "<span style='color:#888'>" + partesMarca.join(" · ") + "</span>";
+
+    var tbody = document.getElementById("syncPreviewTbody");
+    var filas = diff.actualiza
+        .map(function (it) { return { it: it, cambio: "Actualiza" }; })
+        .concat(diff.nuevos.map(function (it) { return { it: it, cambio: "Nuevo" }; }));
+    tbody.innerHTML =
+        filas
+            .map(function (f) {
+                var it = f.it;
+                var color = f.cambio === "Nuevo" ? "#2e7d32" : "#1565c0";
+                return (
+                    "<tr><td>" + esc(it.codigo) + "</td><td>" + esc(it.descripcion) + "</td><td>" + esc(it.categoria) + "</td>" +
+                    "<td>$" + Math.round(it.precio_mayorista) + "</td><td>$" + Math.round(it.pvp || 0) + "</td><td>" + it.estado + "</td>" +
+                    "<td>" + esc(it.marca_manager) + "</td><td style='color:" + color + ";font-weight:700'>" + f.cambio + "</td></tr>"
+                );
+            })
+            .join("") || "<tr><td colspan='8' style='text-align:center;color:#888'>Sin cambios — el catálogo ya está al día</td></tr>";
+}
+
+function closeSyncPreviewModal() {
+    document.getElementById("syncPreviewModal").classList.remove("open");
+    syncPreviewDiff = null;
+}
+
+async function confirmarSyncManager() {
+    var btn = document.getElementById("btnSyncConfirm");
+    btn.disabled = true;
+    btn.textContent = "Aplicando...";
+    try {
+        var res = await fetch(API + "?action=manager_sync_apply", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ _user: authUser, _pass: authPass }),
+        });
+        var json = await res.json();
+        if (!json.ok) { toast("Error: " + json.error, "#c62828"); return; }
+        toast("Sync aplicada: " + json.actualizados + " actualizados, " + json.nuevos_creados + " nuevos");
+        closeSyncPreviewModal();
+        loadSyncStatus();
+        loadPendientesManagerBadge();
+        await loadProducts();
+    } catch (e) {
+        toast("Error al aplicar la sync", "#c62828");
+    } finally {
+        btn.disabled = false;
+        btn.textContent = "Confirmar y aplicar";
+    }
+}
+
+// ── Pendientes de Manager (modo semiautomático) ─────────────────────────────
+async function loadPendientesManagerBadge() {
+    try {
+        var res = await fetch(API + "?action=manager_sync_pendientes_list", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ _user: authUser, _pass: authPass }),
+        });
+        var json = await res.json();
+        var n = Array.isArray(json) ? json.length : 0;
+        var badge = document.getElementById("pendMgrBadge");
+        if (badge) {
+            badge.textContent = n;
+            badge.style.display = n > 0 ? "" : "none";
+        }
+    } catch (e) {}
+}
+
+async function loadPendientesManager() {
+    var res = await fetch(API + "?action=manager_sync_pendientes_list", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ _user: authUser, _pass: authPass }),
+    });
+    var rows = await res.json();
+    var tbody = document.getElementById("pendMgrTbody");
+    if (!Array.isArray(rows) || !rows.length) {
+        tbody.innerHTML = "<tr><td colspan='9' style='text-align:center;color:#888'>No hay productos pendientes de aprobación</td></tr>";
+        var badge = document.getElementById("pendMgrBadge");
+        if (badge) badge.style.display = "none";
+        return;
+    }
+    tbody.innerHTML = rows
+        .map(function (p) {
+            return (
+                "<tr>" +
+                "<td><input type='checkbox' class='pendChk' value='" + p.id + "'></td>" +
+                "<td>" + esc(p.codigo) + "</td><td>" + esc(p.descripcion) + "</td><td>" + esc(p.categoria) + "</td>" +
+                "<td>$" + Math.round(p.precio_mayorista) + "</td><td>$" + Math.round(p.pvp || 0) + "</td><td>" + p.estado + "</td>" +
+                "<td>" + esc(p.marca_manager) + "</td>" +
+                "<td><button class='btn btn-primary' style='padding:4px 10px;font-size:11px' onclick='aprobarPendiente(" + p.id + ")'>✓ Aprobar</button> " +
+                "<button class='btn' style='padding:4px 10px;font-size:11px;color:#c62828' onclick='rechazarPendiente(" + p.id + ")'>✗ Rechazar</button></td>" +
+                "</tr>"
+            );
+        })
+        .join("");
+    var selAll = document.getElementById("pendSelectAll");
+    if (selAll) selAll.checked = false;
+}
+
+function toggleSelectAllPendientes(cb) {
+    document.querySelectorAll(".pendChk").forEach(function (el) { el.checked = cb.checked; });
+}
+
+function pendientesSeleccionados() {
+    return Array.from(document.querySelectorAll(".pendChk:checked")).map(function (el) { return parseInt(el.value); });
+}
+
+async function aprobarPendiente(id) { await aplicarAccionPendientes([id], "aprobar"); }
+async function rechazarPendiente(id) { await aplicarAccionPendientes([id], "rechazar"); }
+
+async function aprobarPendientesSeleccionados() {
+    var ids = pendientesSeleccionados();
+    if (!ids.length) { toast("Seleccioná al menos un producto", "#c62828"); return; }
+    await aplicarAccionPendientes(ids, "aprobar");
+}
+async function rechazarPendientesSeleccionados() {
+    var ids = pendientesSeleccionados();
+    if (!ids.length) { toast("Seleccioná al menos un producto", "#c62828"); return; }
+    await aplicarAccionPendientes(ids, "rechazar");
+}
+
+async function aplicarAccionPendientes(ids, accion) {
+    var action = accion === "aprobar" ? "manager_sync_pendientes_aprobar" : "manager_sync_pendientes_rechazar";
+    var res = await fetch(API + "?action=" + action, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ _user: authUser, _pass: authPass, ids: ids }),
+    });
+    var json = await res.json();
+    if (json.ok) {
+        toast(
+            accion === "aprobar"
+                ? (json.creados || ids.length) + " producto(s) aprobado(s)"
+                : (json.eliminados || ids.length) + " producto(s) rechazado(s)"
+        );
+        loadPendientesManager();
+        loadPendientesManagerBadge();
+        if (accion === "aprobar") await loadProducts();
+    } else {
+        toast("Error: " + json.error, "#c62828");
+    }
 }
 
 // ── Image bulk import ─────────────────────────────────────────────────────────

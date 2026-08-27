@@ -151,6 +151,17 @@
                     <div class="sidebar-group">
                         <button
                             class="sidebar-item"
+                            data-section="pendientesManager"
+                            onclick="showSection('pendientesManager', this)"
+                        >
+                            <span class="si-icon">📥</span
+                            ><span class="si-label">Pendientes Manager</span
+                            ><span id="pendMgrBadge" class="sidebar-badge" style="display:none">0</span>
+                        </button>
+                    </div>
+                    <div class="sidebar-group">
+                        <button
+                            class="sidebar-item"
                             data-section="herramientas"
                             onclick="showSection('herramientas', this)"
                         >
@@ -362,6 +373,41 @@
                     </div>
 
                     <!-- CATEGORÍAS -->
+                    <!-- PENDIENTES DE MANAGER (modo semiautomático) -->
+                    <div class="wrap section" id="secPendientesManager">
+                        <h2 style="font-size:16px;font-weight:800;color:var(--blue);margin-bottom:8px">
+                            Productos nuevos pendientes de Manager
+                        </h2>
+                        <p style="font-size:13px;color:var(--muted);margin-bottom:16px">
+                            En modo semiautomático, los productos nuevos detectados en Manager
+                            esperan tu aprobación acá antes de aparecer en el catálogo público.
+                        </p>
+                        <div class="cat-inline" style="margin-bottom:12px">
+                            <label style="display:flex;align-items:center;gap:6px;font-size:13px">
+                                <input type="checkbox" id="pendSelectAll" onchange="toggleSelectAllPendientes(this)" />
+                                Seleccionar todos
+                            </label>
+                            <button class="btn btn-primary" onclick="aprobarPendientesSeleccionados()">✓ Aprobar seleccionados</button>
+                            <button class="btn" style="color:var(--red)" onclick="rechazarPendientesSeleccionados()">✗ Rechazar seleccionados</button>
+                        </div>
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th></th>
+                                    <th>Código</th>
+                                    <th>Descripción</th>
+                                    <th>Categoría</th>
+                                    <th>Mayorista</th>
+                                    <th>PVP</th>
+                                    <th>Estado</th>
+                                    <th>Marca</th>
+                                    <th>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody id="pendMgrTbody"></tbody>
+                        </table>
+                    </div>
+
                     <div class="wrap section" id="secCategorias">
                         <h2
                             style="
@@ -533,6 +579,31 @@
                                 </div>
                                 <button class="btn btn-primary" onclick="savePassword()">
                                     Cambiar contraseña
+                                </button>
+                            </div>
+                            <div class="config-box" data-keywords="manager sync sincronizacion erp precio stock automatico">
+                                <h3>🔄 Sincronización con Manager</h3>
+                                <p style="font-size:13px;color:var(--muted);margin-bottom:12px">
+                                    Trae precio, estado y productos nuevos desde Manager2Max.
+                                    Elegí cómo se aplican los cambios.
+                                </p>
+                                <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px">
+                                    <label style="display:flex;align-items:flex-start;gap:8px;font-size:13px;cursor:pointer">
+                                        <input type="radio" name="syncMode" value="manual" onchange="setSyncMode(this.value)" style="margin-top:2px" />
+                                        <span><strong>Manual</strong> — revisás y confirmás antes de aplicar</span>
+                                    </label>
+                                    <label style="display:flex;align-items:flex-start;gap:8px;font-size:13px;cursor:pointer">
+                                        <input type="radio" name="syncMode" value="semiautomatico" onchange="setSyncMode(this.value)" style="margin-top:2px" />
+                                        <span><strong>Semiautomático</strong> — precio/estado se aplican solos, productos nuevos esperan tu aprobación</span>
+                                    </label>
+                                    <label style="display:flex;align-items:flex-start;gap:8px;font-size:13px;cursor:pointer">
+                                        <input type="radio" name="syncMode" value="automatico" onchange="setSyncMode(this.value)" style="margin-top:2px" />
+                                        <span><strong>Automático</strong> — todo se aplica solo, incluidas altas de producto</span>
+                                    </label>
+                                </div>
+                                <div id="syncStatusLine" style="font-size:12.5px;color:var(--muted);margin-bottom:12px">Cargando estado…</div>
+                                <button class="btn btn-primary" id="btnSyncNow" onclick="sincronizarManagerAhora()">
+                                    🔄 Sincronizar ahora
                                 </button>
                             </div>
                         </div>
@@ -2363,6 +2434,32 @@
                 <div class="modal-foot">
                     <button class="btn" style="background:#eee" onclick="closeImgImportModal()">Cancelar</button>
                     <button id="btnImgUpload" class="btn btn-primary" disabled onclick="uploadImages()">Subir imágenes</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- SYNC MANAGER PREVIEW MODAL (modo manual) -->
+        <div class="modal-bg" id="syncPreviewModal" onclick="if(event.target===this)closeSyncPreviewModal()">
+            <div class="modal" style="max-width:760px;width:95%;padding:0">
+                <div class="modal-head">
+                    <h2>🔄 Sincronizar con Manager</h2>
+                    <button class="modal-close" onclick="closeSyncPreviewModal()">✕</button>
+                </div>
+                <div style="padding:20px 24px;max-height:60vh;overflow-y:auto">
+                    <div id="syncPreviewStats" style="margin-bottom:14px;font-size:13px;color:#555"></div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Código</th><th>Descripción</th><th>Categoría</th>
+                                <th>Mayorista</th><th>PVP</th><th>Estado</th><th>Marca</th><th>Cambio</th>
+                            </tr>
+                        </thead>
+                        <tbody id="syncPreviewTbody"></tbody>
+                    </table>
+                </div>
+                <div class="modal-foot">
+                    <button class="btn" style="background:#eee" onclick="closeSyncPreviewModal()">Cancelar</button>
+                    <button id="btnSyncConfirm" class="btn btn-primary" onclick="confirmarSyncManager()">Confirmar y aplicar</button>
                 </div>
             </div>
         </div>

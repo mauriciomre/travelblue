@@ -18,10 +18,241 @@ function checkAuth($data) {
     $r = $db->query("SELECT valor FROM config WHERE clave='admin_pass' LIMIT 1");
     $row = $r ? $r->fetch_assoc() : null;
     $validPass = $row ? $row['valor'] : ADMIN_PASS;
-    if ($u !== ADMIN_USER || $p !== $validPass) {
+    if ($u !== ADMIN_USER || !hash_equals($validPass, $p)) {
         http_response_code(401);
         die(json_encode(['error' => 'No autorizado']));
     }
+}
+
+// ── Sync con Manager2Max ─────────────────────────────────────────────────────
+// Reglas de negocio confirmadas por Mauricio (Mi-Cerebro/proyectos/travelblue-catalogo-backlog.md):
+define('MANAGER_MARCAS', ['TRAVEL BLUE', 'ANOMEO', 'SLOOTH']);
+define('MANAGER_LISTA_MAYORISTA', 11); // "Travel Blue S"
+define('MANAGER_LISTA_PVP', 1);        // "Público General" (Mauricio dijo "Público" — es la única lista con ese nombre base)
+
+function manager_login() {
+    $ch = curl_init(MANAGER_API_URL . '/Api/Login/LoginUsuarioEmpresa');
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_POST, true);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json; charset=utf-8']);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode([
+        'CodigoUsuario' => MANAGER_API_USER,
+        'Contraseña' => MANAGER_API_PASS,
+        'IDEmpresa' => MANAGER_IDEMPRESA,
+    ], JSON_UNESCAPED_UNICODE));
+    curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 20);
+    $resp = curl_exec($ch);
+    $err = curl_error($ch);
+    curl_close($ch);
+    if ($err) throw new Exception("Login Manager falló: $err");
+    $data = json_decode($resp, true);
+    if (empty($data['Token'])) throw new Exception("Login Manager sin token: " . ($data['ErrMessage'] ?? 'desconocido'));
+    return $data['Token'];
+}
+
+function manager_call($token, $endpoint, $body) {
+    $ch = curl_init(MANAGER_API_URL . $endpoint);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_POST, true);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json; charset=utf-8', 'Authorization: Bearer ' . $token]);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($body, JSON_UNESCAPED_UNICODE));
+    curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+    $resp = curl_exec($ch);
+    $err = curl_error($ch);
+    curl_close($ch);
+    if ($err) throw new Exception("Manager $endpoint falló: $err");
+    $data = json_decode($resp, true);
+    if (($data['ErrCode'] ?? null) !== 200) throw new Exception("Manager $endpoint error: " . ($data['ErrMessage'] ?? 'desconocido'));
+    return $data['Data']['DT']['data'] ?? [];
+}
+
+function manager_filtro_texto($valor) {
+    return [
+        '$type' => 'UpSoft.Framework.Data.Filters.FilterText, UpSoft.Framework.Data',
+        'Criteria' => 0,
+        'Value' => $valor,
+        'ArrayValue' => ['$type' => 'System.Collections.Generic.List`1[[System.String, mscorlib]], mscorlib', '$values' => ['']],
+        'FieldName' => '',
+        'ActiveFilter' => true,
+    ];
+}
+function manager_filtro_numero($valor) {
+    return [
+        '$type' => 'UpSoft.Framework.Data.Filters.FilterNumber, UpSoft.Framework.Data',
+        'Criteria' => 0, 'Value1' => $valor, 'Value2' => 0.0, 'FieldName' => '', 'ActiveFilter' => true,
+    ];
+}
+function manager_dict_filtros($filtros) {
+    return array_merge([
+        '$type' => 'System.Collections.Generic.Dictionary`2[[System.String, mscorlib],[UpSoft.Framework.Data.Filters.BaseFilter, UpSoft.Framework.Data]], mscorlib',
+    ], $filtros);
+}
+
+// Categoría del catálogo a partir de Marca/Rubro de Manager — regla confirmada 27/08/2026
+function manager_categoria($marca, $rubro) {
+    if (strtoupper(trim($marca)) !== 'TRAVEL BLUE') return strtoupper(trim($marca));
+    $rubro = strtoupper(trim($rubro));
+    if ($rubro === 'MOCHILAS') return 'MOCHILAS';
+    if ($rubro === 'EQUIPAJES') return 'VALIJAS';
+    return 'ACCESORIOS';
+}
+
+// Saca solo la mención literal de la marca de la descripción — regla confirmada 27/08/2026
+function manager_limpiar_descripcion($desc, $marca) {
+    $desc = trim($desc);
+    $desc = preg_replace('/\s*' . preg_quote($marca, '/') . '\s*/i', ' ', $desc);
+    return trim(preg_replace('/\s+/', ' ', $desc));
+}
+
+// Trae y transforma los artículos de una marca: descripción, categoría, estado
+// (desde Sube) + precio mayorista/PVP de las 2 listas relevantes. Devuelve
+// codigo => datos ya listos para comparar/aplicar contra la tabla productos.
+function manager_fetch_marca($token, $marca) {
+    $articulos = manager_call($token, '/Api/articulo/GetDTArticulos', [
+        'DTRequest' => ['draw' => 1, 'order' => [], 'start' => 0, 'length' => 5000],
+        'DefinicionTablaFiltros' => false,
+        'CalculaTotales' => false,
+        'ListFilters' => manager_dict_filtros(['Marca' => manager_filtro_texto($marca)]),
+    ]);
+
+    $items = [];
+    foreach ($articulos as $a) {
+        $codigo = trim($a['CodigoArticulo'] ?? '');
+        if ($codigo === '') continue;
+        $items[$codigo] = [
+            'codigo' => $codigo,
+            'descripcion' => manager_limpiar_descripcion($a['Descripcion'] ?? '', $marca),
+            'categoria' => manager_categoria($marca, $a['Rubro'] ?? ''),
+            'estado' => !empty($a['Sube']) ? 'DISPONIBLE' : 'AGOTADO',
+            'codigo_barras' => trim($a['CodigoAuxiliar'] ?? '') ?: null,
+            'marca_manager' => $marca,
+            'rubro_manager' => $a['Rubro'] ?? '',
+            'precio_mayorista' => null,
+            'pvp' => null,
+        ];
+    }
+
+    $listas = [MANAGER_LISTA_MAYORISTA => 'precio_mayorista', MANAGER_LISTA_PVP => 'pvp'];
+    foreach ($listas as $idLista => $campo) {
+        $precios = manager_call($token, '/Api/articulo/GetDTArticulosPrecioExistencia', [
+            'DTRequest' => ['draw' => 1, 'order' => [], 'start' => 0, 'length' => 5000],
+            'DefinicionTablaFiltros' => false,
+            'CalculaTotales' => false,
+            'ListFilters' => manager_dict_filtros([
+                'IDListaPrecio' => manager_filtro_numero($idLista),
+                'IDDeposito' => manager_filtro_numero(0),
+                'IDCliente' => manager_filtro_numero(0),
+                'IDProveedor' => manager_filtro_numero(0),
+                'IDMonedaComprobante' => manager_filtro_numero(1),
+                'FactorCotizacionMonCompMonLP' => manager_filtro_numero(1.0),
+                'Marca' => manager_filtro_texto($marca),
+            ]),
+        ]);
+        foreach ($precios as $p) {
+            $codigo = trim($p['CodigoArticulo'] ?? '');
+            if (isset($items[$codigo]) && isset($p['PrecioFinalLP'])) {
+                $items[$codigo][$campo] = round(floatval($p['PrecioFinalLP']), 2);
+            }
+        }
+    }
+
+    return array_values($items);
+}
+
+// Compara los artículos ya transformados de las 3 marcas contra la tabla
+// productos (por código) y arma el diff, sin escribir nada. $porMarca sale
+// con ok/error por marca para no perder fallas parciales en silencio.
+function manager_sync_diff($db, $token) {
+    $porMarca = [];
+    $actualiza = [];
+    $nuevos = [];
+    foreach (MANAGER_MARCAS as $marca) {
+        try {
+            $items = manager_fetch_marca($token, $marca);
+            $porMarca[$marca] = ['ok' => true, 'mensaje' => null, 'cantidad' => count($items)];
+            foreach ($items as $it) {
+                $chk = $db->prepare("SELECT id,descripcion,categoria,precio_mayorista,pvp,estado,codigo_barras FROM productos WHERE codigo=?");
+                $chk->bind_param('s', $it['codigo']);
+                $chk->execute();
+                $existing = $chk->get_result()->fetch_assoc();
+                if ($existing) {
+                    $cambia = round(floatval($existing['precio_mayorista']), 2) !== $it['precio_mayorista']
+                        || round(floatval($existing['pvp']), 2) !== $it['pvp']
+                        || $existing['estado'] !== $it['estado']
+                        || trim($existing['descripcion']) !== $it['descripcion']
+                        || trim($existing['categoria']) !== $it['categoria'];
+                    if ($cambia) $actualiza[] = array_merge($it, ['id' => $existing['id']]);
+                } else {
+                    $nuevos[] = $it;
+                }
+            }
+        } catch (Exception $e) {
+            $porMarca[$marca] = ['ok' => false, 'mensaje' => $e->getMessage(), 'cantidad' => 0];
+        }
+    }
+    return ['por_marca' => $porMarca, 'actualiza' => $actualiza, 'nuevos' => $nuevos];
+}
+
+// Aplica un diff ya calculado. $modo determina qué pasa con los productos
+// nuevos: 'automatico' los crea directo, 'semiautomatico'/'manual' los deja
+// en manager_sync_pendientes para aprobación.
+function manager_sync_aplicar($db, $diff, $modo, $runId) {
+    $actualizados = 0; $nuevosCreados = 0; $nuevosPendientes = 0;
+
+    foreach ($diff['actualiza'] as $it) {
+        $prevStmt = $db->prepare("SELECT codigo,descripcion,categoria,precio_mayorista,pvp,estado,codigo_barras FROM productos WHERE id=?");
+        $prevStmt->bind_param('i', $it['id']);
+        $prevStmt->execute();
+        $prev = $prevStmt->get_result()->fetch_assoc();
+        if ($prev) {
+            $prevJson = json_encode($prev, JSON_UNESCAPED_UNICODE);
+            $snap = $db->prepare("INSERT INTO import_snapshots (import_id, codigo, accion, datos_anteriores) VALUES (?,?,'updated',?)");
+            $snap->bind_param('sss', $runId, $it['codigo'], $prevJson);
+            $snap->execute();
+        }
+        $stmt = $db->prepare("UPDATE productos SET descripcion=?,categoria=?,precio_mayorista=?,pvp=?,estado=? WHERE id=?");
+        $stmt->bind_param('ssddsi', $it['descripcion'], $it['categoria'], $it['precio_mayorista'], $it['pvp'], $it['estado'], $it['id']);
+        if ($stmt->execute()) $actualizados++;
+    }
+
+    foreach ($diff['nuevos'] as $it) {
+        // Solo semiautomático encola para aprobación — en manual, esta función
+        // se llama recién DESPUÉS de que el admin ya revisó y confirmó el
+        // preview (que incluye los nuevos), así que ahí ya está "aprobado".
+        if ($modo !== 'semiautomatico') {
+            $catStmt = $db->prepare("INSERT IGNORE INTO categorias (nombre) VALUES (?)");
+            $catStmt->bind_param('s', $it['categoria']);
+            $catStmt->execute();
+
+            $snap = $db->prepare("INSERT INTO import_snapshots (import_id, codigo, accion, datos_anteriores) VALUES (?,?,'inserted',NULL)");
+            $snap->bind_param('ss', $runId, $it['codigo']);
+            $snap->execute();
+
+            $o = 0; $multiplo = 1;
+            $stmt = $db->prepare("INSERT INTO productos (codigo,descripcion,categoria,precio_mayorista,pvp,estado,orden,multiplo,codigo_barras) VALUES (?,?,?,?,?,?,?,?,?)");
+            $stmt->bind_param('sssddsiis', $it['codigo'], $it['descripcion'], $it['categoria'], $it['precio_mayorista'], $it['pvp'], $it['estado'], $o, $multiplo, $it['codigo_barras']);
+            if ($stmt->execute()) $nuevosCreados++;
+        } else {
+            $stmt = $db->prepare("INSERT INTO manager_sync_pendientes (codigo,descripcion,categoria,precio_mayorista,pvp,estado,codigo_barras,marca_manager,rubro_manager) VALUES (?,?,?,?,?,?,?,?,?)");
+            $stmt->bind_param('sssddssss', $it['codigo'], $it['descripcion'], $it['categoria'], $it['precio_mayorista'], $it['pvp'], $it['estado'], $it['codigo_barras'], $it['marca_manager'], $it['rubro_manager']);
+            if ($stmt->execute()) $nuevosPendientes++;
+        }
+    }
+
+    foreach ($diff['por_marca'] as $marca => $r) {
+        $nuevosMarca = 0;
+        foreach ($diff['nuevos'] as $it) if ($it['marca_manager'] === $marca) $nuevosMarca++;
+        $actualizaMarca = 0;
+        foreach ($diff['actualiza'] as $it) if ($it['marca_manager'] === $marca) $actualizaMarca++;
+        $log = $db->prepare("INSERT INTO manager_sync_log (run_id, marca, ok, mensaje, actualizados, nuevos) VALUES (?,?,?,?,?,?)");
+        $ok = $r['ok'] ? 1 : 0;
+        $log->bind_param('ssisii', $runId, $marca, $ok, $r['mensaje'], $actualizaMarca, $nuevosMarca);
+        $log->execute();
+    }
+
+    return ['actualizados' => $actualizados, 'nuevos_creados' => $nuevosCreados, 'nuevos_pendientes' => $nuevosPendientes];
 }
 
 function setupDB($db) {
@@ -145,6 +376,35 @@ function setupDB($db) {
         pedido_id INT NOT NULL,
         estado VARCHAR(50) NOT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+    // ── Sync con Manager2Max ─────────────────────────────────────────────
+    $db->query("INSERT IGNORE INTO config (clave, valor) VALUES ('manager_sync_mode', 'manual')");
+
+    $db->query("CREATE TABLE IF NOT EXISTS manager_sync_pendientes (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        codigo VARCHAR(50) NOT NULL,
+        descripcion VARCHAR(255),
+        categoria VARCHAR(100),
+        precio_mayorista DECIMAL(10,2),
+        pvp DECIMAL(10,2),
+        estado VARCHAR(20),
+        codigo_barras VARCHAR(50),
+        marca_manager VARCHAR(100),
+        rubro_manager VARCHAR(100),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+    $db->query("CREATE TABLE IF NOT EXISTS manager_sync_log (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        run_id VARCHAR(50) NOT NULL,
+        marca VARCHAR(50) NOT NULL,
+        ok TINYINT NOT NULL,
+        mensaje VARCHAR(255),
+        actualizados INT DEFAULT 0,
+        nuevos INT DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_run_id (run_id)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 }
 
@@ -426,8 +686,9 @@ switch ($action) {
         break;
 
     case 'import_last':
-        // Devuelve metadatos de la importación más reciente (para mostrar el botón Deshacer al cargar la página)
-        $r = $db->query("SELECT import_id, created_at, COUNT(*) as n FROM import_snapshots GROUP BY import_id, created_at ORDER BY created_at DESC LIMIT 1");
+        // Devuelve metadatos de la importación manual más reciente (para mostrar el botón Deshacer al cargar la página)
+        // Excluye corridas de sync con Manager (import_id con prefijo sync_) — esas no se deshacen desde este banner
+        $r = $db->query("SELECT import_id, created_at, COUNT(*) as n FROM import_snapshots WHERE import_id NOT LIKE 'sync\\_%' GROUP BY import_id, created_at ORDER BY created_at DESC LIMIT 1");
         $row = $r ? $r->fetch_assoc() : null;
         echo json_encode($row ? ['ok' => true, 'import_id' => $row['import_id'], 'created_at' => $row['created_at'], 'n' => intval($row['n'])] : ['ok' => true, 'import_id' => null]);
         break;
@@ -649,6 +910,146 @@ switch ($action) {
         $resultado['respuesta_cruda'] = $respuesta !== false ? $respuesta : null;
         $resultado['ok'] = !empty($respuesta);
         echo json_encode($resultado);
+        break;
+
+    // ── SYNC CON MANAGER2MAX ────────────────────────────────────────────────
+    case 'manager_sync_preview':
+        $data = json_decode(file_get_contents('php://input'), true);
+        checkAuth($data);
+        try {
+            $token = manager_login();
+            $diff = manager_sync_diff($db, $token);
+            echo json_encode(['ok' => true] + $diff);
+        } catch (Exception $e) {
+            http_response_code(500);
+            echo json_encode(['error' => $e->getMessage()]);
+        }
+        break;
+
+    case 'manager_sync_apply':
+        $data = json_decode(file_get_contents('php://input'), true);
+        checkAuth($data);
+
+        $lockRow = $db->query("SELECT GET_LOCK('manager_sync_lock', 0) as l")->fetch_assoc();
+        if (!$lockRow || $lockRow['l'] != 1) {
+            http_response_code(409);
+            die(json_encode(['error' => 'Ya hay una sincronización en curso, esperá a que termine']));
+        }
+        try {
+            $modoRow = $db->query("SELECT valor FROM config WHERE clave='manager_sync_mode'")->fetch_assoc();
+            $modo = $modoRow ? $modoRow['valor'] : 'manual';
+            $token = manager_login();
+            $diff = manager_sync_diff($db, $token);
+            $runId = 'sync_' . date('Ymd_His') . '_' . substr(uniqid(), -4);
+            $resumen = manager_sync_aplicar($db, $diff, $modo, $runId);
+            echo json_encode(['ok' => true, 'modo' => $modo, 'run_id' => $runId, 'por_marca' => $diff['por_marca']] + $resumen);
+        } catch (Exception $e) {
+            http_response_code(500);
+            echo json_encode(['error' => $e->getMessage()]);
+        } finally {
+            $db->query("SELECT RELEASE_LOCK('manager_sync_lock')");
+        }
+        break;
+
+    case 'manager_sync_cron':
+        // Sin sesión — autenticado por token, para poder dispararse desde un Cron Job de Ferozo
+        $token_recibido = $_GET['token'] ?? '';
+        if (!hash_equals(MANAGER_SYNC_TOKEN, $token_recibido)) {
+            http_response_code(401);
+            die(json_encode(['error' => 'Token inválido']));
+        }
+
+        $modoRow = $db->query("SELECT valor FROM config WHERE clave='manager_sync_mode'")->fetch_assoc();
+        $modo = $modoRow ? $modoRow['valor'] : 'manual';
+        if ($modo === 'manual') {
+            echo json_encode(['ok' => true, 'modo' => 'manual', 'accion' => 'ninguna — modo manual, el cron no aplica cambios']);
+            break;
+        }
+
+        $lockRow = $db->query("SELECT GET_LOCK('manager_sync_lock', 0) as l")->fetch_assoc();
+        if (!$lockRow || $lockRow['l'] != 1) {
+            http_response_code(409);
+            die(json_encode(['error' => 'Ya hay una sincronización en curso']));
+        }
+        try {
+            $token = manager_login();
+            $diff = manager_sync_diff($db, $token);
+            $runId = 'sync_' . date('Ymd_His') . '_' . substr(uniqid(), -4);
+            $resumen = manager_sync_aplicar($db, $diff, $modo, $runId);
+            echo json_encode(['ok' => true, 'modo' => $modo, 'run_id' => $runId, 'por_marca' => $diff['por_marca']] + $resumen);
+        } catch (Exception $e) {
+            http_response_code(500);
+            echo json_encode(['error' => $e->getMessage()]);
+        } finally {
+            $db->query("SELECT RELEASE_LOCK('manager_sync_lock')");
+        }
+        break;
+
+    case 'manager_sync_pendientes_list':
+        $r = $db->query("SELECT * FROM manager_sync_pendientes ORDER BY created_at DESC");
+        echo json_encode($r->fetch_all(MYSQLI_ASSOC));
+        break;
+
+    case 'manager_sync_pendientes_aprobar':
+        $data = json_decode(file_get_contents('php://input'), true);
+        checkAuth($data);
+        $ids = array_map('intval', $data['ids'] ?? []);
+        if (!$ids) { http_response_code(400); die(json_encode(['error' => 'ids requerido'])); }
+        $runId = 'sync_' . date('Ymd_His') . '_' . substr(uniqid(), -4);
+        $creados = 0; $errors = [];
+        foreach ($ids as $id) {
+            $stmt = $db->prepare("SELECT * FROM manager_sync_pendientes WHERE id=?");
+            $stmt->bind_param('i', $id);
+            $stmt->execute();
+            $p = $stmt->get_result()->fetch_assoc();
+            if (!$p) continue;
+
+            $catStmt = $db->prepare("INSERT IGNORE INTO categorias (nombre) VALUES (?)");
+            $catStmt->bind_param('s', $p['categoria']);
+            $catStmt->execute();
+
+            $snap = $db->prepare("INSERT INTO import_snapshots (import_id, codigo, accion, datos_anteriores) VALUES (?,?,'inserted',NULL)");
+            $snap->bind_param('ss', $runId, $p['codigo']);
+            $snap->execute();
+
+            $o = 0; $multiplo = 1;
+            $ins = $db->prepare("INSERT INTO productos (codigo,descripcion,categoria,precio_mayorista,pvp,estado,orden,multiplo,codigo_barras) VALUES (?,?,?,?,?,?,?,?,?)");
+            $ins->bind_param('sssddsiis', $p['codigo'], $p['descripcion'], $p['categoria'], $p['precio_mayorista'], $p['pvp'], $p['estado'], $o, $multiplo, $p['codigo_barras']);
+            if ($ins->execute()) {
+                $creados++;
+                $del = $db->prepare("DELETE FROM manager_sync_pendientes WHERE id=?");
+                $del->bind_param('i', $id);
+                $del->execute();
+            } else {
+                $errors[] = ['codigo' => $p['codigo'], 'motivo' => $db->error];
+            }
+        }
+        echo json_encode(['ok' => true, 'creados' => $creados, 'errors' => $errors]);
+        break;
+
+    case 'manager_sync_pendientes_rechazar':
+        $data = json_decode(file_get_contents('php://input'), true);
+        checkAuth($data);
+        $ids = array_map('intval', $data['ids'] ?? []);
+        if (!$ids) { http_response_code(400); die(json_encode(['error' => 'ids requerido'])); }
+        $ph = implode(',', array_fill(0, count($ids), '?'));
+        $stmt = $db->prepare("DELETE FROM manager_sync_pendientes WHERE id IN ($ph)");
+        $stmt->bind_param(str_repeat('i', count($ids)), ...$ids);
+        $stmt->execute();
+        echo json_encode(['ok' => true, 'eliminados' => $stmt->affected_rows]);
+        break;
+
+    case 'manager_sync_log_ultimo':
+        $data = json_decode(file_get_contents('php://input'), true);
+        checkAuth($data);
+        $modoRow = $db->query("SELECT valor FROM config WHERE clave='manager_sync_mode'")->fetch_assoc();
+        $modo = $modoRow ? $modoRow['valor'] : 'manual';
+        $ultimo = $db->query("SELECT run_id FROM manager_sync_log ORDER BY created_at DESC LIMIT 1")->fetch_assoc();
+        if (!$ultimo) { echo json_encode(['ok' => true, 'modo' => $modo, 'run_id' => null, 'filas' => []]); break; }
+        $stmt = $db->prepare("SELECT marca, ok, mensaje, actualizados, nuevos, created_at FROM manager_sync_log WHERE run_id=?");
+        $stmt->bind_param('s', $ultimo['run_id']);
+        $stmt->execute();
+        echo json_encode(['ok' => true, 'modo' => $modo, 'run_id' => $ultimo['run_id'], 'filas' => $stmt->get_result()->fetch_all(MYSQLI_ASSOC)]);
         break;
 
     case 'config_set':
