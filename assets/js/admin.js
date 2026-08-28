@@ -383,7 +383,7 @@ function renderColoresTable(filter) {
             '<button class="btn btn-danger" onclick="eliminarColor(' +
             c.id +
             ",'" +
-            c.nombre +
+            esc(c.nombre).replace(/'/g, "") +
             "')\">🗑</button></div></td>";
         html += "</tr>";
     });
@@ -510,7 +510,7 @@ async function eliminarColor(id, nombre) {
     if (json.ok) {
         toast("Color eliminado");
         await loadColores();
-    }
+    } else toast("Error: " + (json.error || "desconocido"), "#c62828");
 }
 
 // ── MODO EDICIÓN ──────────────────────────────────────────────────────────────
@@ -639,7 +639,7 @@ function renderCatTable() {
             '<button class="btn btn-danger" onclick="eliminarCategoria(' +
             c.id +
             ",'" +
-            c.nombre +
+            esc(c.nombre).replace(/'/g, "") +
             "'," +
             count +
             ')">🗑</button></div></td></tr>';
@@ -788,7 +788,7 @@ async function eliminarCategoria(id, nombre, count) {
         toast("Categoría eliminada");
         await loadCats();
         renderCatTable();
-    }
+    } else toast("Error: " + (json.error || "desconocido"), "#c62828");
 }
 
 // ── PRODUCTOS ─────────────────────────────────────────────────────────────────
@@ -1042,7 +1042,7 @@ function renderTableFromList(list) {
                     '<button class="btn btn-danger" onclick="deleteProduct(' +
                     p.id +
                     ",'" +
-                    p.descripcion.replace(/'/g, "") +
+                    esc(p.descripcion).replace(/'/g, "") +
                     "')\">🗑</button></div></td>";
             }
         }
@@ -1457,7 +1457,7 @@ async function deleteProduct(id, name) {
     if (json.ok) {
         toast("Producto eliminado");
         await loadProducts();
-    }
+    } else toast("Error: " + (json.error || "desconocido"), "#c62828");
 }
 
 async function importarData() {
@@ -1506,7 +1506,7 @@ function renderTransTable() {
             '<button class="btn btn-danger" onclick="eliminarTransporte(' +
             t.id +
             ",'" +
-            t.nombre +
+            esc(t.nombre).replace(/'/g, "") +
             "')\">🗑</button></div></td></tr>";
     });
     el.innerHTML =
@@ -1578,7 +1578,7 @@ async function eliminarTransporte(id, nombre) {
     if (json.ok) {
         toast("Transporte eliminado");
         await loadTransportes();
-    }
+    } else toast("Error: " + (json.error || "desconocido"), "#c62828");
 }
 
 // ── PEDIDOS ───────────────────────────────────────────────────────────────────
@@ -2105,7 +2105,7 @@ function renderClientesTable() {
                     '<button class="btn btn-danger" onclick="eliminarCliente(' +
                     c.id +
                     ",'" +
-                    c.nombre.replace(/'/g, "") +
+                    esc(c.nombre).replace(/'/g, "") +
                     "')\">🗑</button>";
             html += "</div></td>";
         }
