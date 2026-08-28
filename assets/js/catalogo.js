@@ -922,7 +922,7 @@ function updateCart() {
             fmt(sub) +
             '</span><button class="rm" onclick="rmCart(\'' +
             code +
-            "')\">🗑</button></div>";
+            "')\"><img src=\"https://cdn.jsdelivr.net/npm/lucide-static@0.462.0/icons/trash-2.svg\" alt=\"\" style=\"width:14px;height:14px;display:block;filter:opacity(0.4)\"></button></div>";
         html += "</div></div>";
     });
     el.innerHTML = html;
@@ -1019,7 +1019,7 @@ async function buscarCliente() {
             mostrarFormCliente(null);
             toastCarrito(
                 "📝 Primera vez por acá. Completá tus datos para confirmar el pedido.",
-                "#003087",
+                "#262c63",
             );
         }
     } catch (e) {

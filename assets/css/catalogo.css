@@ -1,12 +1,18 @@
 :root {
-    --blue: #003087;
-    --blue2: #0055b3;
-    --pale: #e8f0fb;
+    --blue: #262c63;
+    --blue2: #3a4180;
+    --pale: #f4f2ee;
+    --pale2: #f8f7f4;
+    --yellow: #ffc61c;
     --red: #c62828;
     --green: #2e7d32;
-    --bg: #f0f4f8;
+    --bg: #f4f2ee;
     --border: #e0e0e0;
-    --muted: #666
+    --muted: #7a7d8c;
+    --badge-disp-bg: #e6f4ea;
+    --badge-agot-bg: #fbe4e4;
+    --font-heading: 'Sora', sans-serif;
+    --font-body: 'Work Sans', sans-serif
 }
 
 * {
@@ -21,7 +27,7 @@ html {
 }
 
 body {
-    font-family: 'Segoe UI', system-ui, sans-serif;
+    font-family: var(--font-body);
     background: var(--bg);
     color: #1a1a1a
 }
@@ -274,6 +280,7 @@ header {
 }
 
 .cat-title {
+    font-family: var(--font-heading);
     font-size: 16px;
     font-weight: 800;
     color: var(--blue);
@@ -358,7 +365,7 @@ header {
 }
 
 .badge {
-    background: #ffebee;
+    background: var(--badge-agot-bg);
     color: var(--red);
     font-size: 10px;
     font-weight: 800;
@@ -379,6 +386,7 @@ header {
 }
 
 .price {
+    font-family: var(--font-heading);
     font-size: 22px;
     font-weight: 800;
     color: var(--blue);
@@ -625,6 +633,7 @@ header {
 }
 
 .p-head h2 {
+    font-family: var(--font-heading);
     font-size: 17px;
     font-weight: 800
 }
@@ -766,6 +775,7 @@ header {
 }
 
 .ci-sub {
+    font-family: var(--font-heading);
     font-weight: 800;
     font-size: 14px;
     color: var(--blue);
@@ -810,6 +820,7 @@ header {
 }
 
 .total-val {
+    font-family: var(--font-heading);
     font-size: 22px;
     font-weight: 800;
     color: var(--blue);

@@ -7,6 +7,11 @@
             content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
         />
         <title>Travel Blue Argentina — Catálogo Mayorista</title>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link
+            href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Work+Sans:wght@400;500;600;700&display=swap"
+            rel="stylesheet"
+        />
         <link rel="stylesheet" href="assets/css/catalogo.css" />
         <style>
             /* ── Botón de escaneo en barra de búsqueda ── */
@@ -80,6 +85,7 @@
         </style>
     </head>
     <body>
+        <div style="height: 8px; background: #ffc61c"></div>
         <header>
             <div class="h-top">
                 <div class="brand">
@@ -93,7 +99,7 @@
                 <div class="h-right">
                     <div class="h-right-top">
                         <a class="admin-btn" href="admin/"
-                            >⚙ <span class="admin-txt">Admin</span></a
+                            ><img src="https://cdn.jsdelivr.net/npm/lucide-static@0.462.0/icons/settings.svg" alt="" style="width: 16px; height: 16px; display: inline-block; vertical-align: -3px; filter: brightness(0) invert(1)" /> <span class="admin-txt">Admin</span></a
                         >
                         <div class="view-btns">
                             <button
@@ -102,7 +108,7 @@
                                 onclick="setView('grid')"
                                 title="Vista grilla"
                             >
-                                ⊞
+                                <img src="https://cdn.jsdelivr.net/npm/lucide-static@0.462.0/icons/layout-grid.svg" alt="" style="width: 16px; height: 16px; display: block; filter: brightness(0) invert(1)" />
                             </button>
                             <button
                                 class="view-btn"
@@ -110,13 +116,13 @@
                                 onclick="setView('list')"
                                 title="Vista lista"
                             >
-                                ☰
+                                <img src="https://cdn.jsdelivr.net/npm/lucide-static@0.462.0/icons/list.svg" alt="" style="width: 16px; height: 16px; display: block; filter: brightness(0) invert(1)" />
                             </button>
                         </div>
                     </div>
                     <div class="h-right-bottom">
                         <button class="cart-btn" onclick="openCart()">
-                            🛒 Mi pedido
+                            <img src="https://cdn.jsdelivr.net/npm/lucide-static@0.462.0/icons/shopping-cart.svg" alt="" style="width: 17px; height: 17px; display: inline-block; vertical-align: -3px; filter: invert(13%) sepia(52%) saturate(1826%) hue-rotate(215deg) brightness(94%) contrast(93%)" /> Mi pedido
                             <div class="cart-n" id="cartN">0</div>
                         </button>
                     </div>
@@ -134,7 +140,7 @@
                     class="scan-btn"
                     onclick="openBarcodeScanner(function(code){document.getElementById('srch').value=code;doSearchEnter({key:'Enter'});})"
                     title="Escanear código de barras"
-                >📷</button>
+                ><img src="https://cdn.jsdelivr.net/npm/lucide-static@0.462.0/icons/camera.svg" alt="" style="width: 16px; height: 16px; display: block; filter: brightness(0) invert(1)" /></button>
             </div>
         </header>
 

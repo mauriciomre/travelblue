@@ -1,12 +1,18 @@
 :root {
-    --blue: #003087;
-    --blue2: #0055b3;
-    --pale: #e8f0fb;
+    --blue: #262c63;
+    --blue2: #3a4180;
+    --pale: #f4f2ee;
+    --pale2: #f8f7f4;
+    --yellow: #ffc61c;
     --red: #c62828;
     --green: #2e7d32;
-    --bg: #f0f4f8;
+    --bg: #f4f2ee;
     --border: #e0e0e0;
-    --muted: #666
+    --muted: #7a7d8c;
+    --badge-disp-bg: #e6f4ea;
+    --badge-agot-bg: #fbe4e4;
+    --font-heading: 'Sora', sans-serif;
+    --font-body: 'Work Sans', sans-serif
 }
 
 * {
@@ -16,7 +22,7 @@
 }
 
 body {
-    font-family: 'Segoe UI', system-ui, sans-serif;
+    font-family: var(--font-body);
     background: var(--bg);
     color: #1a1a1a
 }
