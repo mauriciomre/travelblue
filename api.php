@@ -1009,6 +1009,21 @@ switch ($action) {
             $modo = $modoRow ? $modoRow['valor'] : 'manual';
             $token = manager_login();
             $diff = manager_sync_diff($db, $token);
+
+            // codigos_incluir: si viene (desde el preview manual con checks por
+            // fila), solo se aplican esos códigos — permite destildar filas
+            // puntuales antes de confirmar. Si no viene (automático/semiautomático/
+            // cron), se aplica todo el diff como siempre.
+            if (isset($data['codigos_incluir']) && is_array($data['codigos_incluir'])) {
+                $incluir = array_flip($data['codigos_incluir']);
+                $diff['actualiza'] = array_values(array_filter($diff['actualiza'], function ($it) use ($incluir) {
+                    return isset($incluir[$it['codigo']]);
+                }));
+                $diff['nuevos'] = array_values(array_filter($diff['nuevos'], function ($it) use ($incluir) {
+                    return isset($incluir[$it['codigo']]);
+                }));
+            }
+
             $runId = 'sync_' . date('Ymd_His') . '_' . substr(uniqid(), -4);
             $resumen = manager_sync_aplicar($db, $diff, $modo, $runId, $token);
             echo json_encode(['ok' => true, 'modo' => $modo, 'run_id' => $runId, 'por_marca' => $diff['por_marca']] + $resumen);

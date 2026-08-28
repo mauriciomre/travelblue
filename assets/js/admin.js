@@ -3217,15 +3217,39 @@ async function sincronizarManagerAhora() {
 }
 
 var _syncFilter = "todos";
+var _syncSelected = {}; // codigo -> bool, solo para filas NUEVO/ACTUALIZA
 
 function renderSyncPreview(diff) {
     syncPreviewDiff = diff;
     _syncFilter = "todos";
+    _syncSelected = {};
+    diff.nuevos.concat(diff.actualiza).forEach(function (it) { _syncSelected[it.codigo] = true; });
+
     var wrap = document.getElementById("syncPreviewWrap");
     wrap.innerHTML = buildSyncPreviewHTML(diff);
-    var importable = diff.actualiza.length + diff.nuevos.length;
+    wrap.onchange = function (e) {
+        if (e.target.classList.contains("syncChk")) {
+            _syncSelected[e.target.dataset.codigo] = e.target.checked;
+            updateSyncConfirmState();
+        } else if (e.target.id === "syncSelectAll") {
+            var checked = e.target.checked;
+            wrap.querySelectorAll(".syncChk").forEach(function (cb) {
+                cb.checked = checked;
+                _syncSelected[cb.dataset.codigo] = checked;
+            });
+            updateSyncConfirmState();
+        }
+    };
+    updateSyncConfirmState();
+}
+
+function updateSyncConfirmState() {
+    var n = Object.keys(_syncSelected).filter(function (c) { return _syncSelected[c]; }).length;
     var btn = document.getElementById("btnSyncConfirm");
-    if (btn) btn.disabled = importable === 0;
+    if (btn) {
+        btn.disabled = n === 0;
+        btn.textContent = n > 0 ? "Confirmar y aplicar (" + n + ")" : "Confirmar y aplicar";
+    }
 }
 
 function buildSyncPreviewHTML(diff) {
@@ -3279,20 +3303,29 @@ function buildSyncPreviewHTML(diff) {
         { key: "estado", label: "Estado" },
     ];
 
+    var visibleAccionable = visible.filter(function (r) { return r.status !== "SIN_CAMBIOS"; });
+    var allVisibleSelected = visibleAccionable.length > 0 && visibleAccionable.every(function (r) { return _syncSelected[r.it.codigo]; });
+
     html += "<div style='overflow:auto;max-height:320px;border:1px solid #e0e0e0;border-radius:8px'>";
     html += "<table class='import-preview-table' style='min-width:100%'><thead><tr>";
+    html += "<th style='min-width:26px'>" + (visibleAccionable.length ? "<input type='checkbox' id='syncSelectAll'" + (allVisibleSelected ? " checked" : "") + ">" : "") + "</th>";
     html += "<th style='min-width:90px'>Cambio</th><th>Código</th><th>Marca</th>";
     CAMPOS.forEach(function (c) { html += "<th>" + c.label + "</th>"; });
     html += "</tr></thead><tbody>";
 
     if (!visible.length) {
-        html += "<tr><td colspan='" + (CAMPOS.length + 3) + "' style='text-align:center;padding:20px;color:#999'>Sin filas en este filtro</td></tr>";
+        html += "<tr><td colspan='" + (CAMPOS.length + 4) + "' style='text-align:center;padding:20px;color:#999'>Sin filas en este filtro</td></tr>";
     }
 
     visible.slice(0, 100).forEach(function (f) {
         var it = f.it;
         var badge = STATUS_BADGE[f.status];
         html += "<tr style='background:" + STATUS_BG[f.status] + "'>";
+        if (f.status !== "SIN_CAMBIOS") {
+            html += "<td style='padding:6px 8px'><input type='checkbox' class='syncChk' data-codigo='" + esc(it.codigo) + "'" + (_syncSelected[it.codigo] ? " checked" : "") + "></td>";
+        } else {
+            html += "<td></td>";
+        }
         html += "<td style='padding:6px 8px'><span class='imp-badge' style='background:" + badge.bg + ";color:" + badge.color + "'>" + badge.label + "</span></td>";
         html += "<td style='padding:6px 8px'>" + esc(it.codigo) + "</td>";
         html += "<td style='padding:6px 8px'>" + esc(it.marca_manager) + "</td>";
@@ -3314,7 +3347,7 @@ function buildSyncPreviewHTML(diff) {
     });
 
     if (visible.length > 100) {
-        html += "<tr><td colspan='" + (CAMPOS.length + 3) + "' style='text-align:center;padding:10px;color:#999;font-size:12px'>… y " + (visible.length - 100) + " filas más</td></tr>";
+        html += "<tr><td colspan='" + (CAMPOS.length + 4) + "' style='text-align:center;padding:10px;color:#999;font-size:12px'>… y " + (visible.length - 100) + " filas más</td></tr>";
     }
 
     html += "</tbody></table></div>";
@@ -3343,6 +3376,9 @@ function closeSyncPreviewModal() {
 }
 
 async function confirmarSyncManager() {
+    var codigosIncluir = Object.keys(_syncSelected).filter(function (c) { return _syncSelected[c]; });
+    if (!codigosIncluir.length) { toast("Seleccioná al menos un producto", "#c62828"); return; }
+
     var btn = document.getElementById("btnSyncConfirm");
     btn.disabled = true;
     btn.textContent = "Aplicando...";
@@ -3350,7 +3386,7 @@ async function confirmarSyncManager() {
         var res = await fetch(API + "?action=manager_sync_apply", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ _user: authUser, _pass: authPass }),
+            body: JSON.stringify({ _user: authUser, _pass: authPass, codigos_incluir: codigosIncluir }),
         });
         var json = await res.json();
         if (!json.ok) { toast("Error: " + json.error, "#c62828"); return; }
