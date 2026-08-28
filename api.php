@@ -168,6 +168,7 @@ function manager_sync_diff($db, $token) {
     $porMarca = [];
     $actualiza = [];
     $nuevos = [];
+    $sinCambios = [];
     foreach (MANAGER_MARCAS as $marca) {
         try {
             $items = manager_fetch_marca($token, $marca);
@@ -183,7 +184,20 @@ function manager_sync_diff($db, $token) {
                         || $existing['estado'] !== $it['estado']
                         || trim($existing['descripcion']) !== $it['descripcion']
                         || trim($existing['categoria']) !== $it['categoria'];
-                    if ($cambia) $actualiza[] = array_merge($it, ['id' => $existing['id']]);
+                    if ($cambia) {
+                        $actualiza[] = array_merge($it, [
+                            'id' => $existing['id'],
+                            '_anterior' => [
+                                'descripcion' => trim($existing['descripcion']),
+                                'categoria' => trim($existing['categoria']),
+                                'precio_mayorista' => round(floatval($existing['precio_mayorista']), 2),
+                                'pvp' => round(floatval($existing['pvp']), 2),
+                                'estado' => $existing['estado'],
+                            ],
+                        ]);
+                    } else {
+                        $sinCambios[] = array_merge($it, ['id' => $existing['id']]);
+                    }
                 } else {
                     $nuevos[] = $it;
                 }
@@ -192,7 +206,7 @@ function manager_sync_diff($db, $token) {
             $porMarca[$marca] = ['ok' => false, 'mensaje' => $e->getMessage(), 'cantidad' => 0];
         }
     }
-    return ['por_marca' => $porMarca, 'actualiza' => $actualiza, 'nuevos' => $nuevos];
+    return ['por_marca' => $porMarca, 'actualiza' => $actualiza, 'nuevos' => $nuevos, 'sin_cambios' => $sinCambios];
 }
 
 // Aplica un diff ya calculado. $modo determina qué pasa con los productos

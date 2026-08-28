@@ -3190,34 +3190,125 @@ async function sincronizarManagerAhora() {
     }
 }
 
+var _syncFilter = "todos";
+
 function renderSyncPreview(diff) {
     syncPreviewDiff = diff;
-    var stats = document.getElementById("syncPreviewStats");
+    _syncFilter = "todos";
+    var wrap = document.getElementById("syncPreviewWrap");
+    wrap.innerHTML = buildSyncPreviewHTML(diff);
+    var importable = diff.actualiza.length + diff.nuevos.length;
+    var btn = document.getElementById("btnSyncConfirm");
+    if (btn) btn.disabled = importable === 0;
+}
+
+function buildSyncPreviewHTML(diff) {
+    var counts = {
+        NUEVO: diff.nuevos.length,
+        ACTUALIZA: diff.actualiza.length,
+        SIN_CAMBIOS: diff.sin_cambios.length,
+    };
+    var all = diff.nuevos
+        .map(function (it) { return { it: it, status: "NUEVO" }; })
+        .concat(diff.actualiza.map(function (it) { return { it: it, status: "ACTUALIZA" }; }))
+        .concat(diff.sin_cambios.map(function (it) { return { it: it, status: "SIN_CAMBIOS" }; }));
+    var visible = _syncFilter === "todos" ? all : all.filter(function (r) { return r.status === _syncFilter; });
+
+    var html = "";
+
+    // ── Estado por marca (si alguna falló, se ve acá arriba de todo) ──
     var partesMarca = Object.keys(diff.por_marca).map(function (m) {
         var r = diff.por_marca[m];
-        return m + ": " + (r.ok ? r.cantidad + " artículos" : "FALLÓ (" + r.mensaje + ")");
+        return r.ok ? m + ": " + r.cantidad + " artículos" : m + ": ⚠ FALLÓ (" + r.mensaje + ")";
     });
-    stats.innerHTML =
-        "<strong>" + diff.actualiza.length + "</strong> productos van a actualizar precio/estado/descripción, " +
-        "<strong>" + diff.nuevos.length + "</strong> productos nuevos se van a crear.<br>" +
-        "<span style='color:#888'>" + partesMarca.join(" · ") + "</span>";
+    html += "<div style='font-size:12px;color:#888;margin-bottom:12px'>" + partesMarca.join(" · ") + "</div>";
 
-    var tbody = document.getElementById("syncPreviewTbody");
-    var filas = diff.actualiza
-        .map(function (it) { return { it: it, cambio: "Actualiza" }; })
-        .concat(diff.nuevos.map(function (it) { return { it: it, cambio: "Nuevo" }; }));
-    tbody.innerHTML =
-        filas
-            .map(function (f) {
-                var it = f.it;
-                var color = f.cambio === "Nuevo" ? "#2e7d32" : "#1565c0";
-                return (
-                    "<tr><td>" + esc(it.codigo) + "</td><td>" + esc(it.descripcion) + "</td><td>" + esc(it.categoria) + "</td>" +
-                    "<td>$" + Math.round(it.precio_mayorista) + "</td><td>$" + Math.round(it.pvp || 0) + "</td><td>" + it.estado + "</td>" +
-                    "<td>" + esc(it.marca_manager) + "</td><td style='color:" + color + ";font-weight:700'>" + f.cambio + "</td></tr>"
-                );
-            })
-            .join("") || "<tr><td colspan='8' style='text-align:center;color:#888'>Sin cambios — el catálogo ya está al día</td></tr>";
+    // ── Stat tiles ──
+    html += "<div style='display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px'>";
+    html += importStatTile("✅ Nuevos", counts.NUEVO, "#1b5e20", "#e8f5e9");
+    html += importStatTile("🔄 Actualizan", counts.ACTUALIZA, "#0d47a1", "#e3f2fd");
+    html += importStatTile("⏭ Sin cambios", counts.SIN_CAMBIOS, "#555", "#f5f5f5");
+    html += "</div>";
+
+    // ── Filter tabs ──
+    html += "<div style='display:flex;gap:5px;margin-bottom:10px;flex-wrap:wrap'>";
+    html += syncFilterTab("todos", "Todos", all.length);
+    html += syncFilterTab("NUEVO", "Nuevos", counts.NUEVO);
+    html += syncFilterTab("ACTUALIZA", "Actualizan", counts.ACTUALIZA);
+    html += syncFilterTab("SIN_CAMBIOS", "Sin cambios", counts.SIN_CAMBIOS);
+    html += "</div>";
+
+    // ── Tabla con sticky header ──
+    var STATUS_BG = { NUEVO: "#e8f5e9", ACTUALIZA: "#e3f2fd", SIN_CAMBIOS: "#fafafa" };
+    var STATUS_BADGE = {
+        NUEVO: { bg: "#c8e6c9", color: "#1b5e20", label: "NUEVO" },
+        ACTUALIZA: { bg: "#bbdefb", color: "#0d47a1", label: "ACTUALIZA" },
+        SIN_CAMBIOS: { bg: "#eeeeee", color: "#757575", label: "SIN CAMBIOS" },
+    };
+    var CAMPOS = [
+        { key: "descripcion", label: "Descripción" },
+        { key: "categoria", label: "Categoría" },
+        { key: "precio_mayorista", label: "Mayorista", money: true },
+        { key: "pvp", label: "PVP", money: true },
+        { key: "estado", label: "Estado" },
+    ];
+
+    html += "<div style='overflow:auto;max-height:320px;border:1px solid #e0e0e0;border-radius:8px'>";
+    html += "<table class='import-preview-table' style='min-width:100%'><thead><tr>";
+    html += "<th style='min-width:90px'>Cambio</th><th>Código</th><th>Marca</th>";
+    CAMPOS.forEach(function (c) { html += "<th>" + c.label + "</th>"; });
+    html += "</tr></thead><tbody>";
+
+    if (!visible.length) {
+        html += "<tr><td colspan='" + (CAMPOS.length + 3) + "' style='text-align:center;padding:20px;color:#999'>Sin filas en este filtro</td></tr>";
+    }
+
+    visible.slice(0, 100).forEach(function (f) {
+        var it = f.it;
+        var badge = STATUS_BADGE[f.status];
+        html += "<tr style='background:" + STATUS_BG[f.status] + "'>";
+        html += "<td style='padding:6px 8px'><span class='imp-badge' style='background:" + badge.bg + ";color:" + badge.color + "'>" + badge.label + "</span></td>";
+        html += "<td style='padding:6px 8px'>" + esc(it.codigo) + "</td>";
+        html += "<td style='padding:6px 8px'>" + esc(it.marca_manager) + "</td>";
+        CAMPOS.forEach(function (c) {
+            var val = it[c.key];
+            var display = c.money ? "$" + Math.round(val || 0) : esc(String(val ?? ""));
+            if (f.status === "ACTUALIZA" && it._anterior) {
+                var oldVal = it._anterior[c.key];
+                var changed = c.money ? Math.round(parseFloat(oldVal) * 100) !== Math.round(parseFloat(val) * 100) : String(oldVal) !== String(val);
+                if (changed) {
+                    var oldDisplay = c.money ? "$" + Math.round(oldVal || 0) : esc(String(oldVal ?? ""));
+                    html += "<td style='padding:6px 8px;font-size:12px'><span style='text-decoration:line-through;color:#aaa'>" + oldDisplay + "</span> → <strong>" + display + "</strong></td>";
+                    return;
+                }
+            }
+            html += "<td style='padding:6px 8px'>" + display + "</td>";
+        });
+        html += "</tr>";
+    });
+
+    if (visible.length > 100) {
+        html += "<tr><td colspan='" + (CAMPOS.length + 3) + "' style='text-align:center;padding:10px;color:#999;font-size:12px'>… y " + (visible.length - 100) + " filas más</td></tr>";
+    }
+
+    html += "</tbody></table></div>";
+
+    if (counts.SIN_CAMBIOS > 0) {
+        html += "<p style='font-size:12px;color:#888;margin-top:8px'>⏭ Las " + counts.SIN_CAMBIOS + " fila(s) sin cambios no se van a tocar.</p>";
+    }
+
+    return html;
+}
+
+function syncFilterTab(value, label, count) {
+    var isActive = _syncFilter === value;
+    var cls = "imp-tab" + (isActive ? " active" : "");
+    return "<button class='" + cls + "' onclick='setSyncFilter(\"" + value + "\")'>" + label + " (" + count + ")</button>";
+}
+
+function setSyncFilter(value) {
+    _syncFilter = value;
+    if (syncPreviewDiff) document.getElementById("syncPreviewWrap").innerHTML = buildSyncPreviewHTML(syncPreviewDiff);
 }
 
 function closeSyncPreviewModal() {
