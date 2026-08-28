@@ -51,7 +51,7 @@ function manager_login() {
     return $data['Token'];
 }
 
-function manager_call($token, $endpoint, $body) {
+function manager_call_raw($token, $endpoint, $body) {
     $ch = curl_init(MANAGER_API_URL . $endpoint);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_POST, true);
@@ -65,7 +65,13 @@ function manager_call($token, $endpoint, $body) {
     if ($err) throw new Exception("Manager $endpoint falló: $err");
     $data = json_decode($resp, true);
     if (($data['ErrCode'] ?? null) !== 200) throw new Exception("Manager $endpoint error: " . ($data['ErrMessage'] ?? 'desconocido'));
-    return $data['Data']['DT']['data'] ?? [];
+    return $data['Data'] ?? [];
+}
+
+// GetDTxxx (listados con paginación) — la mayoría de los endpoints de Manager.
+function manager_call($token, $endpoint, $body) {
+    $data = manager_call_raw($token, $endpoint, $body);
+    return $data['DT']['data'] ?? [];
 }
 
 function manager_filtro_texto($valor) {
@@ -109,6 +115,54 @@ function manager_limpiar_descripcion($desc, $marca) {
 // Trae y transforma los artículos de una marca: descripción, categoría, estado
 // (desde Sube) + precio mayorista/PVP de las 2 listas relevantes. Devuelve
 // codigo => datos ya listos para comparar/aplicar contra la tabla productos.
+// Trae la foto principal (Orden=1) de un artículo desde Manager, la procesa
+// con el mismo pipeline que upload.php (800x800, fondo blanco, JPEG 85%) y la
+// guarda en imgs/<codigo>.jpeg. Devuelve la ruta relativa o null si no hay
+// foto / falla — nunca debe frenar la creación del producto por esto.
+// Solo se usa para productos NUEVOS — nunca pisa la foto de uno ya existente.
+function manager_fetch_foto($token, $codigo) {
+    try {
+        $imgs = manager_call($token, '/Api/ECommerce/GetDTArticulosImagenes', [
+            'DTRequest' => ['draw' => 1, 'order' => [], 'start' => 0, 'length' => 50],
+            'DefinicionTablaFiltros' => false,
+            'CalculaTotales' => false,
+            'ListFilters' => manager_dict_filtros(['CodigoArticulo' => manager_filtro_texto($codigo)]),
+        ]);
+        $principal = null;
+        foreach ($imgs as $img) {
+            if (intval($img['Orden'] ?? 0) === 1) { $principal = $img; break; }
+        }
+        if (!$principal || empty($principal['PasoImagen'])) return null;
+
+        $imgData = manager_call_raw($token, '/Api/Image/GetImage', ['ImageFullPath' => $principal['PasoImagen']]);
+        if (empty($imgData['ImageContent'])) return null;
+
+        $binario = base64_decode($imgData['ImageContent']);
+        $src = @imagecreatefromstring($binario);
+        if (!$src) return null;
+
+        $ow = imagesx($src); $oh = imagesy($src);
+        $ratio = min(800 / $ow, 800 / $oh);
+        $nw = intval($ow * $ratio); $nh = intval($oh * $ratio);
+        $ox = intval((800 - $nw) / 2); $oy = intval((800 - $nh) / 2);
+        $dst = imagecreatetruecolor(800, 800);
+        $white = imagecolorallocate($dst, 255, 255, 255);
+        imagefill($dst, 0, 0, $white);
+        imagecopyresampled($dst, $src, $ox, $oy, 0, 0, $nw, $nh, $ow, $oh);
+
+        $filename = preg_replace('/[^a-zA-Z0-9_\-\.]/', '_', $codigo) . '.jpeg';
+        $dir = __DIR__ . '/imgs/';
+        if (!is_dir($dir)) mkdir($dir, 0755, true);
+        $guardado = imagejpeg($dst, $dir . $filename, 85);
+        imagedestroy($src);
+        imagedestroy($dst);
+
+        return $guardado ? 'imgs/' . $filename : null;
+    } catch (Exception $e) {
+        return null;
+    }
+}
+
 function manager_fetch_marca($token, $marca) {
     $articulos = manager_call($token, '/Api/articulo/GetDTArticulos', [
         'DTRequest' => ['draw' => 1, 'order' => [], 'start' => 0, 'length' => 5000],
@@ -212,7 +266,7 @@ function manager_sync_diff($db, $token) {
 // Aplica un diff ya calculado. $modo determina qué pasa con los productos
 // nuevos: 'automatico' los crea directo, 'semiautomatico'/'manual' los deja
 // en manager_sync_pendientes para aprobación.
-function manager_sync_aplicar($db, $diff, $modo, $runId) {
+function manager_sync_aplicar($db, $diff, $modo, $runId, $token) {
     $actualizados = 0; $nuevosCreados = 0; $nuevosPendientes = 0;
 
     foreach ($diff['actualiza'] as $it) {
@@ -244,9 +298,10 @@ function manager_sync_aplicar($db, $diff, $modo, $runId) {
             $snap->bind_param('ss', $runId, $it['codigo']);
             $snap->execute();
 
+            $foto = manager_fetch_foto($token, $it['codigo']);
             $o = 0; $multiplo = 1;
-            $stmt = $db->prepare("INSERT INTO productos (codigo,descripcion,categoria,precio_mayorista,pvp,estado,orden,multiplo,codigo_barras) VALUES (?,?,?,?,?,?,?,?,?)");
-            $stmt->bind_param('sssddsiis', $it['codigo'], $it['descripcion'], $it['categoria'], $it['precio_mayorista'], $it['pvp'], $it['estado'], $o, $multiplo, $it['codigo_barras']);
+            $stmt = $db->prepare("INSERT INTO productos (codigo,descripcion,categoria,precio_mayorista,pvp,estado,orden,multiplo,codigo_barras,foto) VALUES (?,?,?,?,?,?,?,?,?,?)");
+            $stmt->bind_param('sssddsiiss', $it['codigo'], $it['descripcion'], $it['categoria'], $it['precio_mayorista'], $it['pvp'], $it['estado'], $o, $multiplo, $it['codigo_barras'], $foto);
             if ($stmt->execute()) $nuevosCreados++;
         } else {
             $stmt = $db->prepare("INSERT INTO manager_sync_pendientes (codigo,descripcion,categoria,precio_mayorista,pvp,estado,codigo_barras,marca_manager,rubro_manager) VALUES (?,?,?,?,?,?,?,?,?)");
@@ -955,7 +1010,7 @@ switch ($action) {
             $token = manager_login();
             $diff = manager_sync_diff($db, $token);
             $runId = 'sync_' . date('Ymd_His') . '_' . substr(uniqid(), -4);
-            $resumen = manager_sync_aplicar($db, $diff, $modo, $runId);
+            $resumen = manager_sync_aplicar($db, $diff, $modo, $runId, $token);
             echo json_encode(['ok' => true, 'modo' => $modo, 'run_id' => $runId, 'por_marca' => $diff['por_marca']] + $resumen);
         } catch (Exception $e) {
             http_response_code(500);
@@ -989,7 +1044,7 @@ switch ($action) {
             $token = manager_login();
             $diff = manager_sync_diff($db, $token);
             $runId = 'sync_' . date('Ymd_His') . '_' . substr(uniqid(), -4);
-            $resumen = manager_sync_aplicar($db, $diff, $modo, $runId);
+            $resumen = manager_sync_aplicar($db, $diff, $modo, $runId, $token);
             echo json_encode(['ok' => true, 'modo' => $modo, 'run_id' => $runId, 'por_marca' => $diff['por_marca']] + $resumen);
         } catch (Exception $e) {
             http_response_code(500);
@@ -1011,6 +1066,8 @@ switch ($action) {
         if (!$ids) { http_response_code(400); die(json_encode(['error' => 'ids requerido'])); }
         $runId = 'sync_' . date('Ymd_His') . '_' . substr(uniqid(), -4);
         $creados = 0; $errors = [];
+        $tokenFoto = null;
+        try { $tokenFoto = manager_login(); } catch (Exception $e) { /* sin foto si falla el login, no bloquea la aprobación */ }
         foreach ($ids as $id) {
             $stmt = $db->prepare("SELECT * FROM manager_sync_pendientes WHERE id=?");
             $stmt->bind_param('i', $id);
@@ -1026,9 +1083,10 @@ switch ($action) {
             $snap->bind_param('ss', $runId, $p['codigo']);
             $snap->execute();
 
+            $foto = $tokenFoto ? manager_fetch_foto($tokenFoto, $p['codigo']) : null;
             $o = 0; $multiplo = 1;
-            $ins = $db->prepare("INSERT INTO productos (codigo,descripcion,categoria,precio_mayorista,pvp,estado,orden,multiplo,codigo_barras) VALUES (?,?,?,?,?,?,?,?,?)");
-            $ins->bind_param('sssddsiis', $p['codigo'], $p['descripcion'], $p['categoria'], $p['precio_mayorista'], $p['pvp'], $p['estado'], $o, $multiplo, $p['codigo_barras']);
+            $ins = $db->prepare("INSERT INTO productos (codigo,descripcion,categoria,precio_mayorista,pvp,estado,orden,multiplo,codigo_barras,foto) VALUES (?,?,?,?,?,?,?,?,?,?)");
+            $ins->bind_param('sssddsiiss', $p['codigo'], $p['descripcion'], $p['categoria'], $p['precio_mayorista'], $p['pvp'], $p['estado'], $o, $multiplo, $p['codigo_barras'], $foto);
             if ($ins->execute()) {
                 $creados++;
                 $del = $db->prepare("DELETE FROM manager_sync_pendientes WHERE id=?");

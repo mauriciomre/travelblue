@@ -3111,6 +3111,30 @@ async function checkLastImport() {
 // ── Sync con Manager2Max ─────────────────────────────────────────────────────
 var syncPreviewDiff = null;
 
+async function undoLastSync(runId) {
+    if (!confirm("¿Seguro que querés revertir la última sincronización con Manager? Los productos que se actualizaron vuelven a su valor anterior, y los que se crearon en esa corrida se eliminan.")) return;
+    var line = document.getElementById("syncStatusLine");
+    if (line) line.innerHTML = "⏳ Revirtiendo...";
+    try {
+        var res = await fetch(API + "?action=import_rollback", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ _user: authUser, _pass: authPass, import_id: runId }),
+        });
+        var json = await res.json();
+        if (json.ok) {
+            toast("↩ Sincronización revertida — " + json.restored + " producto(s) restaurado(s)");
+            await loadProducts();
+        } else {
+            toast("Error al revertir: " + (json.error || "desconocido"), "#c62828");
+        }
+    } catch (err) {
+        toast("Error de red: " + err.message, "#c62828");
+    } finally {
+        loadSyncStatus();
+    }
+}
+
 async function loadSyncStatus() {
     try {
         var res = await fetch(API + "?action=manager_sync_log_ultimo", {
@@ -3135,7 +3159,9 @@ async function loadSyncStatus() {
         });
         var d = new Date(json.filas[0].created_at.replace(" ", "T"));
         var fechaStr = d.toLocaleDateString("es-AR") + " " + d.getHours().toString().padStart(2, "0") + ":" + d.getMinutes().toString().padStart(2, "0");
-        line.innerHTML = "Última sync: " + fechaStr + " — " + partes.join(", ");
+        line.innerHTML =
+            "Última sync: " + fechaStr + " — " + partes.join(", ") +
+            " <button onclick=\"undoLastSync('" + json.run_id + "')\" style=\"margin-left:6px;font-size:11px;padding:2px 8px;border-radius:12px;border:1px solid #ccc;background:#fff;cursor:pointer;color:#c62828\">↩ Deshacer</button>";
     } catch (e) {}
 }
 
