@@ -259,6 +259,22 @@ header {
     text-align: center
 }
 
+.si-icon img {
+    width: 15px;
+    height: 15px;
+    display: inline-block;
+    vertical-align: -3px;
+    filter: opacity(0.4)
+}
+
+.sidebar-item.on .si-icon img {
+    filter: invert(13%) sepia(52%) saturate(1826%) hue-rotate(215deg) brightness(94%) contrast(93%)
+}
+
+.collapse-icon img {
+    filter: opacity(0.5)
+}
+
 .si-label {
     transition: opacity .2s
 }
@@ -414,6 +430,14 @@ header {
     color: #fff
 }
 
+.btn-toggle .edit-mode-icon {
+    filter: invert(13%) sepia(52%) saturate(1826%) hue-rotate(215deg) brightness(94%) contrast(93%)
+}
+
+.btn-toggle.on .edit-mode-icon {
+    filter: brightness(0) invert(1)
+}
+
 /* TABLE */
 table {
     width: 100%;
@@ -471,7 +495,7 @@ tr:hover td {
 }
 
 .badge-disp {
-    background: #e8f5e9;
+    background: var(--badge-disp-bg);
     color: var(--green);
     padding: 3px 10px;
     border-radius: 10px;
@@ -480,12 +504,18 @@ tr:hover td {
 }
 
 .badge-agot {
-    background: #ffebee;
+    background: var(--badge-agot-bg);
     color: var(--red);
     padding: 3px 10px;
     border-radius: 10px;
     font-size: 11px;
     font-weight: 700
+}
+
+.badge-disp, .badge-agot {
+    border: none;
+    cursor: pointer;
+    font-family: inherit
 }
 
 .actions {
@@ -578,6 +608,7 @@ td.editing {
 }
 
 .modal h2 {
+    font-family: var(--font-heading);
     font-size: 17px;
     font-weight: 800;
     margin-bottom: 20px;
@@ -736,6 +767,7 @@ td.editing {
 }
 
 .login-box h2 {
+    font-family: var(--font-heading);
     color: var(--blue);
     font-size: 20px;
     font-weight: 800;
@@ -824,6 +856,7 @@ td.editing {
 }
 
 .stat-n {
+    font-family: var(--font-heading);
     font-size: 28px;
     font-weight: 800;
     color: var(--blue)
@@ -904,14 +937,14 @@ td.editing {
 
 /* EDIT MODE BAR */
 .edit-mode-bar {
-    background: #fff3cd;
-    border: 1px solid #ffc107;
+    background: #fff6df;
+    border: 1px solid #ffc61c;
     border-radius: 8px;
     padding: 10px 16px;
     margin-bottom: 12px;
     font-size: 13px;
     font-weight: 600;
-    color: #856404;
+    color: #7a5c00;
     display: none
 }
 
@@ -986,6 +1019,7 @@ td.editing {
 }
 
 .config-box h3 {
+    font-family: var(--font-heading);
     font-size: 15px;
     font-weight: 800;
     color: var(--blue);

@@ -179,12 +179,12 @@ function toggleSidebar() {
 
 // ── FAVORITOS ─────────────────────────────────────────────────────────────────
 var ALL_SECTIONS = [
-    { key: "productos", label: "Productos", icon: "📋" },
-    { key: "categorias", label: "Categorías", icon: "🗂" },
-    { key: "colores", label: "Colores", icon: "🎨" },
-    { key: "pedidos", label: "Pedidos", icon: "🛒" },
-    { key: "clientes", label: "Clientes", icon: "👤" },
-    { key: "configuracion", label: "Configuración", icon: "⚙️" },
+    { key: "productos", label: "Productos", icon: "📋", iconName: "list-checks" },
+    { key: "categorias", label: "Categorías", icon: "🗂", iconName: "tags" },
+    { key: "colores", label: "Colores", icon: "🎨", iconName: "palette" },
+    { key: "pedidos", label: "Pedidos", icon: "🛒", iconName: "shopping-cart" },
+    { key: "clientes", label: "Clientes", icon: "👤", iconName: "users" },
+    { key: "configuracion", label: "Configuración", icon: "⚙️", iconName: "settings" },
 ];
 var favSections = [];
 
@@ -214,9 +214,9 @@ function renderFavbar() {
                 key +
                 '" onclick="showSection(\'' +
                 key +
-                "',this)\">" +
-                s.icon +
-                " " +
+                "',this)\"><img src=\"https://cdn.jsdelivr.net/npm/lucide-static@0.462.0/icons/" +
+                s.iconName +
+                '.svg" alt="" style="width:13px;height:13px;display:inline-block;vertical-align:-2px;filter:brightness(0) invert(1)"> ' +
                 s.label +
                 "</button>"
             );
@@ -384,7 +384,7 @@ function renderColoresTable(filter) {
             c.id +
             ",'" +
             esc(c.nombre).replace(/'/g, "") +
-            "')\">🗑</button></div></td>";
+            "')\"><img src=\"https://cdn.jsdelivr.net/npm/lucide-static@0.462.0/icons/trash-2.svg\" alt=\"\" style=\"width:13px;height:13px;display:block;filter:brightness(0) invert(1)\"></button></div></td>";
         html += "</tr>";
     });
     el.innerHTML =
@@ -642,7 +642,7 @@ function renderCatTable() {
             esc(c.nombre).replace(/'/g, "") +
             "'," +
             count +
-            ')">🗑</button></div></td></tr>';
+            ')"><img src="https://cdn.jsdelivr.net/npm/lucide-static@0.462.0/icons/trash-2.svg" alt="" style="width:13px;height:13px;display:block;filter:brightness(0) invert(1)"></button></div></td></tr>';
     });
     document.getElementById("catTbody").innerHTML =
         html ||
@@ -1001,11 +1001,15 @@ function renderTableFromList(list) {
             if (col("pvp")) html += "<td>" + fmt(p.pvp) + "</td>";
             if (col("estado"))
                 html +=
-                    '<td><span class="badge-' +
+                    '<td><button type="button" class="badge-' +
                     (p.estado === "DISPONIBLE" ? "disp" : "agot") +
+                    '" onclick="toggleEstadoBadge(' +
+                    p.id +
+                    ')" title="Cambiar a ' +
+                    (p.estado === "DISPONIBLE" ? "AGOTADO" : "DISPONIBLE") +
                     '">' +
                     p.estado +
-                    "</span></td>";
+                    "</button></td>";
             if (col("multiplo"))
                 html +=
                     '<td style="color:var(--muted);font-size:12px">×' +
@@ -1043,7 +1047,7 @@ function renderTableFromList(list) {
                     p.id +
                     ",'" +
                     esc(p.descripcion).replace(/'/g, "") +
-                    "')\">🗑</button></div></td>";
+                    "')\"><img src=\"https://cdn.jsdelivr.net/npm/lucide-static@0.462.0/icons/trash-2.svg\" alt=\"\" style=\"width:13px;height:13px;display:block;filter:brightness(0) invert(1)\"></button></div></td>";
             }
         }
         html += "</tr>";
@@ -1122,6 +1126,28 @@ async function saveInline(id) {
     var json = await res.json();
     if (json.ok) {
         toast("Guardado");
+        await loadProducts();
+    } else toast("Error: " + (json.error || "desconocido"), "#c62828");
+}
+
+async function toggleEstadoBadge(id) {
+    var p = allProducts.find((p) => p.id === id);
+    if (!p) return;
+    var nuevoEstado = p.estado === "DISPONIBLE" ? "AGOTADO" : "DISPONIBLE";
+    var res = await fetch(API + "?action=editar&id=" + id, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            _user: authUser, _pass: authPass,
+            codigo: p.codigo, descripcion: p.descripcion, categoria: p.categoria,
+            precio_mayorista: p.precio_mayorista, pvp: p.pvp, foto: p.foto,
+            estado: nuevoEstado, orden: p.orden, multiplo: p.multiplo,
+            codigo_barras: p.codigo_barras,
+        }),
+    });
+    var json = await res.json();
+    if (json.ok) {
+        toast("Estado actualizado");
         await loadProducts();
     } else toast("Error: " + (json.error || "desconocido"), "#c62828");
 }
@@ -1507,7 +1533,7 @@ function renderTransTable() {
             t.id +
             ",'" +
             esc(t.nombre).replace(/'/g, "") +
-            "')\">🗑</button></div></td></tr>";
+            "')\"><img src=\"https://cdn.jsdelivr.net/npm/lucide-static@0.462.0/icons/trash-2.svg\" alt=\"\" style=\"width:13px;height:13px;display:block;filter:brightness(0) invert(1)\"></button></div></td></tr>";
     });
     el.innerHTML =
         html ||
@@ -1676,7 +1702,7 @@ function renderPedidosTable() {
             html +=
                 '<button class="btn btn-danger" onclick="eliminarPedido(' +
                 p.id +
-                ')">🗑</button>';
+                ')"><img src="https://cdn.jsdelivr.net/npm/lucide-static@0.462.0/icons/trash-2.svg" alt="" style="width:13px;height:13px;display:block;filter:brightness(0) invert(1)"></button>';
         html += "</div></td>";
         html += "</tr>";
     });
@@ -2106,7 +2132,7 @@ function renderClientesTable() {
                     c.id +
                     ",'" +
                     esc(c.nombre).replace(/'/g, "") +
-                    "')\">🗑</button>";
+                    "')\"><img src=\"https://cdn.jsdelivr.net/npm/lucide-static@0.462.0/icons/trash-2.svg\" alt=\"\" style=\"width:13px;height:13px;display:block;filter:brightness(0) invert(1)\"></button>";
             html += "</div></td>";
         }
         html += "</tr>";
@@ -2297,7 +2323,7 @@ function setImportStep(n) {
     [1, 2, 3].forEach(function(i) {
         var el = document.getElementById("importStep" + i);
         if (!el) return;
-        el.style.background = i === n ? "#263494" : "#e8eaf6";
+        el.style.background = i === n ? "#262c63" : "#e8eaf6";
         el.style.color      = i === n ? "#fff"    : "#999";
     });
 }
@@ -2924,7 +2950,7 @@ function executePrint() {
         '.cliente-grid .campo.full{grid-column:1/-1;min-height:2em;align-items:flex-start;padding-top:3px}' +
         '.cliente-grid .campo label{font-size:0.75em;font-weight:700;text-transform:uppercase;color:#000;white-space:nowrap;min-width:70px}' +
         '.cliente-grid .campo span{flex:1}' +
-        '.cat-title{font-size:1em;font-weight:900;background:#003399;color:#fff;padding:3px 8px;margin:10px 0 0}' +
+        '.cat-title{font-size:1em;font-weight:900;background:#262c63;color:#fff;padding:3px 8px;margin:10px 0 0}' +
         'table{width:100%;border-collapse:collapse;margin-bottom:0}' +
         'thead tr{background:#dde6ff}' +
         'th,td{border:1px solid #aaa;padding:3px 5px;text-align:left;font-size:1em}' +
