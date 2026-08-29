@@ -160,7 +160,13 @@ document.addEventListener("DOMContentLoaded", function () {
 });
 
 // ── SIDEBAR ───────────────────────────────────────────────────────────────────
-var sidebarCollapsed = localStorage.getItem("tb_sidebar") === "collapsed";
+// Sin preferencia guardada todavía, arranca colapsada en pantallas angostas
+// (no le come ancho a la tabla) y expandida en desktop — una vez que el
+// usuario toca el botón, su elección se guarda y se respeta en cualquier
+// tamaño de pantalla.
+var sidebarCollapsed = localStorage.getItem("tb_sidebar")
+    ? localStorage.getItem("tb_sidebar") === "collapsed"
+    : window.innerWidth <= 768;
 
 function initSidebar() {
     if (sidebarCollapsed)
@@ -519,6 +525,7 @@ function toggleEditMode() {
     sortedProducts = null;
     document.getElementById("btnEditMode").classList.toggle("on", editMode);
     document.getElementById("editModeBar").classList.toggle("on", editMode);
+    document.getElementById("mainTable").classList.toggle("edit-mode", editMode);
     document.getElementById("sortToolbar").style.display = editMode
         ? "flex"
         : "none";
@@ -856,13 +863,13 @@ function renderTableHeader() {
     var h = "<thead><tr>";
     if (col("handle")) h += "<th></th>";
     if (col("img")) h += "<th>Img</th>";
-    if (col("codigo")) h += "<th>Código</th>";
+    if (col("codigo")) h += '<th class="sticky-col">Código</th>';
     if (col("desc")) h += "<th>Descripción</th>";
-    if (col("cat")) h += "<th>Categoría</th>";
+    if (col("cat")) h += '<th class="col-hide-2">Categoría</th>';
     if (col("may")) h += "<th>Mayorista</th>";
     if (col("pvp")) h += "<th>PVP</th>";
     if (col("estado")) h += "<th>Estado</th>";
-    if (col("multiplo")) h += "<th>Múltiplo</th>";
+    if (col("multiplo")) h += '<th class="col-hide-1">Múltiplo</th>';
     if (col("barras")) h += "<th>Cód. Barras</th>";
     if (col("colores")) h += "<th>Colores</th>";
     if (col("acciones")) h += "<th>Acciones</th>";
@@ -902,7 +909,7 @@ function renderTableFromList(list) {
         if (editMode) {
             if (col("codigo"))
                 html +=
-                    '<td class="editing"><input class="inline-input" value="' +
+                    '<td class="editing sticky-col"><input class="inline-input" value="' +
                     esc(p.codigo) +
                     '" data-field="codigo" data-id="' +
                     p.id +
@@ -916,7 +923,7 @@ function renderTableFromList(list) {
                     '" style="width:180px"></td>';
             if (col("cat"))
                 html +=
-                    '<td class="editing"><select class="inline-select" data-field="categoria" data-id="' +
+                    '<td class="editing col-hide-2"><select class="inline-select" data-field="categoria" data-id="' +
                     p.id +
                     '">' +
                     allCats
@@ -957,7 +964,7 @@ function renderTableFromList(list) {
                     ">AGOTADO</option></select></td>";
             if (col("multiplo"))
                 html +=
-                    '<td class="editing"><input class="inline-input" type="number" value="' +
+                    '<td class="editing col-hide-1"><input class="inline-input" type="number" value="' +
                     multiplo +
                     '" data-field="multiplo" data-id="' +
                     p.id +
@@ -990,9 +997,9 @@ function renderTableFromList(list) {
                     p.id +
                     ')">💾</button></td>';
         } else {
-            if (col("codigo")) html += "<td><code>" + p.codigo + "</code></td>";
+            if (col("codigo")) html += '<td class="sticky-col"><code>' + p.codigo + "</code></td>";
             if (col("desc")) html += "<td>" + p.descripcion + "</td>";
-            if (col("cat")) html += "<td>" + p.categoria + "</td>";
+            if (col("cat")) html += '<td class="col-hide-2">' + p.categoria + "</td>";
             if (col("may"))
                 html +=
                     '<td style="font-weight:800;color:var(--blue)">' +
@@ -1012,7 +1019,7 @@ function renderTableFromList(list) {
                     "</button></td>";
             if (col("multiplo"))
                 html +=
-                    '<td style="color:var(--muted);font-size:12px">×' +
+                    '<td class="col-hide-1" style="color:var(--muted);font-size:12px">×' +
                     multiplo +
                     "</td>";
             if (col("barras"))
@@ -1673,7 +1680,7 @@ function renderPedidosTable() {
         html +=
             '<td style="font-size:12px;white-space:nowrap">' + fecha + "</td>";
         html +=
-            '<td><button class="link-btn" onclick="abrirClienteDesdePedido(' +
+            '<td class="sticky-col"><button class="link-btn" onclick="abrirClienteDesdePedido(' +
             p.cliente_id +
             ')">' +
             p.cliente_nombre +
@@ -2076,7 +2083,11 @@ function renderClientesTable() {
     // Header dinámico
     var thead = "<tr>";
     CLIENT_COLS.forEach(function (c) {
-        if (ccol(c.key)) thead += "<th>" + c.label + "</th>";
+        if (ccol(c.key))
+            thead +=
+                c.key === "nombre"
+                    ? '<th class="sticky-col">' + c.label + "</th>"
+                    : "<th>" + c.label + "</th>";
     });
     thead += "</tr>";
     document.getElementById("clientesThead").innerHTML = thead;
@@ -2086,7 +2097,7 @@ function renderClientesTable() {
         var eliminado = parseInt(c.eliminado) === 1;
         html += "<tr" + (eliminado ? ' style="opacity:.5"' : "") + ">";
         if (ccol("nombre"))
-            html += "<td><strong>" + c.nombre + "</strong></td>";
+            html += '<td class="sticky-col"><strong>' + c.nombre + "</strong></td>";
         if (ccol("telefono"))
             html +=
                 '<td><a href="https://wa.me/' +

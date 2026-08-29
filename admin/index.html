@@ -26,7 +26,7 @@
                 font-size: 20px;
                 cursor: pointer;
                 color: #888;
-                padding: 2px 8px;
+                padding: 9px 12px;
                 border-radius: 4px;
                 line-height: 1;
             }
@@ -220,50 +220,56 @@
                             </div>
                         </div>
                         <div class="toolbar">
-                            <input
-                                type="text"
-                                id="srch"
-                                placeholder="🔍 Buscar..."
-                                oninput="filterTable()"
-                            />
-                            <button
-                                class="btn"
-                                style="padding:6px 10px;font-size:1.1em;line-height:1"
-                                onclick="openBarcodeScanner(function(code){document.getElementById('srch').value=code;filterTable();})"
-                                title="Escanear código de barras"
-                            ><img src="https://cdn.jsdelivr.net/npm/lucide-static@0.462.0/icons/camera.svg" alt="" style="width:15px;height:15px;display:block;filter:invert(13%) sepia(52%) saturate(1826%) hue-rotate(215deg) brightness(94%) contrast(93%)" /></button>
-                            <select id="filtCat" onchange="filterTable()">
-                                <option value="">Todas las categorías</option>
-                            </select>
-                            <select id="filtEst" onchange="filterTable()">
-                                <option value="">Todos los estados</option>
-                                <option value="DISPONIBLE">Disponible</option>
-                                <option value="AGOTADO">Agotado</option>
-                            </select>
-                            <button
-                                class="btn"
-                                style="
-                                    background: #fff;
-                                    border: 1.5px solid var(--border);
-                                    color: #333;
-                                "
-                                onclick="openColModal()"
-                            >
-                                <img src="https://cdn.jsdelivr.net/npm/lucide-static@0.462.0/icons/settings.svg" alt="" style="width:14px;height:14px;display:inline-block;vertical-align:-2px;filter:invert(13%) sepia(52%) saturate(1826%) hue-rotate(215deg) brightness(94%) contrast(93%)" /> Columnas
-                            </button>
-                            <button
-                                class="btn-toggle"
-                                id="btnEditMode"
-                                onclick="toggleEditMode()"
-                            >
-                                <img src="https://cdn.jsdelivr.net/npm/lucide-static@0.462.0/icons/pencil.svg" alt="" class="edit-mode-icon" style="width:14px;height:14px;display:inline-block;vertical-align:-2px" /> Modo edición
-                            </button>
-                            <button
-                                class="btn btn-primary"
-                                onclick="openModal()"
-                            >
-                                + Nuevo producto
-                            </button>
+                            <div class="hdr-search">
+                                <input
+                                    type="text"
+                                    id="srch"
+                                    placeholder="🔍 Buscar..."
+                                    oninput="filterTable()"
+                                />
+                                <button
+                                    class="btn"
+                                    style="padding:6px 10px;font-size:1.1em;line-height:1"
+                                    onclick="openBarcodeScanner(function(code){document.getElementById('srch').value=code;filterTable();})"
+                                    title="Escanear código de barras"
+                                ><img src="https://cdn.jsdelivr.net/npm/lucide-static@0.462.0/icons/camera.svg" alt="" style="width:15px;height:15px;display:block;filter:invert(13%) sepia(52%) saturate(1826%) hue-rotate(215deg) brightness(94%) contrast(93%)" /></button>
+                            </div>
+                            <div class="hdr-filters">
+                                <select id="filtCat" onchange="filterTable()">
+                                    <option value="">Todas las categorías</option>
+                                </select>
+                                <select id="filtEst" onchange="filterTable()">
+                                    <option value="">Todos los estados</option>
+                                    <option value="DISPONIBLE">Disponible</option>
+                                    <option value="AGOTADO">Agotado</option>
+                                </select>
+                            </div>
+                            <div class="hdr-actions">
+                                <button
+                                    class="btn"
+                                    style="
+                                        background: #fff;
+                                        border: 1.5px solid var(--border);
+                                        color: #333;
+                                    "
+                                    onclick="openColModal()"
+                                >
+                                    <img src="https://cdn.jsdelivr.net/npm/lucide-static@0.462.0/icons/settings.svg" alt="" style="width:14px;height:14px;display:inline-block;vertical-align:-2px;filter:invert(13%) sepia(52%) saturate(1826%) hue-rotate(215deg) brightness(94%) contrast(93%)" /> Columnas
+                                </button>
+                                <button
+                                    class="btn-toggle"
+                                    id="btnEditMode"
+                                    onclick="toggleEditMode()"
+                                >
+                                    <img src="https://cdn.jsdelivr.net/npm/lucide-static@0.462.0/icons/pencil.svg" alt="" class="edit-mode-icon" style="width:14px;height:14px;display:inline-block;vertical-align:-2px" /> Modo edición
+                                </button>
+                                <button
+                                    class="btn btn-primary"
+                                    onclick="openModal()"
+                                >
+                                    <span class="btn-txt-largo">+ Nuevo producto</span><span class="btn-txt-corto">+ Nuevo</span>
+                                </button>
+                            </div>
                         </div>
                         <!-- Banner "Deshacer última importación" -->
                         <div
@@ -364,23 +370,27 @@
                                 💾 Guardar todo
                             </button>
                         </div>
-                        <table id="mainTable">
-                            <thead>
-                                <tr>
-                                    <th></th>
-                                    <th>Img</th>
-                                    <th>Código</th>
-                                    <th>Descripción</th>
-                                    <th>Categoría</th>
-                                    <th>Mayorista</th>
-                                    <th>PVP</th>
-                                    <th>Estado</th>
-                                    <th>Múltiplo</th>
-                                    <th>Acciones</th>
-                                </tr>
-                            </thead>
-                            <tbody id="tbody"></tbody>
-                        </table>
+                        <div class="table-outer">
+                            <div class="table-scroll">
+                                <table id="mainTable">
+                                    <thead>
+                                        <tr>
+                                            <th></th>
+                                            <th>Img</th>
+                                            <th class="sticky-col">Código</th>
+                                            <th>Descripción</th>
+                                            <th class="col-hide-2">Categoría</th>
+                                            <th>Mayorista</th>
+                                            <th>PVP</th>
+                                            <th>Estado</th>
+                                            <th class="col-hide-1">Múltiplo</th>
+                                            <th>Acciones</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="tbody"></tbody>
+                                </table>
+                            </div>
+                        </div>
                     </div>
 
                     <!-- CATEGORÍAS -->
@@ -401,22 +411,26 @@
                             <button class="btn btn-primary" onclick="aprobarPendientesSeleccionados()">✓ Aprobar seleccionados</button>
                             <button class="btn" style="color:var(--red)" onclick="rechazarPendientesSeleccionados()">✗ Rechazar seleccionados</button>
                         </div>
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th></th>
-                                    <th>Código</th>
-                                    <th>Descripción</th>
-                                    <th>Categoría</th>
-                                    <th>Mayorista</th>
-                                    <th>PVP</th>
-                                    <th>Estado</th>
-                                    <th>Marca</th>
-                                    <th>Acciones</th>
-                                </tr>
-                            </thead>
-                            <tbody id="pendMgrTbody"></tbody>
-                        </table>
+                        <div class="table-outer">
+                            <div class="table-scroll">
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th></th>
+                                            <th>Código</th>
+                                            <th>Descripción</th>
+                                            <th>Categoría</th>
+                                            <th>Mayorista</th>
+                                            <th>PVP</th>
+                                            <th>Estado</th>
+                                            <th>Marca</th>
+                                            <th>Acciones</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="pendMgrTbody"></tbody>
+                                </table>
+                            </div>
+                        </div>
                     </div>
 
                     <div class="wrap section" id="secCategorias">
@@ -456,17 +470,21 @@
                                 + Agregar
                             </button>
                         </div>
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th></th>
-                                    <th>Nombre</th>
-                                    <th>Productos</th>
-                                    <th>Acciones</th>
-                                </tr>
-                            </thead>
-                            <tbody id="catTbody"></tbody>
-                        </table>
+                        <div class="table-outer">
+                            <div class="table-scroll">
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th></th>
+                                            <th>Nombre</th>
+                                            <th>Productos</th>
+                                            <th>Acciones</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="catTbody"></tbody>
+                                </table>
+                            </div>
+                        </div>
                     </div>
 
                     <!-- HERRAMIENTAS -->
@@ -553,15 +571,19 @@
                                         + Agregar
                                     </button>
                                 </div>
-                                <table>
-                                    <thead>
-                                        <tr>
-                                            <th>Nombre</th>
-                                            <th>Acciones</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="transTbody"></tbody>
-                                </table>
+                                <div class="table-outer">
+                                    <div class="table-scroll">
+                                        <table>
+                                            <thead>
+                                                <tr>
+                                                    <th>Nombre</th>
+                                                    <th>Acciones</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="transTbody"></tbody>
+                                        </table>
+                                    </div>
+                                </div>
                             </div>
                             <div class="config-box" data-keywords="whatsapp número teléfono pedidos contacto">
                                 <h3>📱 WhatsApp</h3>
@@ -688,17 +710,21 @@
                                     oninput="renderColoresTable(this.value)"
                                 />
                             </div>
-                            <table>
-                                <thead>
-                                    <tr>
-                                        <th>Color</th>
-                                        <th>Nombre</th>
-                                        <th>Hex</th>
-                                        <th>Acciones</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="coloresTbody"></tbody>
-                            </table>
+                            <div class="table-outer">
+                                <div class="table-scroll">
+                                    <table>
+                                        <thead>
+                                            <tr>
+                                                <th>Color</th>
+                                                <th>Nombre</th>
+                                                <th>Hex</th>
+                                                <th>Acciones</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="coloresTbody"></tbody>
+                                    </table>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
@@ -715,44 +741,52 @@
                             Pedidos
                         </h2>
                         <div class="toolbar" style="margin-bottom: 16px">
-                            <input
-                                type="text"
-                                id="pedidoSrch"
-                                placeholder="🔍 Buscar por cliente o teléfono..."
-                                oninput="filterPedidos()"
-                                style="flex: 1"
-                            />
-                            <select
-                                id="pedidoFiltEst"
-                                onchange="filterPedidos()"
-                            >
-                                <option value="">Todos los estados</option>
-                                <option value="TODOS_CON_ELIMINADOS">
-                                    Todos (+ Eliminados)
-                                </option>
-                                <option value="PENDIENTE">Pendiente</option>
-                                <option value="EN_PREPARACION">
-                                    En preparación
-                                </option>
-                                <option value="FACTURADO">Facturado</option>
-                                <option value="ENVIADO">Enviado</option>
-                                <option value="ELIMINADO">Eliminados</option>
-                            </select>
+                            <div class="hdr-search">
+                                <input
+                                    type="text"
+                                    id="pedidoSrch"
+                                    placeholder="🔍 Buscar por cliente o teléfono..."
+                                    oninput="filterPedidos()"
+                                    style="flex: 1"
+                                />
+                            </div>
+                            <div class="hdr-filters">
+                                <select
+                                    id="pedidoFiltEst"
+                                    onchange="filterPedidos()"
+                                >
+                                    <option value="">Todos los estados</option>
+                                    <option value="TODOS_CON_ELIMINADOS">
+                                        Todos (+ Eliminados)
+                                    </option>
+                                    <option value="PENDIENTE">Pendiente</option>
+                                    <option value="EN_PREPARACION">
+                                        En preparación
+                                    </option>
+                                    <option value="FACTURADO">Facturado</option>
+                                    <option value="ENVIADO">Enviado</option>
+                                    <option value="ELIMINADO">Eliminados</option>
+                                </select>
+                            </div>
                         </div>
-                        <table id="pedidosTable">
-                            <thead>
-                                <tr>
-                                    <th>#</th>
-                                    <th>Fecha</th>
-                                    <th>Cliente</th>
-                                    <th>Teléfono</th>
-                                    <th>Total</th>
-                                    <th>Estado</th>
-                                    <th>Acciones</th>
-                                </tr>
-                            </thead>
-                            <tbody id="pedidosTbody"></tbody>
-                        </table>
+                        <div class="table-outer">
+                            <div class="table-scroll">
+                                <table id="pedidosTable">
+                                    <thead>
+                                        <tr>
+                                            <th>#</th>
+                                            <th>Fecha</th>
+                                            <th class="sticky-col">Cliente</th>
+                                            <th>Teléfono</th>
+                                            <th>Total</th>
+                                            <th>Estado</th>
+                                            <th>Acciones</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="pedidosTbody"></tbody>
+                                </table>
+                            </div>
+                        </div>
                     </div>
 
                     <!-- CLIENTES -->
@@ -768,52 +802,60 @@
                             Clientes
                         </h2>
                         <div class="toolbar" style="margin-bottom: 16px">
-                            <input
-                                type="text"
-                                id="clienteSrch"
-                                placeholder="🔍 Buscar por nombre, teléfono o CUIT..."
-                                oninput="filterClientes()"
-                                style="flex: 1"
-                            />
-                            <select
-                                id="clienteFiltVista"
-                                onchange="filterClientes()"
-                            >
-                                <option value="activos">Activos</option>
-                                <option value="eliminados">Eliminados</option>
-                                <option value="todos">Todos</option>
-                            </select>
-                            <button
-                                class="btn"
-                                style="
-                                    background: #fff;
-                                    border: 1.5px solid var(--border);
-                                    color: #333;
-                                "
-                                onclick="openClientColModal()"
-                            >
-                                ⚙ Columnas
-                            </button>
-                            <button
-                                class="btn btn-primary"
-                                onclick="openNuevoClienteModal()"
-                            >
-                                + Nuevo cliente
-                            </button>
+                            <div class="hdr-search">
+                                <input
+                                    type="text"
+                                    id="clienteSrch"
+                                    placeholder="🔍 Buscar por nombre, teléfono o CUIT..."
+                                    oninput="filterClientes()"
+                                    style="flex: 1"
+                                />
+                            </div>
+                            <div class="hdr-actions">
+                                <select
+                                    id="clienteFiltVista"
+                                    onchange="filterClientes()"
+                                >
+                                    <option value="activos">Activos</option>
+                                    <option value="eliminados">Eliminados</option>
+                                    <option value="todos">Todos</option>
+                                </select>
+                                <button
+                                    class="btn"
+                                    style="
+                                        background: #fff;
+                                        border: 1.5px solid var(--border);
+                                        color: #333;
+                                    "
+                                    onclick="openClientColModal()"
+                                >
+                                    ⚙ Columnas
+                                </button>
+                                <button
+                                    class="btn btn-primary"
+                                    onclick="openNuevoClienteModal()"
+                                >
+                                    <span class="btn-txt-largo">+ Nuevo cliente</span><span class="btn-txt-corto">+ Nuevo</span>
+                                </button>
+                            </div>
                         </div>
-                        <table>
-                            <thead id="clientesThead">
-                                <tr>
-                                    <th>Nombre</th>
-                                    <th>Teléfono</th>
-                                    <th>CUIT/DNI</th>
-                                    <th>Localidad</th>
-                                    <th>Pedidos</th>
-                                    <th>Acciones</th>
-                                </tr>
-                            </thead>
-                            <tbody id="clientesTbody"></tbody>
-                        </table>
+                        <div class="table-outer">
+                            <div class="table-scroll">
+                                <table>
+                                    <thead id="clientesThead">
+                                        <tr>
+                                            <th class="sticky-col">Nombre</th>
+                                            <th>Teléfono</th>
+                                            <th>CUIT/DNI</th>
+                                            <th>Localidad</th>
+                                            <th>Pedidos</th>
+                                            <th>Acciones</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="clientesTbody"></tbody>
+                                </table>
+                            </div>
+                        </div>
                     </div>
 
                     <!-- MODAL PEDIDO DETALLE -->

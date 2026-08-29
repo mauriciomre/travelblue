@@ -62,7 +62,7 @@ header {
     color: #fff;
     font-size: 20px;
     cursor: pointer;
-    padding: 4px 8px;
+    padding: 9px 10px;
     border-radius: 6px;
     line-height: 1
 }
@@ -142,7 +142,7 @@ header {
     color: rgba(255, 255, 255, .6);
     font-size: 18px;
     cursor: pointer;
-    padding: 4px 6px;
+    padding: 9px 10px;
     line-height: 1
 }
 
@@ -366,8 +366,54 @@ header {
 }
 
 .toolbar input {
-    flex: 1;
-    min-width: 200px
+    flex: 1 1 200px;
+    min-width: 160px;
+    max-width: 360px
+}
+
+/* Grupos semánticos de la toolbar — el JSX/HTML no cambia entre desktop y
+   mobile, solo el orden visual vía flex `order` (ver media query abajo). */
+.toolbar .hdr-search,
+.toolbar .hdr-filters,
+.toolbar .hdr-actions {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap
+}
+
+.toolbar .hdr-search {
+    order: 1;
+    flex: 1 1 auto
+}
+
+.toolbar .hdr-filters {
+    order: 2
+}
+
+.toolbar .hdr-actions {
+    order: 3;
+    margin-left: auto
+}
+
+.btn-txt-corto {
+    display: none
+}
+
+/* Feedback táctil universal — :active en vez de depender de :hover
+   (:hover no dispara en touch, o queda "pegado" tras el tap) */
+button {
+    transition: transform .1s ease, opacity .15s ease, background .15s ease
+}
+
+button:active:not(:disabled) {
+    transform: scale(.97)
+}
+
+@media (prefers-reduced-motion: reduce) {
+    button:active:not(:disabled) {
+        transform: none
+    }
 }
 
 /* BUTTONS */
@@ -442,10 +488,44 @@ header {
 table {
     width: 100%;
     border-collapse: collapse;
+    background: #fff
+}
+
+/* Wrapper de scroll horizontal en 2 divs: el externo recorta bordes
+   redondeados, el interno es el que realmente scrollea. Necesario para
+   que .sticky-col funcione (el overflow:hidden que recorta las esquinas
+   nunca puede estar entre la celda sticky y el contenedor que scrollea). */
+.table-outer {
     background: #fff;
     border-radius: 12px;
     overflow: hidden;
     box-shadow: 0 1px 4px rgba(0, 0, 0, .08)
+}
+
+.table-scroll {
+    overflow-x: auto;
+    overflow-y: hidden
+}
+
+.sticky-col {
+    position: sticky;
+    left: 0;
+    background: #fff;
+    z-index: 1;
+    box-shadow: 2px 0 4px -2px rgba(0, 0, 0, .15)
+}
+
+th.sticky-col {
+    background: var(--blue);
+    z-index: 2
+}
+
+tr:hover td.sticky-col {
+    background: #fafbff
+}
+
+tr.dragging td.sticky-col {
+    background: #e8f0fb
 }
 
 th {
@@ -669,7 +749,7 @@ td.editing {
 
 .row2 {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
     gap: 12px
 }
 
@@ -1089,4 +1169,66 @@ td.editing {
 
 .config-row input:focus {
     border-color: var(--blue)
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   MOBILE — nada se oculta, solo se reorganiza qué se ve primero según
+   el ancho disponible. Ningún nivel esconde una acción o dato completo.
+   ══════════════════════════════════════════════════════════════════════ */
+@media (max-width: 768px) {
+    /* Toolbar: buscador ocupa su propia fila arriba de todo, filtros y
+       acciones abajo — mismo HTML, solo cambia el `order` visual. */
+    .toolbar .hdr-search {
+        order: 1;
+        flex-basis: 100%
+    }
+
+    .toolbar .hdr-search input {
+        max-width: none
+    }
+
+    .toolbar .hdr-filters {
+        order: 2;
+        flex-basis: 100%
+    }
+
+    .toolbar .hdr-filters select {
+        flex: 1
+    }
+
+    .toolbar .hdr-actions {
+        order: 3;
+        flex-basis: 100%;
+        margin-left: 0;
+        justify-content: flex-end
+    }
+
+    /* Tabla Productos: se saca Múltiplo primero (recuperable abriendo
+       "Editar"), después Categoría — el resto sigue en la tabla, con scroll
+       horizontal + Código fijo (.sticky-col) para lo que no entre.
+       Solo aplica fuera de "Modo edición": ahí no hay botón "Editar" de
+       respaldo por fila, así que ninguna columna se oculta y se depende
+       100% del scroll horizontal. */
+    #mainTable:not(.edit-mode) .col-hide-1 {
+        display: none
+    }
+}
+
+@media (max-width: 560px) {
+    #mainTable:not(.edit-mode) .col-hide-2 {
+        display: none
+    }
+}
+
+/* Texto de botón que se acorta a una palabra en pantallas muy chicas —
+   ambos textos están en el DOM, CSS decide cuál se ve (mejor para
+   accesibilidad que armar el string en JS). */
+@media (max-width: 400px) {
+    .btn-txt-largo {
+        display: none
+    }
+
+    .btn-txt-corto {
+        display: inline
+    }
 }
