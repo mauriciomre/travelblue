@@ -22,6 +22,7 @@ var COLS = [
     { key: "may", label: "Mayorista", default: true },
     { key: "pvp", label: "PVP", default: true },
     { key: "estado", label: "Estado", default: true },
+    { key: "mostrar", label: "Mostrar", default: true },
     { key: "multiplo", label: "Múltiplo", default: true },
     { key: "barras", label: "Cód. Barras", default: false },
     { key: "colores", label: "Colores", default: true },
@@ -800,7 +801,11 @@ async function eliminarCategoria(id, nombre, count) {
 
 // ── PRODUCTOS ─────────────────────────────────────────────────────────────────
 async function loadProducts() {
-    var res = await fetch(API + "?action=productos");
+    var res = await fetch(API + "?action=productos", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ _user: authUser, _pass: authPass }),
+    });
     allProducts = await res.json();
     renderStats();
     renderTable(getFiltered());
@@ -819,6 +824,8 @@ function getFiltered() {
     var q = document.getElementById("srch").value.toLowerCase();
     var cat = document.getElementById("filtCat").value;
     var est = document.getElementById("filtEst").value;
+    var mostrarEl = document.getElementById("filtMostrar");
+    var mostrarFiltro = mostrarEl ? mostrarEl.value : "";
     var base = sortedProducts || allProducts;
     return base.filter(
         (p) =>
@@ -827,7 +834,8 @@ function getFiltered() {
                 p.codigo.toLowerCase().includes(q) ||
                 (p.codigo_barras && p.codigo_barras.toLowerCase().includes(q))) &&
             (!cat || p.categoria === cat) &&
-            (!est || p.estado === est),
+            (!est || p.estado === est) &&
+            (!mostrarFiltro || (mostrarFiltro === "1" ? p.mostrar != 0 : p.mostrar == 0)),
     );
 }
 function filterTable() {
@@ -869,6 +877,7 @@ function renderTableHeader() {
     if (col("may")) h += "<th>Mayorista</th>";
     if (col("pvp")) h += "<th>PVP</th>";
     if (col("estado")) h += "<th>Estado</th>";
+    if (col("mostrar")) h += "<th>Mostrar</th>";
     if (col("multiplo")) h += '<th class="col-hide-1">Múltiplo</th>';
     if (col("barras")) h += "<th>Cód. Barras</th>";
     if (col("colores")) h += "<th>Colores</th>";
@@ -962,6 +971,15 @@ function renderTableFromList(list) {
                     ">DISPONIBLE</option><option" +
                     (p.estado === "AGOTADO" ? " selected" : "") +
                     ">AGOTADO</option></select></td>";
+            if (col("mostrar"))
+                html +=
+                    '<td class="editing"><select class="inline-select" data-field="mostrar" data-id="' +
+                    p.id +
+                    '"><option value="1"' +
+                    (p.mostrar != 0 ? " selected" : "") +
+                    '>Sí</option><option value="0"' +
+                    (p.mostrar == 0 ? " selected" : "") +
+                    ">No</option></select></td>";
             if (col("multiplo"))
                 html +=
                     '<td class="editing col-hide-1"><input class="inline-input" type="number" value="' +
@@ -1017,6 +1035,17 @@ function renderTableFromList(list) {
                     '">' +
                     p.estado +
                     "</button></td>";
+            if (col("mostrar"))
+                html +=
+                    '<td><button type="button" class="badge-' +
+                    (p.mostrar != 0 ? "disp" : "agot") +
+                    '" onclick="toggleMostrarBadge(' +
+                    p.id +
+                    ')" title="' +
+                    (p.mostrar != 0 ? "Ocultar del catálogo" : "Mostrar en el catálogo") +
+                    '">' +
+                    (p.mostrar != 0 ? "SÍ" : "NO") +
+                    "</button></td>";
             if (col("multiplo"))
                 html +=
                     '<td class="col-hide-1" style="color:var(--muted);font-size:12px">×' +
@@ -1061,7 +1090,7 @@ function renderTableFromList(list) {
     });
     document.getElementById("tbody").innerHTML =
         html ||
-        '<tr><td colspan="11" style="text-align:center;color:#aaa;padding:30px">No hay productos</td></tr>';
+        '<tr><td colspan="12" style="text-align:center;color:#aaa;padding:30px">No hay productos</td></tr>';
     if (editMode) initDragDrop();
 }
 
@@ -1149,12 +1178,34 @@ async function toggleEstadoBadge(id) {
             codigo: p.codigo, descripcion: p.descripcion, categoria: p.categoria,
             precio_mayorista: p.precio_mayorista, pvp: p.pvp, foto: p.foto,
             estado: nuevoEstado, orden: p.orden, multiplo: p.multiplo,
-            codigo_barras: p.codigo_barras,
+            codigo_barras: p.codigo_barras, mostrar: p.mostrar,
         }),
     });
     var json = await res.json();
     if (json.ok) {
         toast("Estado actualizado");
+        await loadProducts();
+    } else toast("Error: " + (json.error || "desconocido"), "#c62828");
+}
+
+async function toggleMostrarBadge(id) {
+    var p = allProducts.find((p) => p.id === id);
+    if (!p) return;
+    var nuevoMostrar = p.mostrar != 0 ? 0 : 1;
+    var res = await fetch(API + "?action=editar&id=" + id, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            _user: authUser, _pass: authPass,
+            codigo: p.codigo, descripcion: p.descripcion, categoria: p.categoria,
+            precio_mayorista: p.precio_mayorista, pvp: p.pvp, foto: p.foto,
+            estado: p.estado, orden: p.orden, multiplo: p.multiplo,
+            codigo_barras: p.codigo_barras, mostrar: nuevoMostrar,
+        }),
+    });
+    var json = await res.json();
+    if (json.ok) {
+        toast(nuevoMostrar ? "Producto visible en el catálogo" : "Producto oculto del catálogo");
         await loadProducts();
     } else toast("Error: " + (json.error || "desconocido"), "#c62828");
 }
@@ -1275,6 +1326,7 @@ function openModal(p) {
             : ""
         : "";
     document.getElementById("fEstado").value = p ? p.estado : "DISPONIBLE";
+    document.getElementById("fMostrar").value = p && p.mostrar == 0 ? "0" : "1";
     document.getElementById("fMultiplo").value = p ? p.multiplo || 1 : 1;
     document.getElementById("fCodigoBarras").value = p ? (p.codigo_barras || "") : "";
     // Colores
@@ -1456,6 +1508,7 @@ async function saveProduct() {
         pvp: parseFloat(pvp) || null,
         foto: fotoUrl,
         estado: document.getElementById("fEstado").value,
+        mostrar: parseInt(document.getElementById("fMostrar").value, 10),
         orden: orden,
         multiplo,
         codigo_barras: codigoBarras,
@@ -2304,6 +2357,7 @@ var SYSTEM_FIELDS = [
     { key: "PRECIO_MAYORISTA", label: "Precio mayorista", required: false },
     { key: "PVP",              label: "PVP",              required: false },
     { key: "ESTADO",           label: "Estado",           required: false },
+    { key: "MOSTRAR",          label: "Mostrar en catálogo", required: false },
 ];
 
 var FIELD_ALIASES = {
@@ -2314,7 +2368,14 @@ var FIELD_ALIASES = {
     "PRECIO_MAYORISTA": ["PRECIO_MAYORISTA", "PRECIO", "PRECIO_MAY", "MAYORISTA", "PRICE", "COSTO", "PRECIO_COSTO"],
     "PVP":              ["PVP", "PRECIO_VENTA", "PRECIO_PUBLICO", "RETAIL", "PRECIO_SUGERIDO"],
     "ESTADO":           ["ESTADO", "STATUS", "STATE", "DISPONIBILIDAD", "ACTIVO"],
+    "MOSTRAR":          ["MOSTRAR", "VISIBLE", "MOSTRAR_CATALOGO", "SHOW", "PUBLICADO"],
 };
+
+// Interpretación permisiva de una celda booleana (columna MOSTRAR del Excel)
+function mostrarBool(v) {
+    var s = String(v || "").toUpperCase().trim();
+    return ["SI", "SÍ", "S", "YES", "Y", "1", "TRUE", "X"].indexOf(s) >= 0;
+}
 
 function normalizeHeader(h) {
     return h.toUpperCase().trim()
@@ -2499,6 +2560,7 @@ function getRowStatus(row, existingData) {
         PVP:              "pvp",
         ESTADO:           "estado",
         CODIGO_BARRAS:    "codigo_barras",
+        MOSTRAR:          "mostrar",
     };
     var changed = false;
     Object.keys(fieldMap).forEach(function(k) {
@@ -2509,6 +2571,8 @@ function getRowStatus(row, existingData) {
             if (Math.round(parseFloat(newV) * 100) !== Math.round(parseFloat(oldV) * 100)) changed = true;
         } else if (k === "ESTADO") {
             if (newV.toUpperCase() !== oldV.toUpperCase()) changed = true;
+        } else if (k === "MOSTRAR") {
+            if (mostrarBool(newV) !== (oldV === "1")) changed = true;
         } else {
             if (newV !== oldV) changed = true;
         }
@@ -2538,7 +2602,7 @@ function renderImportPreview(rows, existingData) {
     enriched.forEach(function(r) { counts[r._status.status]++; });
 
     // Detectar qué campos vinieron en el archivo
-    var ORDERED = ["CODIGO","CODIGO_BARRAS","DESCRIPCION","CATEGORIA","PRECIO_MAYORISTA","PVP","ESTADO"];
+    var ORDERED = ["CODIGO","CODIGO_BARRAS","DESCRIPCION","CATEGORIA","PRECIO_MAYORISTA","PVP","ESTADO","MOSTRAR"];
     var activeFields = ORDERED.filter(function(f) {
         return rows.some(function(r) { return r[f] !== undefined && r[f] !== ""; });
     });
@@ -2561,6 +2625,7 @@ function buildImportPreviewHTML(enriched, counts, activeFields) {
         DESCRIPCION: "descripcion", CATEGORIA: "categoria",
         PRECIO_MAYORISTA: "precio_mayorista", PVP: "pvp",
         ESTADO: "estado", CODIGO_BARRAS: "codigo_barras",
+        MOSTRAR: "mostrar",
     };
 
     var html = "";
@@ -2619,6 +2684,20 @@ function buildImportPreviewHTML(enriched, counts, activeFields) {
             // Celda de error: requerida vacía en producto nuevo
             if (st.status === "ERROR" && !val && (f === "DESCRIPCION" || f === "CATEGORIA") && !st.existing) {
                 html += '<td style="background:#ffcdd2;color:#c62828;font-size:11px;padding:6px 8px">⚠ vacío</td>';
+                return;
+            }
+
+            // MOSTRAR se muestra siempre interpretado (Sí/No), no el texto crudo de la planilla
+            if (f === "MOSTRAR" && val) {
+                var mostrarNew = mostrarBool(val) ? "Sí" : "No";
+                if (st.status === "ACTUALIZA" && dbKey && st.existing && mostrarBool(val) !== (oldVal === "1")) {
+                    var mostrarOld = oldVal === "1" ? "Sí" : "No";
+                    html += '<td style="padding:6px 8px;font-size:12px">'
+                        + '<span style="text-decoration:line-through;color:#aaa">' + mostrarOld + '</span>'
+                        + ' → <strong>' + mostrarNew + '</strong></td>';
+                } else {
+                    html += '<td style="padding:6px 8px">' + mostrarNew + '</td>';
+                }
                 return;
             }
 
@@ -2773,13 +2852,13 @@ async function undoLastImport(import_id) {
 // ── Exportar plantilla vacía ──────────────────────────────────────────────────
 function exportTemplate() {
     if (typeof XLSX === 'undefined') { alert('Cargando SheetJS, intentá de nuevo.'); return; }
-    var headers = ['CODIGO', 'CODIGO_BARRAS', 'DESCRIPCION', 'CATEGORIA', 'PRECIO_MAYORISTA', 'PVP', 'ESTADO'];
+    var headers = ['CODIGO', 'CODIGO_BARRAS', 'DESCRIPCION', 'CATEGORIA', 'PRECIO_MAYORISTA', 'PVP', 'ESTADO', 'MOSTRAR'];
     var wb = XLSX.utils.book_new();
     var ws = XLSX.utils.aoa_to_sheet([headers]);
     // Ancho de columna aproximado
     ws['!cols'] = [
         {wch: 14}, {wch: 16}, {wch: 40}, {wch: 22},
-        {wch: 18}, {wch: 12}, {wch: 12}
+        {wch: 18}, {wch: 12}, {wch: 12}, {wch: 10}
     ];
     XLSX.utils.book_append_sheet(wb, ws, 'Productos');
     XLSX.writeFile(wb, 'plantilla_importacion_travelblue.xlsx');
@@ -2789,10 +2868,14 @@ function exportTemplate() {
 async function exportCatalog() {
     if (typeof XLSX === 'undefined') { alert('Cargando SheetJS, intentá de nuevo.'); return; }
     try {
-        var res  = await fetch(API + '?action=productos');
+        var res  = await fetch(API + '?action=productos', {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ _user: authUser, _pass: authPass }),
+        });
         var json = await res.json();
         if (!Array.isArray(json) || !json.length) { alert('No hay productos para exportar.'); return; }
-        var headers = ['CODIGO', 'CODIGO_BARRAS', 'DESCRIPCION', 'CATEGORIA', 'PRECIO_MAYORISTA', 'PVP', 'ESTADO'];
+        var headers = ['CODIGO', 'CODIGO_BARRAS', 'DESCRIPCION', 'CATEGORIA', 'PRECIO_MAYORISTA', 'PVP', 'ESTADO', 'MOSTRAR'];
         var rows = json.map(function(p) {
             return [
                 p.codigo        || '',
@@ -2801,14 +2884,15 @@ async function exportCatalog() {
                 p.categoria     || '',
                 p.precio_mayorista != null ? Number(p.precio_mayorista) : '',
                 p.pvp           != null    ? Number(p.pvp)              : '',
-                p.estado        || ''
+                p.estado        || '',
+                p.mostrar != 0  ? 'SI' : 'NO'
             ];
         });
         var wb = XLSX.utils.book_new();
         var ws = XLSX.utils.aoa_to_sheet([headers].concat(rows));
         ws['!cols'] = [
             {wch: 14}, {wch: 16}, {wch: 40}, {wch: 22},
-            {wch: 18}, {wch: 12}, {wch: 12}
+            {wch: 18}, {wch: 12}, {wch: 12}, {wch: 10}
         ];
         XLSX.utils.book_append_sheet(wb, ws, 'Productos');
         var fecha = new Date().toISOString().slice(0, 10);
@@ -2821,7 +2905,11 @@ async function exportCatalog() {
 // ── Imprimir nota de pedido (admin — carga desde API) ────────────────────────
 async function printNotaAdmin() {
     try {
-        var res  = await fetch(API + '?action=productos');
+        var res  = await fetch(API + '?action=productos', {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ _user: authUser, _pass: authPass }),
+        });
         var json = await res.json();
         if (!Array.isArray(json) || !json.length) { alert('No hay productos para imprimir.'); return; }
         // Guardamos todos (disponibles + agotados); el modal decide qué mostrar

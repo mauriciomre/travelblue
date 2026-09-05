@@ -243,6 +243,11 @@
                                     <option value="DISPONIBLE">Disponible</option>
                                     <option value="AGOTADO">Agotado</option>
                                 </select>
+                                <select id="filtMostrar" onchange="filterTable()">
+                                    <option value="">Mostrados y ocultos</option>
+                                    <option value="1">Solo mostrados</option>
+                                    <option value="0">Solo ocultos</option>
+                                </select>
                             </div>
                             <div class="hdr-actions">
                                 <button
@@ -1070,6 +1075,16 @@
                                         Ej: 6 → solo se puede pedir de a 6, 12,
                                         18...
                                     </div>
+                                </div>
+                            </div>
+                            <div class="field">
+                                <label>Mostrar en el catálogo</label>
+                                <select id="fMostrar">
+                                    <option value="1">Sí</option>
+                                    <option value="0">No (oculto, aunque esté Disponible)</option>
+                                </select>
+                                <div style="font-size:11px;color:var(--muted);margin-top:4px">
+                                    Independiente del Estado — un producto oculto no aparece en el catálogo público aunque esté Disponible.
                                 </div>
                             </div>
                             <div class="field">
