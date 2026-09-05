@@ -946,19 +946,19 @@ function col(key) {
 
 function renderTableHeader() {
     var h = "<thead><tr>";
-    if (col("handle")) h += "<th></th>";
-    if (col("img")) h += "<th>Img</th>";
-    if (col("codigo")) h += sortableTh("Código", "codigo", "sticky-col");
+    if (col("handle")) h += '<th class="w-handle"></th>';
+    if (col("img")) h += '<th class="w-img">Img</th>';
+    if (col("codigo")) h += sortableTh("Código", "codigo", "sticky-col w-codigo");
     if (col("desc")) h += sortableTh("Descripción", "desc");
-    if (col("cat")) h += sortableTh("Categoría", "cat", "col-hide-2");
-    if (col("may")) h += sortableTh("Mayorista", "may");
-    if (col("pvp")) h += sortableTh("PVP", "pvp");
-    if (col("estado")) h += sortableTh("Estado", "estado");
-    if (col("mostrar")) h += sortableTh("Mostrar", "mostrar");
-    if (col("multiplo")) h += sortableTh("Múltiplo", "multiplo", "col-hide-1");
-    if (col("barras")) h += "<th>Cód. Barras</th>";
-    if (col("colores")) h += "<th>Colores</th>";
-    if (col("acciones")) h += "<th>Acciones</th>";
+    if (col("cat")) h += sortableTh("Categoría", "cat", "col-hide-2 w-cat");
+    if (col("may")) h += sortableTh("Mayorista", "may", "w-may");
+    if (col("pvp")) h += sortableTh("PVP", "pvp", "w-pvp");
+    if (col("estado")) h += sortableTh("Estado", "estado", "w-estado");
+    if (col("mostrar")) h += sortableTh("Mostrar", "mostrar", "w-mostrar");
+    if (col("multiplo")) h += sortableTh("Múltiplo", "multiplo", "col-hide-1 w-multiplo");
+    if (col("barras")) h += '<th class="w-barras">Cód. Barras</th>';
+    if (col("colores")) h += '<th class="w-colores">Colores</th>';
+    if (col("acciones")) h += '<th class="w-acciones">Acciones</th>';
     h += "</tr></thead>";
     document.querySelector("#mainTable thead") &&
         (document.querySelector("#mainTable thead").outerHTML = h);
@@ -1054,14 +1054,14 @@ function renderTableFromList(list) {
                     esc(p.codigo) +
                     '" data-field="codigo" data-id="' +
                     p.id +
-                    '" style="width:90px"></td>';
+                    '"></td>';
             if (col("desc"))
                 html +=
                     '<td class="editing"><input class="inline-input" value="' +
                     esc(p.descripcion) +
                     '" data-field="descripcion" data-id="' +
                     p.id +
-                    '" style="width:180px"></td>';
+                    '"></td>';
             if (col("cat"))
                 html +=
                     '<td class="editing col-hide-2"><select class="inline-select" data-field="categoria" data-id="' +
@@ -1086,14 +1086,14 @@ function renderTableFromList(list) {
                     fmtInput(p.precio_mayorista) +
                     '" data-field="precio_mayorista" data-id="' +
                     p.id +
-                    '" style="width:90px"></td>';
+                    '"></td>';
             if (col("pvp"))
                 html +=
                     '<td class="editing"><input class="inline-input" type="number" value="' +
                     fmtInput(p.pvp) +
                     '" data-field="pvp" data-id="' +
                     p.id +
-                    '" style="width:90px"></td>';
+                    '"></td>';
             if (col("estado"))
                 html +=
                     '<td class="editing"><select class="inline-select" data-field="estado" data-id="' +
@@ -1118,7 +1118,7 @@ function renderTableFromList(list) {
                     multiplo +
                     '" data-field="multiplo" data-id="' +
                     p.id +
-                    '" style="width:60px" min="1"></td>';
+                    '" min="1"></td>';
             if (col("barras"))
                 html +=
                     '<td style="color:var(--muted);font-size:11px">' +
@@ -2961,13 +2961,25 @@ function showUndoBanner(import_id, imported, updated) {
 
 function hideUndoBanner() {
     var banner = document.getElementById("undoBanner");
-    if (banner) banner.style.display = "none";
+    if (!banner) return;
+    // Recordar en localStorage cuál import_id se cerró a mano, para que
+    // checkLastImport() no lo vuelva a mostrar en la próxima carga de
+    // página — antes reaparecía siempre, aunque ya lo hubieras cerrado.
+    if (banner._importId) {
+        try { localStorage.setItem("tb_dismissed_import", banner._importId); } catch (e) {}
+    }
+    banner.style.display = "none";
 }
 
 async function undoLastImport(import_id) {
     if (!confirm("¿Seguro que querés revertir la última importación? Los productos vuelven al estado anterior.")) return;
+    // Feedback de "revirtiendo..." en los dos lugares posibles desde donde se
+    // pudo haber disparado esto — el cartel de arriba (si está visible) y/o
+    // la tarjeta fija de Herramientas.
     var banner = document.getElementById("undoBanner");
     if (banner) banner.innerHTML = '<span>⏳ Revirtiendo...</span>';
+    var toolInfo = document.getElementById("toolUndoInfo");
+    if (toolInfo) toolInfo.innerHTML = '<p style="font-size:13px;color:var(--muted)">⏳ Revirtiendo...</p>';
     try {
         var res = await fetch(API + "?action=import_rollback", {
             method: "POST",
@@ -2979,6 +2991,7 @@ async function undoLastImport(import_id) {
             toast("↩ Importación revertida — " + json.restored + " producto(s) restaurado(s)");
             hideUndoBanner();
             loadProducts();
+            checkLastImport(); // refresca el cartel y la tarjeta con lo que quede (otra importación previa, o "nada para deshacer")
         } else {
             toast("Error al revertir: " + (json.error || "desconocido"), "#c62828");
             hideUndoBanner();
@@ -3359,16 +3372,40 @@ async function checkLastImport() {
         var res = await fetch(API + "?action=import_last");
         var json = await res.json();
         if (json.ok && json.import_id) {
-            var banner = document.getElementById("undoBanner");
-            if (!banner) return;
             var d = new Date(json.created_at);
             var hora = d.getHours().toString().padStart(2,"0") + ":" + d.getMinutes().toString().padStart(2,"0");
             var fechaStr = d.toLocaleDateString("es-AR") + " " + hora;
+
+            // Tarjeta fija de Herramientas: siempre muestra el estado real,
+            // exista o no el cartel de arriba (independiente de si ya se
+            // cerró a mano) — para poder deshacer una importación vieja
+            // aunque el cartel automático ya no esté.
+            var toolInfo = document.getElementById("toolUndoInfo");
+            if (toolInfo) {
+                toolInfo.innerHTML =
+                    '<p style="font-size:13px;color:var(--muted);margin-bottom:12px">Última importación reversible: <strong>' + fechaStr + '</strong> (' + json.n + ' producto(s)).</p>' +
+                    '<button class="btn" style="background:#c62828;color:#fff" onclick="undoLastImport(\'' + json.import_id + '\')">↩ Deshacer esa importación</button>';
+            }
+
+            // Cartel de arriba: si el admin ya lo cerró a mano para ESTA
+            // MISMA importación en otra carga de página, no reaparece — pero
+            // la tarjeta de Herramientas de arriba sigue disponible.
+            var dismissed = null;
+            try { dismissed = localStorage.getItem("tb_dismissed_import"); } catch (e) {}
+            if (dismissed === json.import_id) return;
+            var banner = document.getElementById("undoBanner");
+            if (!banner) return;
             banner.innerHTML =
                 '<span>↩ Hay una importación reversible del ' + fechaStr + ' (' + json.n + ' producto(s)).</span>' +
                 '<button onclick="undoLastImport(\'' + json.import_id + '\')">Deshacer</button>' +
                 '<button onclick="hideUndoBanner()" style="background:transparent;color:inherit;opacity:.6;margin-left:4px">✕</button>';
             banner.style.display = "flex";
+            banner._importId = json.import_id;
+        } else {
+            var toolInfoEmpty = document.getElementById("toolUndoInfo");
+            if (toolInfoEmpty) {
+                toolInfoEmpty.innerHTML = '<p style="font-size:13px;color:var(--muted)">No hay ninguna importación reciente para deshacer.</p>';
+            }
         }
     } catch (e) { /* silencioso */ }
 }
