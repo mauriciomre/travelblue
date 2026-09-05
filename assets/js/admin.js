@@ -1,3 +1,28 @@
+// Barra de carga global — envuelve fetch UNA sola vez, así cualquier request
+// a la API (existente o futuro) prende sola una barrita arriba de la pantalla
+// mientras está en curso, sin tener que agregar loading state función por función.
+(function () {
+    var activeRequests = 0;
+    var bar = null;
+    function ensureBar() {
+        if (!bar) {
+            bar = document.createElement("div");
+            bar.id = "globalLoadingBar";
+            document.body.appendChild(bar);
+        }
+        return bar;
+    }
+    var _origFetch = window.fetch;
+    window.fetch = function () {
+        activeRequests++;
+        ensureBar().classList.add("on");
+        return _origFetch.apply(this, arguments).finally(function () {
+            activeRequests = Math.max(0, activeRequests - 1);
+            if (activeRequests === 0 && bar) bar.classList.remove("on");
+        });
+    };
+})();
+
 var API = "../api.php";
 var UPLOAD = "../upload.php";
 var authUser = "",
@@ -11,6 +36,25 @@ var pendingFile = null,
 var editMode = false,
     dragSrc = null;
 var sortedProducts = null;
+var autoSaveEnabled = localStorage.getItem("tb_autosave") !== "0";
+
+function setAutoSave(checked) {
+    autoSaveEnabled = checked;
+    localStorage.setItem("tb_autosave", checked ? "1" : "0");
+}
+
+// Delegado sobre #tbody (el nodo no se recrea entre renders, solo su
+// innerHTML) — cada celda editada en Modo edición se guarda sola al perder
+// el foco, si el autoguardado está prendido.
+function initAutoSaveListener() {
+    var tbody = document.getElementById("tbody");
+    if (!tbody) return;
+    tbody.addEventListener("change", function (e) {
+        var el = e.target.closest("[data-field]");
+        if (!el || !editMode || !autoSaveEnabled) return;
+        saveInline(parseInt(el.dataset.id, 10), true);
+    });
+}
 
 // Columnas visibles — persistidas en localStorage
 var COLS = [
@@ -158,7 +202,24 @@ async function tryAutoLogin() {
 }
 document.addEventListener("DOMContentLoaded", function () {
     tryAutoLogin();
+    initStatsCompactOnScroll();
+    initAutoSaveListener();
+    var autoSaveEl = document.getElementById("autoSaveToggle");
+    if (autoSaveEl) autoSaveEl.checked = autoSaveEnabled;
 });
+
+// Los tiles de stats de Productos se achican al scrollear la tabla, para
+// ganar alto real — escucha el scroll del CONTENEDOR de la tabla (.table-scroll),
+// no el de window, porque esa caja tiene su propio scroll acotado (ver header sticky).
+function initStatsCompactOnScroll() {
+    var tbody = document.getElementById("tbody");
+    var scrollBox = tbody && tbody.closest(".table-scroll");
+    var stats = document.querySelector(".stats");
+    if (!scrollBox || !stats) return;
+    scrollBox.addEventListener("scroll", function () {
+        stats.classList.toggle("compact", scrollBox.scrollTop > 24);
+    });
+}
 
 // ── SIDEBAR ───────────────────────────────────────────────────────────────────
 // Sin preferencia guardada todavía, arranca colapsada en pantallas angostas
@@ -298,6 +359,18 @@ function showSection(s, btn) {
 }
 
 // ── CONFIGURACIÓN ─────────────────────────────────────────────────────────────
+function showCfgTab(name, btn) {
+    document.querySelectorAll(".cfg-tab").forEach(function (b) {
+        b.classList.remove("on");
+    });
+    btn.classList.add("on");
+    document.querySelectorAll(".cfg-tab-content").forEach(function (c) {
+        c.classList.remove("on");
+    });
+    var content = document.getElementById("cfgTab-" + name);
+    if (content) content.classList.add("on");
+}
+
 async function loadConfig() {
     var res = await fetch(API + "?action=config_get");
     var cfg = await res.json();
@@ -826,8 +899,10 @@ function getFiltered() {
     var est = document.getElementById("filtEst").value;
     var mostrarEl = document.getElementById("filtMostrar");
     var mostrarFiltro = mostrarEl ? mostrarEl.value : "";
+    var fotoEl = document.getElementById("filtFoto");
+    var fotoFiltro = fotoEl ? fotoEl.value : "";
     var base = sortedProducts || allProducts;
-    return base.filter(
+    var filtered = base.filter(
         (p) =>
             (!q ||
                 p.descripcion.toLowerCase().includes(q) ||
@@ -835,8 +910,10 @@ function getFiltered() {
                 (p.codigo_barras && p.codigo_barras.toLowerCase().includes(q))) &&
             (!cat || p.categoria === cat) &&
             (!est || p.estado === est) &&
-            (!mostrarFiltro || (mostrarFiltro === "1" ? p.mostrar != 0 : p.mostrar == 0)),
+            (!mostrarFiltro || (mostrarFiltro === "1" ? p.mostrar != 0 : p.mostrar == 0)) &&
+            (!fotoFiltro || (fotoFiltro === "con" ? !!p.foto : !p.foto)),
     );
+    return applyColSort(filtered);
 }
 function filterTable() {
     renderTable(getFiltered());
@@ -871,20 +948,75 @@ function renderTableHeader() {
     var h = "<thead><tr>";
     if (col("handle")) h += "<th></th>";
     if (col("img")) h += "<th>Img</th>";
-    if (col("codigo")) h += '<th class="sticky-col">Código</th>';
-    if (col("desc")) h += "<th>Descripción</th>";
-    if (col("cat")) h += '<th class="col-hide-2">Categoría</th>';
-    if (col("may")) h += "<th>Mayorista</th>";
-    if (col("pvp")) h += "<th>PVP</th>";
-    if (col("estado")) h += "<th>Estado</th>";
-    if (col("mostrar")) h += "<th>Mostrar</th>";
-    if (col("multiplo")) h += '<th class="col-hide-1">Múltiplo</th>';
+    if (col("codigo")) h += sortableTh("Código", "codigo", "sticky-col");
+    if (col("desc")) h += sortableTh("Descripción", "desc");
+    if (col("cat")) h += sortableTh("Categoría", "cat", "col-hide-2");
+    if (col("may")) h += sortableTh("Mayorista", "may");
+    if (col("pvp")) h += sortableTh("PVP", "pvp");
+    if (col("estado")) h += sortableTh("Estado", "estado");
+    if (col("mostrar")) h += sortableTh("Mostrar", "mostrar");
+    if (col("multiplo")) h += sortableTh("Múltiplo", "multiplo", "col-hide-1");
     if (col("barras")) h += "<th>Cód. Barras</th>";
     if (col("colores")) h += "<th>Colores</th>";
     if (col("acciones")) h += "<th>Acciones</th>";
     h += "</tr></thead>";
     document.querySelector("#mainTable thead") &&
         (document.querySelector("#mainTable thead").outerHTML = h);
+}
+
+// ── ORDENAR TABLA DE PRODUCTOS POR COLUMNA (clic en header) ──────────────────
+// Puramente de vista — no persiste nada ni toca el campo "orden" real (eso lo
+// sigue haciendo el drag&drop de "Modo edición"). Por eso se oculta del todo
+// durante Modo edición: mezclar los dos mecanismos sería confuso.
+var colSort = null; // { key, dir: 'asc'|'desc' }
+var COL_SORT_FIELDS = {
+    codigo: { get: function (p) { return p.codigo || ""; }, type: "code" },
+    desc: { get: function (p) { return p.descripcion || ""; }, type: "text" },
+    cat: { get: function (p) { return p.categoria || ""; }, type: "text" },
+    may: { get: function (p) { return Number(p.precio_mayorista) || 0; }, type: "num" },
+    pvp: { get: function (p) { return Number(p.pvp) || 0; }, type: "num" },
+    estado: { get: function (p) { return p.estado || ""; }, type: "text" },
+    mostrar: { get: function (p) { return p.mostrar != 0 ? 1 : 0; }, type: "num" },
+    multiplo: { get: function (p) { return Number(p.multiplo) || 0; }, type: "num" },
+};
+
+function toggleColSort(key) {
+    if (editMode) return;
+    if (!colSort || colSort.key !== key) colSort = { key: key, dir: "asc" };
+    else if (colSort.dir === "asc") colSort.dir = "desc";
+    else colSort = null;
+    renderTable(getFiltered());
+}
+
+function applyColSort(list) {
+    // Guardado por las dudas, además de ocultar los íconos: en Modo edición el
+    // orden real de las filas lo define el drag&drop, nunca este sort de vista.
+    if (editMode || !colSort) return list;
+    var f = COL_SORT_FIELDS[colSort.key];
+    if (!f) return list;
+    var dir = colSort.dir === "asc" ? 1 : -1;
+    return list.slice().sort(function (a, b) {
+        var av = f.get(a), bv = f.get(b);
+        var cmp = f.type === "num"
+            ? av - bv
+            : String(av).localeCompare(String(bv), undefined, { numeric: f.type === "code" });
+        return cmp * dir;
+    });
+}
+
+function sortIconHTML(key) {
+    var active = colSort && colSort.key === key;
+    var name = active ? (colSort.dir === "asc" ? "arrow-up" : "arrow-down") : "chevrons-up-down";
+    return '<img src="https://cdn.jsdelivr.net/npm/lucide-static@0.462.0/icons/' + name +
+        '.svg" alt="" style="width:12px;height:12px;display:inline-block;vertical-align:-2px;margin-left:4px;filter:brightness(0) invert(1);opacity:' +
+        (active ? "1" : ".55") + '">';
+}
+
+function sortableTh(label, key, cls) {
+    var clsAttr = cls ? ' class="' + cls + '"' : "";
+    if (editMode) return "<th" + clsAttr + ">" + label + "</th>";
+    return '<th' + clsAttr + ' style="cursor:pointer;user-select:none" onclick="toggleColSort(\'' +
+        key + '\')" title="Ordenar por ' + label + '">' + label + sortIconHTML(key) + "</th>";
 }
 
 function renderTableFromList(list) {
@@ -1136,22 +1268,23 @@ async function saveAllInline() {
 }
 
 // ── INLINE SAVE ───────────────────────────────────────────────────────────────
-async function saveInline(id) {
+async function saveInline(id, quiet) {
     var p = allProducts.find((p) => p.id === id);
     if (!p) return;
     var row = document.querySelector('tr[data-id="' + id + '"]');
     if (!row) return;
-    var data = { _user: authUser, _pass: authPass, orden: p.orden || 0 };
+    var fields = {};
     row.querySelectorAll("[data-field]").forEach(function (el) {
-        data[el.dataset.field] = el.value;
+        fields[el.dataset.field] = el.value;
     });
+    var data = Object.assign({ _user: authUser, _pass: authPass, orden: p.orden || 0 }, fields);
     if (
         !data.codigo ||
         !data.descripcion ||
         !data.categoria ||
         !data.precio_mayorista
     ) {
-        toast("Completá todos los campos", "#c62828");
+        if (!quiet) toast("Completá todos los campos", "#c62828");
         return;
     }
     var res = await fetch(API + "?action=editar&id=" + id, {
@@ -1161,8 +1294,15 @@ async function saveInline(id) {
     });
     var json = await res.json();
     if (json.ok) {
-        toast("Guardado");
-        await loadProducts();
+        if (quiet) {
+            // Autoguardado: no recarga ni repinta la tabla completa — eso
+            // destruiría los <input> justo cuando el usuario está tabulando
+            // entre campos de la misma fila. Solo actualiza en memoria.
+            Object.assign(p, fields);
+        } else {
+            toast("Guardado");
+            await loadProducts();
+        }
     } else toast("Error: " + (json.error || "desconocido"), "#c62828");
 }
 

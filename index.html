@@ -7,6 +7,7 @@
             content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
         />
         <title>Travel Blue Argentina — Catálogo Mayorista</title>
+        <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAzMiAzMiI+PGNpcmNsZSBjeD0iMTYiIGN5PSIxNiIgcj0iMTYiIGZpbGw9IiMyNjJjNjMiLz48dGV4dCB4PSIxNiIgeT0iMjEuNSIgZm9udC1mYW1pbHk9IkFyaWFsLCBIZWx2ZXRpY2EsIHNhbnMtc2VyaWYiIGZvbnQtd2VpZ2h0PSI4MDAiIGZvbnQtc2l6ZT0iMTMiIGZpbGw9IiNmZmM2MWMiIHRleHQtYW5jaG9yPSJtaWRkbGUiPlRCPC90ZXh0Pjwvc3ZnPg==" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link
             href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Work+Sans:wght@400;500;600;700&display=swap"
@@ -170,7 +171,15 @@
             <div class="panel">
                 <div class="p-head">
                     <h2>📋 Mi pedido</h2>
-                    <button class="cls" onclick="closeCart()">×</button>
+                    <div style="display: flex; align-items: center; gap: 10px">
+                        <button
+                            class="cls"
+                            style="font-size: 15px"
+                            onclick="vaciarCarrito()"
+                            title="Vaciar todo el carrito"
+                        ><img src="https://cdn.jsdelivr.net/npm/lucide-static@0.462.0/icons/trash-2.svg" alt="" style="width: 16px; height: 16px; display: block; filter: brightness(0) invert(1)" /></button>
+                        <button class="cls" onclick="closeCart()">×</button>
+                    </div>
                 </div>
 
                 <!-- ZONA 1: productos (scroll independiente) -->
@@ -225,14 +234,14 @@
                                     type="tel"
                                     placeholder="353"
                                     maxlength="4"
-                                    oninput="onTelChange()"
+                                    oninput="onTelChange(this)"
                                 />
                                 <input
                                     id="cNum"
                                     type="tel"
                                     placeholder="4140385"
                                     maxlength="8"
-                                    oninput="onTelChange()"
+                                    oninput="onTelChange(this)"
                                 />
                             </div>
                             <div class="field-hint-sm">

@@ -4,6 +4,7 @@
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <title>Admin — Travel Blue Argentina</title>
+        <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAzMiAzMiI+PGNpcmNsZSBjeD0iMTYiIGN5PSIxNiIgcj0iMTYiIGZpbGw9IiMyNjJjNjMiLz48dGV4dCB4PSIxNiIgeT0iMjEuNSIgZm9udC1mYW1pbHk9IkFyaWFsLCBIZWx2ZXRpY2EsIHNhbnMtc2VyaWYiIGZvbnQtd2VpZ2h0PSI4MDAiIGZvbnQtc2l6ZT0iMTMiIGZpbGw9IiNmZmM2MWMiIHRleHQtYW5jaG9yPSJtaWRkbGUiPlRCPC90ZXh0Pjwvc3ZnPg==" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link
             href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Work+Sans:wght@400;500;600;700&display=swap"
@@ -248,6 +249,11 @@
                                     <option value="1">Solo mostrados</option>
                                     <option value="0">Solo ocultos</option>
                                 </select>
+                                <select id="filtFoto" onchange="filterTable()">
+                                    <option value="">Con o sin foto</option>
+                                    <option value="con">Con foto</option>
+                                    <option value="sin">Sin foto</option>
+                                </select>
                             </div>
                             <div class="hdr-actions">
                                 <button
@@ -363,6 +369,25 @@
                         <div class="edit-mode-bar" id="editModeBar">
                             ✏ Modo edición activo — editá las celdas. Arrastrá
                             para reordenar.
+                            <label
+                                style="
+                                    margin-left: 16px;
+                                    display: inline-flex;
+                                    align-items: center;
+                                    gap: 6px;
+                                    font-size: 13px;
+                                    font-weight: 600;
+                                    cursor: pointer;
+                                "
+                            >
+                                <input
+                                    type="checkbox"
+                                    id="autoSaveToggle"
+                                    checked
+                                    onchange="setAutoSave(this.checked)"
+                                />
+                                Autoguardar
+                            </label>
                             <button
                                 class="btn btn-primary"
                                 style="
@@ -555,10 +580,15 @@
                     <!-- CONFIGURACIÓN -->
                     <div class="wrap section" id="secConfiguracion">
                         <h2 style="font-size:16px;font-weight:800;color:var(--blue);margin-bottom:12px">Configuración</h2>
-                        <input type="search" class="tools-search" placeholder="🔍 Buscar configuración…"
-                            oninput="filterTools(this,'configuracionGrid')">
-                        <div class="tools-grid" id="configuracionGrid">
-                            <div class="config-box" data-keywords="transportes envío flota correo logística">
+                        <div class="cfg-tabs">
+                            <button class="cfg-tab on" onclick="showCfgTab('transportes', this)">Transportes</button>
+                            <button class="cfg-tab" onclick="showCfgTab('notificaciones', this)">Notificaciones</button>
+                            <button class="cfg-tab" onclick="showCfgTab('sync', this)">Sincronización</button>
+                            <button class="cfg-tab" onclick="showCfgTab('seguridad', this)">Seguridad</button>
+                        </div>
+
+                        <div class="cfg-tab-content on" id="cfgTab-transportes">
+                            <div class="config-box" style="max-width:600px">
                                 <h3>🚚 Transportes</h3>
                                 <p style="font-size:13px;color:var(--muted);margin-bottom:12px">
                                     Lista de transportes disponibles para los
@@ -590,7 +620,10 @@
                                     </div>
                                 </div>
                             </div>
-                            <div class="config-box" data-keywords="whatsapp número teléfono pedidos contacto">
+                        </div>
+
+                        <div class="cfg-tab-content" id="cfgTab-notificaciones">
+                            <div class="config-box" style="max-width:600px">
                                 <h3>📱 WhatsApp</h3>
                                 <p style="font-size:13px;color:var(--muted);margin-bottom:12px">
                                     Número completo con código de país, sin espacios
@@ -601,25 +634,10 @@
                                     <button class="btn btn-primary" onclick="saveWA()">Guardar</button>
                                 </div>
                             </div>
-                            <div class="config-box" data-keywords="contraseña password seguridad cambiar acceso clave">
-                                <h3>🔒 Cambiar contraseña</h3>
-                                <div class="field" style="margin-top: 12px">
-                                    <label>Contraseña actual</label>
-                                    <input type="password" id="cfgPassActual" placeholder="••••••••" />
-                                </div>
-                                <div class="field">
-                                    <label>Nueva contraseña</label>
-                                    <input type="password" id="cfgPassNueva" placeholder="••••••••" />
-                                </div>
-                                <div class="field">
-                                    <label>Confirmar nueva contraseña</label>
-                                    <input type="password" id="cfgPassConfirma" placeholder="••••••••" />
-                                </div>
-                                <button class="btn btn-primary" onclick="savePassword()">
-                                    Cambiar contraseña
-                                </button>
-                            </div>
-                            <div class="config-box" data-keywords="manager sync sincronizacion erp precio stock automatico">
+                        </div>
+
+                        <div class="cfg-tab-content" id="cfgTab-sync">
+                            <div class="config-box" style="max-width:600px">
                                 <h3>🔄 Sincronización con Manager</h3>
                                 <p style="font-size:13px;color:var(--muted);margin-bottom:12px">
                                     Trae precio, estado y productos nuevos desde Manager2Max.
@@ -642,6 +660,27 @@
                                 <div id="syncStatusLine" style="font-size:12.5px;color:var(--muted);margin-bottom:12px">Cargando estado…</div>
                                 <button class="btn btn-primary" id="btnSyncNow" onclick="sincronizarManagerAhora()">
                                     🔄 Sincronizar ahora
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="cfg-tab-content" id="cfgTab-seguridad">
+                            <div class="config-box" style="max-width:600px">
+                                <h3>🔒 Cambiar contraseña</h3>
+                                <div class="field" style="margin-top: 12px">
+                                    <label>Contraseña actual</label>
+                                    <input type="password" id="cfgPassActual" placeholder="••••••••" />
+                                </div>
+                                <div class="field">
+                                    <label>Nueva contraseña</label>
+                                    <input type="password" id="cfgPassNueva" placeholder="••••••••" />
+                                </div>
+                                <div class="field">
+                                    <label>Confirmar nueva contraseña</label>
+                                    <input type="password" id="cfgPassConfirma" placeholder="••••••••" />
+                                </div>
+                                <button class="btn btn-primary" onclick="savePassword()">
+                                    Cambiar contraseña
                                 </button>
                             </div>
                         </div>

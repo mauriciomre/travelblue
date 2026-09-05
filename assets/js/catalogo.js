@@ -41,7 +41,7 @@ if (window.IntersectionObserver) {
                     var img = e.target,
                         src = img.getAttribute("data-src");
                     if (src) {
-                        img.src = src;
+                        loadImgWithFade(img, src);
                         img.removeAttribute("data-src");
                     }
                     lazyObs.unobserve(img);
@@ -55,13 +55,26 @@ if (window.IntersectionObserver) {
 function activateLazy() {
     if (!lazyObs) {
         document.querySelectorAll("img[data-src]").forEach(function (i) {
-            i.src = i.getAttribute("data-src") || "";
+            loadImgWithFade(i, i.getAttribute("data-src") || "");
         });
         return;
     }
     document.querySelectorAll("img[data-src]").forEach(function (i) {
         lazyObs.observe(i);
     });
+}
+
+// Evita el "aparece de golpe" al terminar de cargar: engancha el evento load
+// ANTES de asignar src, para no perdérselo en imágenes muy rápidas/cacheadas.
+function loadImgWithFade(img, src) {
+    img.addEventListener(
+        "load",
+        function () {
+            img.classList.add("loaded");
+        },
+        { once: true },
+    );
+    img.src = src;
 }
 
 function getImgSrc(p) {
@@ -854,6 +867,23 @@ function rmCart(code) {
     updateCart();
 }
 
+function vaciarCarrito() {
+    var codes = Object.keys(cart);
+    if (!codes.length) return;
+    if (
+        !confirm(
+            "¿Vaciar todo el carrito? Se van a quitar los " +
+                codes.length +
+                " producto(s) del pedido.",
+        )
+    )
+        return;
+    codes.forEach(function (code) {
+        rmCart(code);
+    });
+    toastCarrito("Carrito vaciado");
+}
+
 function setCartQty(code, qty) {
     var multiplo = getMultiplo(code);
     var snapped = snapToMultiplo(qty, multiplo);
@@ -988,10 +1018,13 @@ function telCompleto() {
 }
 
 var telTimeout = null;
-function onTelChange() {
+function onTelChange(el) {
     clienteId = null;
     document.getElementById("clienteForm").style.display = "none";
     clearTimeout(telTimeout);
+    if (el && el.id === "cCaract" && el.value.length >= el.maxLength) {
+        document.getElementById("cNum").focus();
+    }
     if (!telCompleto()) return;
     telTimeout = setTimeout(buscarCliente, 600);
 }
