@@ -893,7 +893,7 @@ switch ($action) {
     case 'categoria_crear':
         $data = json_decode(file_get_contents('php://input'), true);
         checkAuth($data);
-        $nombre = strtoupper(trim($data['nombre'] ?? ''));
+        $nombre = mb_strtoupper(trim($data['nombre'] ?? ''), 'UTF-8');
         $orden = intval($data['orden'] ?? 0);
         if (!$nombre) { http_response_code(400); die(json_encode(['error' => 'Nombre requerido'])); }
         $stmt = $db->prepare("INSERT INTO categorias (nombre, orden) VALUES (?, ?)");
@@ -906,7 +906,7 @@ switch ($action) {
         $id = intval($_GET['id'] ?? 0);
         $data = json_decode(file_get_contents('php://input'), true);
         checkAuth($data);
-        $nombre = strtoupper(trim($data['nombre'] ?? ''));
+        $nombre = mb_strtoupper(trim($data['nombre'] ?? ''), 'UTF-8');
         $orden = intval($data['orden'] ?? 0);
         $oldStmt = $db->prepare("SELECT nombre FROM categorias WHERE id=?");
         $oldStmt->bind_param('i', $id); $oldStmt->execute();
@@ -1203,7 +1203,7 @@ switch ($action) {
     case 'transporte_crear':
         $data = json_decode(file_get_contents('php://input'), true);
         checkAuth($data);
-        $nombre = strtoupper(trim($data['nombre'] ?? ''));
+        $nombre = mb_strtoupper(trim($data['nombre'] ?? ''), 'UTF-8');
         $orden = intval($data['orden'] ?? 0);
         if (!$nombre) { http_response_code(400); die(json_encode(['error' => 'Nombre requerido'])); }
         $stmt = $db->prepare("INSERT INTO transportes (nombre, orden) VALUES (?, ?)");
@@ -1216,7 +1216,7 @@ switch ($action) {
         $id = intval($_GET['id'] ?? 0);
         $data = json_decode(file_get_contents('php://input'), true);
         checkAuth($data);
-        $nombre = strtoupper(trim($data['nombre'] ?? ''));
+        $nombre = mb_strtoupper(trim($data['nombre'] ?? ''), 'UTF-8');
         $stmt = $db->prepare("UPDATE transportes SET nombre=? WHERE id=?");
         $stmt->bind_param('si', $nombre, $id);
         $stmt->execute();

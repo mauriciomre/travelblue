@@ -2017,7 +2017,8 @@ async function openPedidoModal(id) {
     }
     // Items
     html +=
-        '<table style="width:100%;margin-bottom:16px"><thead><tr><th>Código</th><th>Descripción</th><th>Cant.</th><th>Precio</th><th>Subtotal</th></tr></thead><tbody>';
+        '<div class="table-outer" style="margin-bottom:16px"><div class="table-scroll">' +
+        '<table style="width:100%"><thead><tr><th>Código</th><th>Descripción</th><th>Cant.</th><th>Precio</th><th>Subtotal</th></tr></thead><tbody>';
     p.items.forEach(function (item) {
         html +=
             "<tr><td><code>" +
@@ -2032,7 +2033,7 @@ async function openPedidoModal(id) {
             fmt(item.subtotal) +
             "</td></tr>";
     });
-    html += "</tbody></table>";
+    html += "</tbody></table></div></div>";
     html +=
         '<div style="text-align:right;font-size:18px;font-weight:800;color:var(--blue);margin-bottom:16px">TOTAL: ' +
         fmt(p.total) +

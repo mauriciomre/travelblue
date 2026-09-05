@@ -516,6 +516,43 @@ table {
     box-shadow: 0 1px 4px rgba(0, 0, 0, .08)
 }
 
+/* Con los tiles de stats achicándose al scrollear (.stats.compact), la
+   tabla no tenía cómo estirarse para aprovechar el alto que se libera —
+   quedaba un hueco muerto de fondo de página abajo. Con la sección entera
+   como columna flex de altura fija (todo el alto debajo del topbar) y el
+   resto de los hijos con su tamaño natural, .table-outer (flex:1) es el
+   único que crece o se achica según lo que sobre. Colores queda afuera a
+   propósito — ahí .table-outer no es hijo directo de la sección (va
+   adentro de un wrapper con max-width propio). */
+#secProductos.section.on,
+#secCategorias.section.on,
+#secPedidos.section.on,
+#secClientes.section.on {
+    display: flex;
+    flex-direction: column;
+    height: calc(100vh - 52px);
+    box-sizing: border-box
+}
+
+#secProductos > .table-outer,
+#secCategorias > .table-outer,
+#secPedidos > .table-outer,
+#secClientes > .table-outer {
+    flex: 1;
+    min-height: 200px;
+    display: flex;
+    flex-direction: column
+}
+
+#secProductos > .table-outer .table-scroll,
+#secCategorias > .table-outer .table-scroll,
+#secPedidos > .table-outer .table-scroll,
+#secClientes > .table-outer .table-scroll {
+    flex: 1;
+    min-height: 0;
+    max-height: none
+}
+
 .table-scroll {
     overflow-x: auto;
     /* Header de columnas fijo al scrollear verticalmente — la tabla pasa a
@@ -698,12 +735,19 @@ td.editing {
     display: flex
 }
 
+/* overflow-x:hidden explícito — sin esto, la spec CSS empareja los dos ejes
+   de overflow y cualquier modal con contenido ancho adentro (una tabla sin
+   su propio .table-outer/.table-scroll) termina con scroll horizontal del
+   MODAL ENTERO en vez de quedar contenido. Ningún modal necesita scrollear
+   para el costado por sí mismo; si algo de adentro es más ancho, que
+   scrollee ESO. */
 .modal {
     background: #fff;
     border-radius: 14px;
     padding: 28px;
     width: min(540px, 95vw);
     max-height: 90vh;
+    overflow-x: hidden;
     overflow-y: auto
 }
 
@@ -952,16 +996,14 @@ td.editing {
     padding: 14px 20px;
     flex: 1;
     min-width: 120px;
-    box-shadow: 0 1px 4px rgba(0, 0, 0, .06);
-    transition: padding .18s ease
+    box-shadow: 0 1px 4px rgba(0, 0, 0, .06)
 }
 
 .stat-n {
     font-family: var(--font-heading);
     font-size: 28px;
     font-weight: 800;
-    color: var(--blue);
-    transition: font-size .18s ease
+    color: var(--blue)
 }
 
 .stat-l {
