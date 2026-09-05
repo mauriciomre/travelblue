@@ -946,19 +946,19 @@ function col(key) {
 
 function renderTableHeader() {
     var h = "<thead><tr>";
-    if (col("handle")) h += '<th class="w-handle"></th>';
-    if (col("img")) h += '<th class="w-img">Img</th>';
-    if (col("codigo")) h += sortableTh("Código", "codigo", "sticky-col w-codigo");
+    if (col("handle")) h += "<th></th>";
+    if (col("img")) h += "<th>Img</th>";
+    if (col("codigo")) h += sortableTh("Código", "codigo", "sticky-col");
     if (col("desc")) h += sortableTh("Descripción", "desc");
-    if (col("cat")) h += sortableTh("Categoría", "cat", "col-hide-2 w-cat");
-    if (col("may")) h += sortableTh("Mayorista", "may", "w-may");
-    if (col("pvp")) h += sortableTh("PVP", "pvp", "w-pvp");
-    if (col("estado")) h += sortableTh("Estado", "estado", "w-estado");
-    if (col("mostrar")) h += sortableTh("Mostrar", "mostrar", "w-mostrar");
-    if (col("multiplo")) h += sortableTh("Múltiplo", "multiplo", "col-hide-1 w-multiplo");
-    if (col("barras")) h += '<th class="w-barras">Cód. Barras</th>';
-    if (col("colores")) h += '<th class="w-colores">Colores</th>';
-    if (col("acciones")) h += '<th class="w-acciones">Acciones</th>';
+    if (col("cat")) h += sortableTh("Categoría", "cat", "col-hide-2");
+    if (col("may")) h += sortableTh("Mayorista", "may");
+    if (col("pvp")) h += sortableTh("PVP", "pvp");
+    if (col("estado")) h += sortableTh("Estado", "estado");
+    if (col("mostrar")) h += sortableTh("Mostrar", "mostrar");
+    if (col("multiplo")) h += sortableTh("Múltiplo", "multiplo", "col-hide-1");
+    if (col("barras")) h += "<th>Cód. Barras</th>";
+    if (col("colores")) h += "<th>Colores</th>";
+    if (col("acciones")) h += "<th>Acciones</th>";
     h += "</tr></thead>";
     document.querySelector("#mainTable thead") &&
         (document.querySelector("#mainTable thead").outerHTML = h);
@@ -1054,14 +1054,14 @@ function renderTableFromList(list) {
                     esc(p.codigo) +
                     '" data-field="codigo" data-id="' +
                     p.id +
-                    '"></td>';
+                    '" style="width:90px"></td>';
             if (col("desc"))
                 html +=
                     '<td class="editing"><input class="inline-input" value="' +
                     esc(p.descripcion) +
                     '" data-field="descripcion" data-id="' +
                     p.id +
-                    '"></td>';
+                    '" style="width:180px"></td>';
             if (col("cat"))
                 html +=
                     '<td class="editing col-hide-2"><select class="inline-select" data-field="categoria" data-id="' +
@@ -1086,14 +1086,14 @@ function renderTableFromList(list) {
                     fmtInput(p.precio_mayorista) +
                     '" data-field="precio_mayorista" data-id="' +
                     p.id +
-                    '"></td>';
+                    '" style="width:90px"></td>';
             if (col("pvp"))
                 html +=
                     '<td class="editing"><input class="inline-input" type="number" value="' +
                     fmtInput(p.pvp) +
                     '" data-field="pvp" data-id="' +
                     p.id +
-                    '"></td>';
+                    '" style="width:90px"></td>';
             if (col("estado"))
                 html +=
                     '<td class="editing"><select class="inline-select" data-field="estado" data-id="' +
@@ -1118,7 +1118,7 @@ function renderTableFromList(list) {
                     multiplo +
                     '" data-field="multiplo" data-id="' +
                     p.id +
-                    '" min="1"></td>';
+                    '" style="width:60px" min="1"></td>';
             if (col("barras"))
                 html +=
                     '<td style="color:var(--muted);font-size:11px">' +

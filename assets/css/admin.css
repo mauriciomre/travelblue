@@ -329,6 +329,16 @@ header {
     max-width: 1200px
 }
 
+/* Las secciones con tablas anchas (muchas columnas) necesitan más espacio que
+   el resto (formularios/tarjetas, que se leen mejor angostos) — sin este
+   override, en pantallas grandes la tabla generaba scroll horizontal
+   innecesario mientras quedaba espacio libre sin usar a la derecha. */
+#secProductos.wrap,
+#secPedidos.wrap,
+#secClientes.wrap {
+    max-width: none
+}
+
 .section {
     display: none
 }
@@ -560,44 +570,6 @@ tr:last-child td {
 
 tr:hover td {
     background: #fafbff
-}
-
-/* Tabla de Productos: layout fijo para que 12 columnas no fuercen scroll
-   horizontal cuando sí entra en pantalla (table-layout:auto dejaba que cada
-   columna pida su ancho natural sin wrappear, y la suma superaba el ancho
-   real disponible). Descripción es la única sin ancho fijo — absorbe lo que
-   sobra y wrapea a 2-3 líneas en vez de forzar overflow. */
-#mainTable {
-    table-layout: fixed
-}
-
-#mainTable th,
-#mainTable td {
-    box-sizing: border-box
-}
-
-#mainTable td {
-    white-space: normal;
-    overflow-wrap: break-word
-}
-
-#mainTable .w-handle { width: 24px }
-#mainTable .w-img { width: 50px }
-#mainTable .w-codigo { width: 80px }
-#mainTable .w-cat { width: 100px }
-#mainTable .w-may { width: 85px }
-#mainTable .w-pvp { width: 85px }
-#mainTable .w-estado { width: 92px }
-#mainTable .w-mostrar { width: 85px }
-#mainTable .w-multiplo { width: 85px }
-#mainTable .w-barras { width: 100px }
-#mainTable .w-colores { width: 60px }
-#mainTable .w-acciones { width: 128px; white-space: nowrap }
-
-#mainTable .inline-input,
-#mainTable .inline-select {
-    width: 100%;
-    box-sizing: border-box
 }
 
 .thumb {
