@@ -1911,17 +1911,17 @@ function imprimirPedido() {
         ".info{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;padding:12px;background:#f5f5f5;border-radius:8px;font-size:13px}";
     html += "table{width:100%;border-collapse:collapse;margin-bottom:16px}";
     html +=
-        "th{background:#003087;color:#fff;padding:7px 8px;text-align:left;font-size:12px}";
+        "th{background:#262c63;color:#fff;padding:7px 8px;text-align:left;font-size:12px}";
     html +=
         "td{padding:7px 8px;border-bottom:1px solid #eee;font-size:12px;vertical-align:top}";
     html += "td.desc{max-width:180px;word-wrap:break-word}";
     html += ".price-cell{white-space:nowrap;font-size:11px}";
     html += ".price-unit{color:#666}";
-    html += ".price-sub{font-weight:bold;color:#003087}";
+    html += ".price-sub{font-weight:bold;color:#262c63}";
     html +=
         ".deposit-box{display:inline-block;width:36px;height:26px;border:2px solid #333;vertical-align:middle}";
     html +=
-        ".total{text-align:right;font-size:16px;font-weight:bold;color:#003087;margin-top:8px}";
+        ".total{text-align:right;font-size:16px;font-weight:bold;color:#262c63;margin-top:8px}";
     html +=
         ".footer{margin-top:24px;padding-top:16px;border-top:1px solid #ccc;display:grid;grid-template-columns:1fr 1fr;gap:16px}";
     html +=
