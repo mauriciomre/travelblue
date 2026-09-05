@@ -823,6 +823,36 @@ switch ($action) {
         echo json_encode(['ok' => true, 'productos' => $productos ?: (object)[]]);
         break;
 
+    // Pasada de una sola vez (2026-09-05): completa productos.foto cuando está
+    // NULL en la base pero el archivo real ya existe en imgs/<codigo>.jpeg
+    // (llegaron por Excel o sync con Manager, ninguno de los dos toca ese
+    // campo). No cambia nada visible — getImgUrl() ya adivinaba ese mismo path
+    // como fallback — solo corrige el dato para que quede consistente (export
+    // de Excel, filtro "con/sin foto", futuras ediciones). Se saca del código
+    // después de correrla una vez. UPDATE acotado a foto IS NULL/'' como
+    // resguardo extra, además de la condición que ya trae el WHERE original.
+    case 'backfill_foto_faltante':
+        $data = json_decode(file_get_contents('php://input'), true);
+        checkAuth($data);
+        $r = $db->query("SELECT id, codigo FROM productos WHERE foto IS NULL OR foto = ''");
+        $rows = $r->fetch_all(MYSQLI_ASSOC);
+        $actualizados = 0; $sinArchivo = 0; $detalle = [];
+        foreach ($rows as $row) {
+            $safeCodigo = str_replace('/', '_', $row['codigo']);
+            $path = __DIR__ . '/imgs/' . $safeCodigo . '.jpeg';
+            if (!file_exists($path)) { $sinArchivo++; continue; }
+            $foto = 'imgs/' . $safeCodigo . '.jpeg';
+            $upd = $db->prepare("UPDATE productos SET foto=? WHERE id=? AND (foto IS NULL OR foto='')");
+            $upd->bind_param('si', $foto, $row['id']);
+            $upd->execute();
+            if ($upd->affected_rows > 0) {
+                $actualizados++;
+                $detalle[] = ['id' => $row['id'], 'codigo' => $row['codigo'], 'foto' => $foto];
+            }
+        }
+        echo json_encode(['ok' => true, 'actualizados' => $actualizados, 'sin_archivo' => $sinArchivo, 'detalle' => $detalle]);
+        break;
+
     case 'import_rollback':
         $data = json_decode(file_get_contents('php://input'), true);
         checkAuth($data);
