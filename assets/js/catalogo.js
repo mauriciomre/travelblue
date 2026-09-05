@@ -359,7 +359,9 @@ function getVisible() {
 }
 
 function fmt(v) {
-    return "$ " + Math.round(parseFloat(v) || 0).toLocaleString("es-AR");
+    // Espacio irrompible (U+00A0) entre "$" y el monto — evita que una celda
+    // angosta corte el precio en dos líneas (signo arriba, monto abajo).
+    return "$\u00A0" + Math.round(parseFloat(v) || 0).toLocaleString("es-AR");
 }
 function sid(code) {
     return "p" + code.replace(/[^a-zA-Z0-9]/g, "_");
@@ -908,7 +910,7 @@ function updateCart() {
     if (!keys.length) {
         el.innerHTML =
             '<div class="empty">Todavía no agregaste productos.</div>';
-        document.getElementById("ptotal").textContent = "$ 0";
+        document.getElementById("ptotal").textContent = fmt(0);
         return;
     }
     var total = 0,

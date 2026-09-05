@@ -911,7 +911,7 @@ function getFiltered() {
             (!cat || p.categoria === cat) &&
             (!est || p.estado === est) &&
             (!mostrarFiltro || (mostrarFiltro === "1" ? p.mostrar != 0 : p.mostrar == 0)) &&
-            (!fotoFiltro || (fotoFiltro === "con" ? !!p.foto : !p.foto)),
+            (!fotoFiltro || (fotoFiltro === "con" ? !!p.tiene_foto : !p.tiene_foto)),
     );
     return applyColSort(filtered);
 }
@@ -919,7 +919,7 @@ function filterTable() {
     renderTable(getFiltered());
 }
 function fmt(v) {
-    return v ? "$ " + Math.round(parseFloat(v)).toLocaleString("es-AR") : "—";
+    return v ? "$\u00A0" + Math.round(parseFloat(v)).toLocaleString("es-AR") : "—";
 }
 function fmtInput(v) {
     return v ? Math.round(parseFloat(v)) : "";
@@ -3145,7 +3145,7 @@ function executePrint() {
     // Formato moneda
     function fmtP(v) {
         if (v == null || v === '') return '—';
-        return '$ ' + Number(v).toLocaleString('es-AR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        return '$\u00A0' + Number(v).toLocaleString('es-AR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
     }
 
     var fecha = new Date().toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });

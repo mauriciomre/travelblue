@@ -38,6 +38,18 @@ function parse_mostrar_valor($v) {
     return in_array($v, ['SI', 'SÍ', 'S', 'YES', 'Y', '1', 'TRUE', 'X'], true) ? 1 : 0;
 }
 
+// El campo "foto" queda NULL en muchísimos productos reales (los que entraron
+// por Excel o por Manager nunca lo tocan) aunque el archivo exista de verdad
+// en imgs/<codigo>.jpeg (subido por otra vía) — mismo fallback que ya usa
+// getImgUrl() en el frontend para decidir qué mostrar. Esta función replica
+// ese mismo criterio para poder filtrar "con/sin foto" contra la realidad,
+// no solo contra el campo de la base.
+function producto_tiene_foto($codigo, $foto) {
+    if (!empty($foto)) return true;
+    $guessPath = __DIR__ . '/imgs/' . str_replace('/', '_', $codigo) . '.jpeg';
+    return file_exists($guessPath);
+}
+
 // ── Sync con Manager2Max ─────────────────────────────────────────────────────
 // Reglas de negocio confirmadas por Mauricio (Mi-Cerebro/proyectos/travelblue-catalogo-backlog.md):
 define('MANAGER_MARCAS', ['TRAVEL BLUE', 'ANOMEO', 'SLOOTH']);
@@ -539,6 +551,11 @@ switch ($action) {
             $cstmt->bind_param('i', $prod['id']);
             $cstmt->execute();
             $prod['colores'] = $cstmt->get_result()->fetch_all(MYSQLI_ASSOC);
+            // Solo le sirve al filtro "con/sin foto" del admin — no hace falta
+            // pagar el file_exists() en cada visita anónima al catálogo público.
+            if ($isAdmin) {
+                $prod['tiene_foto'] = producto_tiene_foto($prod['codigo'], $prod['foto']) ? 1 : 0;
+            }
         }
         echo json_encode($productos);
         break;
