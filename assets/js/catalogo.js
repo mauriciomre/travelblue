@@ -6,6 +6,22 @@ var products = [],
     query = "",
     viewMode = "grid",
     sortMode = "default";
+var showAgotados = (function () {
+    try {
+        var v = localStorage.getItem("tb_show_agotados");
+        return v === null ? true : v === "1";
+    } catch (e) {
+        return true;
+    }
+})();
+
+function toggleShowAgotados(checked) {
+    showAgotados = checked;
+    try {
+        localStorage.setItem("tb_show_agotados", checked ? "1" : "0");
+    } catch (e) {}
+    renderProds();
+}
 
 // ── CARRITO PERSISTENTE ───────────────────────────────────────────────────────
 function saveCart() {
@@ -328,7 +344,9 @@ function getVisible() {
             (p.DESCRIPCION || "").toLowerCase().indexOf(query) >= 0 ||
             (p.CODIGO || "").toLowerCase().indexOf(query) >= 0 ||
             (p.CODIGO_BARRAS || "").toLowerCase().indexOf(query) >= 0;
-        return catOk && srchOk;
+        var agotadoOk =
+            showAgotados || (p.ESTADO || "").toUpperCase() !== "AGOTADO";
+        return catOk && srchOk && agotadoOk;
     });
 
     // Ordenamiento
@@ -410,6 +428,10 @@ function renderProds() {
         '<button class="sort-btn' +
         (sortMode === "price_desc" ? " on" : "") +
         '" data-sort="price_desc" onclick="setSort(\'price_desc\')">$ ↓</button>' +
+        '<label style="margin-left:auto;display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--muted);cursor:pointer">' +
+        '<input type="checkbox"' +
+        (showAgotados ? " checked" : "") +
+        ' onchange="toggleShowAgotados(this.checked)"> Mostrar agotados</label>' +
         "</div>";
 
     if (viewMode === "grid") renderGrid(list, el, sortBar);

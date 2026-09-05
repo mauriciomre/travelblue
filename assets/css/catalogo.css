@@ -275,7 +275,7 @@ header {
 /* BODY */
 .body {
     padding: 16px;
-    max-width: 960px;
+    max-width: 1200px;
     margin: 0 auto
 }
 
@@ -296,6 +296,16 @@ header {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
     gap: 12px
+}
+
+/* 5 columnas fijas en desktop — el contenedor (.body, arriba) se ensanchó a
+   1200px junto con este cambio para que las cards no queden comprimidas.
+   Por debajo de 860px sigue el auto-fill de arriba (tablet), y el fijo de
+   2 columnas en mobile (ver media query más abajo). */
+@media (min-width: 860px) {
+    .grid {
+        grid-template-columns: repeat(5, 1fr)
+    }
 }
 
 .card {
