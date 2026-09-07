@@ -350,6 +350,252 @@ function manager_sync_aplicar($db, $diff, $modo, $runId, $token) {
     return ['actualizados' => $actualizados, 'nuevos_creados' => $nuevosCreados, 'nuevos_pendientes' => $nuevosPendientes];
 }
 
+// ── Sync minorista con WooCommerce (travelblue.com.ar) ──────────────────────
+// Solo marca Travel Blue (Anomeo/Slooth son exclusivos del catálogo mayorista,
+// aclarado por Mauricio 07/09/2026). Reglas ya validadas hoy contra producción
+// real por el tool Python travelblue_woocommerce_sync/ (mismo repo de scripts,
+// carpeta hermana) antes de portarlas acá.
+define('WOO_MARCA', 'TRAVEL BLUE');
+define('WOO_LISTA_PRECIO', 1); // Público General
+define('WOO_RUBROS_EXCLUIDOS', ['EXHIBIDORES', 'CONCEPTOS']); // mobiliario de punto de venta / conceptos de facturación, no productos vendibles
+
+function woo_call($method, $path, $body = null, $query = null) {
+    $url = WOO_STORE_URL . '/wp-json/wc/v3' . $path;
+    if ($query) $url .= '?' . http_build_query($query);
+    $ch = curl_init($url);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_CUSTOMREQUEST, $method);
+    curl_setopt($ch, CURLOPT_USERPWD, WOO_CONSUMER_KEY . ':' . WOO_CONSUMER_SECRET);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json; charset=utf-8']);
+    if ($body !== null) curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($body, JSON_UNESCAPED_UNICODE));
+    curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+    $resp = curl_exec($ch);
+    $err = curl_error($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+    if ($err) throw new Exception("WooCommerce $method $path falló: $err");
+    $data = json_decode($resp, true);
+    if ($httpCode >= 400) throw new Exception("WooCommerce $method $path error $httpCode: " . ($data['message'] ?? $resp));
+    return $data;
+}
+
+// GET /products?sku=... hace match EXACTO — devuelve tanto productos simples
+// como VARIACIONES (modelos agrupados por color, ej. "Mochila XPERT" con
+// padre de sku inventado "3XPERT" y variaciones reales "33050"/"33051") con
+// el mismo shape relevante (regular_price/sale_price/stock_status/type/
+// parent_id) — hallazgo real 07/09/2026, ver conocimiento/manager2max.md.
+function woo_find_by_sku($sku) {
+    $productos = woo_call('GET', '/products', null, ['sku' => $sku]);
+    return $productos[0] ?? null;
+}
+function woo_update_product($id, $payload) { return woo_call('PUT', "/products/$id", $payload); }
+function woo_update_variation($parentId, $variationId, $payload) { return woo_call('PUT', "/products/$parentId/variations/$variationId", $payload); }
+function woo_create_product($payload) { return woo_call('POST', '/products', $payload); }
+function woo_list_categories() {
+    $categorias = [];
+    $page = 1;
+    while (true) {
+        $lote = woo_call('GET', '/products/categories', null, ['page' => $page, 'per_page' => 100]);
+        if (!$lote) break;
+        $categorias = array_merge($categorias, $lote);
+        $page++;
+    }
+    return $categorias;
+}
+function woo_create_category($nombre) { return woo_call('POST', '/products/categories', ['name' => $nombre]); }
+
+// Categorías reales confirmadas contra travelblue.com.ar (07/09/2026): a
+// diferencia del mayorista (que renombra Equipajes -> "VALIJAS"), acá la
+// tienda YA usa "Equipajes" tal cual — no renombrar.
+function woo_categoria($rubro) {
+    $rubro = strtoupper(trim($rubro));
+    if ($rubro === 'MOCHILAS') return 'Mochilas';
+    if ($rubro === 'EQUIPAJES') return 'Equipajes';
+    return 'Accesorios';
+}
+
+function woo_es_vendible($rubro) {
+    return !in_array(strtoupper(trim($rubro)), WOO_RUBROS_EXCLUIDOS, true);
+}
+
+// Si el producto tiene sale_price activo, recalcula el precio promocional
+// manteniendo el MISMO % de descuento al cambiar el regular_price — pedido
+// explícito de Mauricio (07/09/2026), sin esto un producto en oferta quedaba
+// con el precio rebajado viejo (% de descuento roto) al actualizar el precio.
+function woo_recalcular_precio_promocional($regularActual, $saleActual, $regularNuevo) {
+    if (empty($saleActual)) return null;
+    $regularActual = floatval($regularActual);
+    $saleActual = floatval($saleActual);
+    if ($regularActual <= 0) return null;
+    $descuento = 1 - ($saleActual / $regularActual);
+    return (string) round(floatval($regularNuevo) * (1 - $descuento));
+}
+
+// Trae todos los artículos vendibles de Travel Blue con precio Público
+// General, ya limpios/categorizados — 2 llamadas a Manager en total (todos
+// los artículos de la marca + todos los precios de la lista para esa marca),
+// mismo patrón eficiente que ya usa manager_fetch_marca (nada de consultar
+// precio artículo por artículo).
+function woo_fetch_travelblue($token) {
+    $articulos = manager_call($token, '/Api/articulo/GetDTArticulos', [
+        'DTRequest' => ['draw' => 1, 'order' => [], 'start' => 0, 'length' => 5000],
+        'DefinicionTablaFiltros' => false,
+        'CalculaTotales' => false,
+        'ListFilters' => manager_dict_filtros(['Marca' => manager_filtro_texto(WOO_MARCA)]),
+    ]);
+
+    $items = [];
+    foreach ($articulos as $a) {
+        $codigo = trim($a['CodigoArticulo'] ?? '');
+        if ($codigo === '') continue;
+        if (!woo_es_vendible($a['Rubro'] ?? '')) continue;
+        $items[$codigo] = [
+            'codigo' => $codigo,
+            'descripcion' => manager_limpiar_descripcion($a['Descripcion'] ?? '', WOO_MARCA),
+            'categoria' => woo_categoria($a['Rubro'] ?? ''),
+            'stock_status' => !empty($a['Sube']) ? 'instock' : 'outofstock',
+            'precio' => null,
+        ];
+    }
+
+    $precios = manager_call($token, '/Api/articulo/GetDTArticulosPrecioExistencia', [
+        'DTRequest' => ['draw' => 1, 'order' => [], 'start' => 0, 'length' => 5000],
+        'DefinicionTablaFiltros' => false,
+        'CalculaTotales' => false,
+        'ListFilters' => manager_dict_filtros([
+            'IDListaPrecio' => manager_filtro_numero(WOO_LISTA_PRECIO),
+            'IDDeposito' => manager_filtro_numero(0),
+            'IDCliente' => manager_filtro_numero(0),
+            'IDProveedor' => manager_filtro_numero(0),
+            'IDMonedaComprobante' => manager_filtro_numero(1),
+            'FactorCotizacionMonCompMonLP' => manager_filtro_numero(1.0),
+            'Marca' => manager_filtro_texto(WOO_MARCA),
+        ]),
+    ]);
+    foreach ($precios as $p) {
+        $codigo = trim($p['CodigoArticulo'] ?? '');
+        if (isset($items[$codigo]) && isset($p['PrecioFinalLP'])) {
+            $items[$codigo]['precio'] = (string) round(floatval($p['PrecioFinalLP']));
+        }
+    }
+
+    return array_values($items);
+}
+
+// Compara Travel Blue (Manager) contra WooCommerce EN VIVO — a diferencia de
+// manager_sync_diff (que compara contra la tabla local `productos`), acá no
+// hay tabla espejo: cada corrida llama woo_find_by_sku por artículo (~160
+// llamadas, mismo costo que ya paga el tool Python, un par de minutos).
+function woo_sync_diff($token) {
+    $items = woo_fetch_travelblue($token);
+    $categoriasWoo = woo_list_categories();
+
+    $actualiza = [];
+    $nuevos = [];
+    $sinCambios = [];
+
+    foreach ($items as $it) {
+        $producto = woo_find_by_sku($it['codigo']);
+
+        if ($producto === null) {
+            $idCategoria = null;
+            foreach ($categoriasWoo as $c) {
+                if (strcasecmp(trim($c['name']), $it['categoria']) === 0) { $idCategoria = $c['id']; break; }
+            }
+            $nuevos[] = array_merge($it, ['id_categoria' => $idCategoria]);
+            continue;
+        }
+
+        $esVariacion = ($producto['type'] ?? '') === 'variation';
+        $cambios = [];
+
+        if ($it['precio'] !== null) {
+            $precioActual = $producto['regular_price'] ?? '';
+            if ($precioActual === '' || abs(floatval($precioActual) - floatval($it['precio'])) >= 1) {
+                $cambios['regular_price'] = ['antes' => $precioActual, 'despues' => $it['precio']];
+                $salePromo = woo_recalcular_precio_promocional($precioActual, $producto['sale_price'] ?? null, $it['precio']);
+                if ($salePromo !== null) {
+                    $cambios['sale_price'] = ['antes' => $producto['sale_price'], 'despues' => $salePromo];
+                }
+            }
+        }
+
+        if (($producto['stock_status'] ?? '') !== $it['stock_status']) {
+            $cambios['stock_status'] = ['antes' => $producto['stock_status'] ?? '', 'despues' => $it['stock_status']];
+        }
+
+        if ($cambios) {
+            $actualiza[] = [
+                'codigo' => $it['codigo'], 'nombre' => $producto['name'] ?? '',
+                'es_variacion' => $esVariacion, 'id' => $producto['id'], 'parent_id' => $producto['parent_id'] ?? null,
+                'cambios' => $cambios,
+            ];
+        } else {
+            $sinCambios[] = ['codigo' => $it['codigo']];
+        }
+    }
+
+    return ['actualiza' => $actualiza, 'nuevos' => $nuevos, 'sin_cambios' => $sinCambios];
+}
+
+// Aplica un diff ya calculado. SIN cola de "pendientes" a diferencia del sync
+// de Manager: una alta en WooCommerce nace SIEMPRE como borrador invisible
+// (status=draft), así que la revisión humana ya está garantizada por eso — no
+// hace falta una aprobación aparte. Por eso solo hay 2 modos (manual/automático,
+// confirmado con Mauricio 07/09/2026), no 3.
+function woo_sync_aplicar($db, $diff, $modo, $runId) {
+    $actualizados = 0; $nuevosCreados = 0; $errores = [];
+
+    foreach ($diff['actualiza'] as $it) {
+        $payload = [];
+        foreach ($it['cambios'] as $campo => $vals) $payload[$campo] = $vals['despues'];
+        try {
+            if ($it['es_variacion']) {
+                woo_update_variation($it['parent_id'], $it['id'], $payload);
+            } else {
+                woo_update_product($it['id'], $payload);
+            }
+            $actualizados++;
+        } catch (Exception $e) {
+            $errores[] = ['codigo' => $it['codigo'], 'motivo' => $e->getMessage()];
+        }
+    }
+
+    foreach ($diff['nuevos'] as $it) {
+        $idCategoria = $it['id_categoria'];
+        if ($idCategoria === null) {
+            try { $idCategoria = woo_create_category($it['categoria'])['id']; } catch (Exception $e) { /* sigue sin categoría si falla */ }
+        }
+        $descripcionHtml = '<h3>Detalles</h3><p>' . htmlspecialchars($it['descripcion']) . '</p><h3>Características</h3><p>(completar antes de publicar)</p>';
+        $payload = [
+            'name' => $it['descripcion'] ?: $it['codigo'],
+            'sku' => $it['codigo'],
+            'type' => 'simple',
+            'status' => 'draft', // nunca publicar automático
+            'description' => $descripcionHtml,
+            'stock_status' => $it['stock_status'],
+            'manage_stock' => false,
+        ];
+        if ($it['precio'] !== null) $payload['regular_price'] = $it['precio'];
+        if ($idCategoria !== null) $payload['categories'] = [['id' => $idCategoria]];
+        try {
+            woo_create_product($payload);
+            $nuevosCreados++;
+        } catch (Exception $e) {
+            $errores[] = ['codigo' => $it['codigo'], 'motivo' => $e->getMessage()];
+        }
+    }
+
+    $ok = empty($errores) ? 1 : 0;
+    $mensaje = empty($errores) ? null : json_encode($errores, JSON_UNESCAPED_UNICODE);
+    $log = $db->prepare("INSERT INTO woo_sync_log (run_id, ok, mensaje, actualizados, nuevos) VALUES (?,?,?,?,?)");
+    $log->bind_param('sisii', $runId, $ok, $mensaje, $actualizados, $nuevosCreados);
+    $log->execute();
+
+    return ['actualizados' => $actualizados, 'nuevos_creados' => $nuevosCreados, 'errores' => $errores];
+}
+
 function setupDB($db) {
     $db->query("CREATE TABLE IF NOT EXISTS categorias (
         id INT AUTO_INCREMENT PRIMARY KEY,
@@ -502,6 +748,20 @@ function setupDB($db) {
         marca VARCHAR(50) NOT NULL,
         ok TINYINT NOT NULL,
         mensaje VARCHAR(255),
+        actualizados INT DEFAULT 0,
+        nuevos INT DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_run_id (run_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+    // ── Sync minorista con WooCommerce (travelblue.com.ar) ───────────────
+    $db->query("INSERT IGNORE INTO config (clave, valor) VALUES ('woo_sync_mode', 'manual')");
+
+    $db->query("CREATE TABLE IF NOT EXISTS woo_sync_log (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        run_id VARCHAR(50) NOT NULL,
+        ok TINYINT NOT NULL,
+        mensaje TEXT,
         actualizados INT DEFAULT 0,
         nuevos INT DEFAULT 0,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -1182,6 +1442,101 @@ switch ($action) {
         $stmt->bind_param('s', $ultimo['run_id']);
         $stmt->execute();
         echo json_encode(['ok' => true, 'modo' => $modo, 'run_id' => $ultimo['run_id'], 'filas' => $stmt->get_result()->fetch_all(MYSQLI_ASSOC)]);
+        break;
+
+    // ── SYNC MINORISTA CON WOOCOMMERCE (travelblue.com.ar) ──────────────────
+    case 'woo_sync_preview':
+        $data = json_decode(file_get_contents('php://input'), true);
+        checkAuth($data);
+        try {
+            $token = manager_login();
+            $diff = woo_sync_diff($token);
+            echo json_encode(['ok' => true] + $diff);
+        } catch (Exception $e) {
+            http_response_code(500);
+            echo json_encode(['error' => $e->getMessage()]);
+        }
+        break;
+
+    case 'woo_sync_apply':
+        $data = json_decode(file_get_contents('php://input'), true);
+        checkAuth($data);
+
+        $lockRow = $db->query("SELECT GET_LOCK('woo_sync_lock', 0) as l")->fetch_assoc();
+        if (!$lockRow || $lockRow['l'] != 1) {
+            http_response_code(409);
+            die(json_encode(['error' => 'Ya hay una sincronización minorista en curso, esperá a que termine']));
+        }
+        try {
+            $modoRow = $db->query("SELECT valor FROM config WHERE clave='woo_sync_mode'")->fetch_assoc();
+            $modo = $modoRow ? $modoRow['valor'] : 'manual';
+            $token = manager_login();
+            $diff = woo_sync_diff($token);
+
+            // codigos_incluir: igual que manager_sync_apply, permite destildar
+            // filas puntuales del preview antes de confirmar.
+            if (isset($data['codigos_incluir']) && is_array($data['codigos_incluir'])) {
+                $incluir = array_flip($data['codigos_incluir']);
+                $diff['actualiza'] = array_values(array_filter($diff['actualiza'], function ($it) use ($incluir) {
+                    return isset($incluir[$it['codigo']]);
+                }));
+                $diff['nuevos'] = array_values(array_filter($diff['nuevos'], function ($it) use ($incluir) {
+                    return isset($incluir[$it['codigo']]);
+                }));
+            }
+
+            $runId = 'woosync_' . date('Ymd_His') . '_' . substr(uniqid(), -4);
+            $resumen = woo_sync_aplicar($db, $diff, $modo, $runId);
+            echo json_encode(['ok' => true, 'modo' => $modo, 'run_id' => $runId] + $resumen);
+        } catch (Exception $e) {
+            http_response_code(500);
+            echo json_encode(['error' => $e->getMessage()]);
+        } finally {
+            $db->query("SELECT RELEASE_LOCK('woo_sync_lock')");
+        }
+        break;
+
+    case 'woo_sync_cron':
+        // Sin sesión — autenticado por token, para poder dispararse desde un Cron Job de Ferozo
+        $token_recibido = $_GET['token'] ?? '';
+        if (!hash_equals(WOO_SYNC_TOKEN, $token_recibido)) {
+            http_response_code(401);
+            die(json_encode(['error' => 'Token inválido']));
+        }
+
+        $modoRow = $db->query("SELECT valor FROM config WHERE clave='woo_sync_mode'")->fetch_assoc();
+        $modo = $modoRow ? $modoRow['valor'] : 'manual';
+        if ($modo === 'manual') {
+            echo json_encode(['ok' => true, 'modo' => 'manual', 'accion' => 'ninguna — modo manual, el cron no aplica cambios']);
+            break;
+        }
+
+        $lockRow = $db->query("SELECT GET_LOCK('woo_sync_lock', 0) as l")->fetch_assoc();
+        if (!$lockRow || $lockRow['l'] != 1) {
+            http_response_code(409);
+            die(json_encode(['error' => 'Ya hay una sincronización minorista en curso']));
+        }
+        try {
+            $token = manager_login();
+            $diff = woo_sync_diff($token);
+            $runId = 'woosync_' . date('Ymd_His') . '_' . substr(uniqid(), -4);
+            $resumen = woo_sync_aplicar($db, $diff, $modo, $runId);
+            echo json_encode(['ok' => true, 'modo' => $modo, 'run_id' => $runId] + $resumen);
+        } catch (Exception $e) {
+            http_response_code(500);
+            echo json_encode(['error' => $e->getMessage()]);
+        } finally {
+            $db->query("SELECT RELEASE_LOCK('woo_sync_lock')");
+        }
+        break;
+
+    case 'woo_sync_log_ultimo':
+        $data = json_decode(file_get_contents('php://input'), true);
+        checkAuth($data);
+        $modoRow = $db->query("SELECT valor FROM config WHERE clave='woo_sync_mode'")->fetch_assoc();
+        $modo = $modoRow ? $modoRow['valor'] : 'manual';
+        $ultimo = $db->query("SELECT * FROM woo_sync_log ORDER BY created_at DESC LIMIT 1")->fetch_assoc();
+        echo json_encode(['ok' => true, 'modo' => $modo, 'ultimo' => $ultimo ?: null]);
         break;
 
     case 'config_set':

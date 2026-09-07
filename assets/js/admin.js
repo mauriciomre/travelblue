@@ -355,7 +355,7 @@ function showSection(s, btn) {
     if (s === "pedidos") loadPedidos();
     if (s === "clientes") loadClientes();
     if (s === "pendientesManager") loadPendientesManager();
-    if (s === "configuracion") loadSyncStatus();
+    if (s === "configuracion") { loadSyncStatus(); loadWooSyncStatus(); }
 }
 
 // ── CONFIGURACIÓN ─────────────────────────────────────────────────────────────
@@ -3797,6 +3797,251 @@ async function aplicarAccionPendientes(ids, accion) {
         if (accion === "aprobar") await loadProducts();
     } else {
         toast("Error: " + json.error, "#c62828");
+    }
+}
+
+// ── Sync minorista con WooCommerce (travelblue.com.ar) ──────────────────────
+// Mismo patrón que la sync de Manager de arriba, clonado y adaptado: sin cola
+// de "pendientes" (una alta en WooCommerce ya nace como borrador invisible,
+// no hace falta aprobación aparte — confirmado con Mauricio 07/09/2026), y
+// sin "por marca" (esta sync es solo Travel Blue). Los campos que cambian
+// (`cambios`) vienen dinámicos desde el backend (regular_price/sale_price/
+// stock_status), no columnas fijas como precio_mayorista/pvp/estado.
+var wooSyncPreviewDiff = null;
+var _wooSyncFilter = "todos";
+var _wooSyncSelected = {};
+
+async function loadWooSyncStatus() {
+    try {
+        var res = await fetch(API + "?action=woo_sync_log_ultimo", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ _user: authUser, _pass: authPass }),
+        });
+        var json = await res.json();
+        if (!json.ok) return;
+        var radio = document.querySelector('input[name="wooSyncMode"][value="' + json.modo + '"]');
+        if (radio) radio.checked = true;
+        var line = document.getElementById("wooSyncStatusLine");
+        if (!line) return;
+        if (!json.ultimo) {
+            line.textContent = "Todavía no se corrió ninguna sincronización.";
+            return;
+        }
+        var u = json.ultimo;
+        var estado = u.ok == 1 ? "OK" : "FALLÓ";
+        var d = new Date(u.created_at.replace(" ", "T"));
+        var fechaStr = d.toLocaleDateString("es-AR") + " " + d.getHours().toString().padStart(2, "0") + ":" + d.getMinutes().toString().padStart(2, "0");
+        line.textContent = "Última sync: " + fechaStr + " — " + estado + " (" + u.actualizados + " act., " + u.nuevos + " nuevos)" + (u.mensaje ? " — " + u.mensaje : "");
+    } catch (e) {}
+}
+
+async function setWooSyncMode(modo) {
+    var res = await fetch(API + "?action=config_set", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ _user: authUser, _pass: authPass, clave: "woo_sync_mode", valor: modo }),
+    });
+    var json = await res.json();
+    if (json.ok) toast("Modo de sincronización minorista actualizado");
+}
+
+async function sincronizarWooAhora() {
+    var modoSel = document.querySelector('input[name="wooSyncMode"]:checked');
+    modoSel = modoSel ? modoSel.value : "manual";
+    var btn = document.getElementById("btnWooSyncNow");
+    btn.disabled = true;
+    btn.textContent = "Consultando Manager y WooCommerce...";
+    try {
+        if (modoSel === "manual") {
+            var res = await fetch(API + "?action=woo_sync_preview", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ _user: authUser, _pass: authPass }),
+            });
+            var json = await res.json();
+            if (!json.ok) { toast("Error: " + json.error, "#c62828"); return; }
+            renderWooSyncPreview(json);
+            document.getElementById("wooSyncPreviewModal").classList.add("open");
+        } else {
+            var res2 = await fetch(API + "?action=woo_sync_apply", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ _user: authUser, _pass: authPass }),
+            });
+            var json2 = await res2.json();
+            if (!json2.ok) { toast("Error: " + json2.error, "#c62828"); return; }
+            toast("Sync minorista aplicada: " + json2.actualizados + " actualizados, " + json2.nuevos_creados + " nuevos (borrador)");
+            loadWooSyncStatus();
+        }
+    } catch (e) {
+        toast("Error de conexión con Manager/WooCommerce", "#c62828");
+    } finally {
+        btn.disabled = false;
+        btn.textContent = "🛍️ Sincronizar ahora";
+    }
+}
+
+function renderWooSyncPreview(diff) {
+    wooSyncPreviewDiff = diff;
+    _wooSyncFilter = "todos";
+    _wooSyncSelected = {};
+    diff.nuevos.concat(diff.actualiza).forEach(function (it) { _wooSyncSelected[it.codigo] = true; });
+
+    var wrap = document.getElementById("wooSyncPreviewWrap");
+    wrap.innerHTML = buildWooSyncPreviewHTML(diff);
+    wrap.onchange = function (e) {
+        if (e.target.classList.contains("wooSyncChk")) {
+            _wooSyncSelected[e.target.dataset.codigo] = e.target.checked;
+            updateWooSyncConfirmState();
+        } else if (e.target.id === "wooSyncSelectAll") {
+            var checked = e.target.checked;
+            wrap.querySelectorAll(".wooSyncChk").forEach(function (cb) {
+                cb.checked = checked;
+                _wooSyncSelected[cb.dataset.codigo] = checked;
+            });
+            updateWooSyncConfirmState();
+        }
+    };
+    updateWooSyncConfirmState();
+}
+
+function updateWooSyncConfirmState() {
+    var n = Object.keys(_wooSyncSelected).filter(function (c) { return _wooSyncSelected[c]; }).length;
+    var btn = document.getElementById("btnWooSyncConfirm");
+    if (btn) {
+        btn.disabled = n === 0;
+        btn.textContent = n > 0 ? "Confirmar y aplicar (" + n + ")" : "Confirmar y aplicar";
+    }
+}
+
+// Muestra cada campo cambiado inline (antes → después) -- a diferencia de la
+// tabla de Manager, acá los campos que cambian son dinámicos (regular_price/
+// sale_price/stock_status), no columnas fijas.
+function wooFormatCambios(cambios) {
+    var ETIQUETAS = { regular_price: "Precio", sale_price: "Precio oferta", stock_status: "Stock" };
+    return Object.keys(cambios).map(function (campo) {
+        var c = cambios[campo];
+        var label = ETIQUETAS[campo] || campo;
+        return "<div><strong>" + label + ":</strong> <span style='text-decoration:line-through;color:#aaa'>" + esc(String(c.antes ?? "")) + "</span> → " + esc(String(c.despues ?? "")) + "</div>";
+    }).join("");
+}
+
+function buildWooSyncPreviewHTML(diff) {
+    var counts = { NUEVO: diff.nuevos.length, ACTUALIZA: diff.actualiza.length, SIN_CAMBIOS: diff.sin_cambios.length };
+    var all = diff.nuevos
+        .map(function (it) { return { it: it, status: "NUEVO" }; })
+        .concat(diff.actualiza.map(function (it) { return { it: it, status: "ACTUALIZA" }; }))
+        .concat(diff.sin_cambios.map(function (it) { return { it: it, status: "SIN_CAMBIOS" }; }));
+    var visible = _wooSyncFilter === "todos" ? all : all.filter(function (r) { return r.status === _wooSyncFilter; });
+
+    var html = "";
+    html += "<div style='display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px'>";
+    html += importStatTile("✅ Nuevos (borrador)", counts.NUEVO, "#1b5e20", "#e8f5e9");
+    html += importStatTile("🔄 Actualizan", counts.ACTUALIZA, "#0d47a1", "#e3f2fd");
+    html += importStatTile("⏭ Sin cambios", counts.SIN_CAMBIOS, "#555", "#f5f5f5");
+    html += "</div>";
+
+    html += "<div style='display:flex;gap:5px;margin-bottom:10px;flex-wrap:wrap'>";
+    html += wooSyncFilterTab("todos", "Todos", all.length);
+    html += wooSyncFilterTab("NUEVO", "Nuevos", counts.NUEVO);
+    html += wooSyncFilterTab("ACTUALIZA", "Actualizan", counts.ACTUALIZA);
+    html += wooSyncFilterTab("SIN_CAMBIOS", "Sin cambios", counts.SIN_CAMBIOS);
+    html += "</div>";
+
+    var STATUS_BG = { NUEVO: "#e8f5e9", ACTUALIZA: "#e3f2fd", SIN_CAMBIOS: "#fafafa" };
+    var STATUS_BADGE = {
+        NUEVO: { bg: "#c8e6c9", color: "#1b5e20", label: "NUEVO (borrador)" },
+        ACTUALIZA: { bg: "#bbdefb", color: "#0d47a1", label: "ACTUALIZA" },
+        SIN_CAMBIOS: { bg: "#eeeeee", color: "#757575", label: "SIN CAMBIOS" },
+    };
+
+    var visibleAccionable = visible.filter(function (r) { return r.status !== "SIN_CAMBIOS"; });
+    var allVisibleSelected = visibleAccionable.length > 0 && visibleAccionable.every(function (r) { return _wooSyncSelected[r.it.codigo]; });
+
+    html += "<div style='overflow:auto;max-height:320px;border:1px solid #e0e0e0;border-radius:8px'>";
+    html += "<table class='import-preview-table' style='min-width:100%'><thead><tr>";
+    html += "<th style='min-width:26px'>" + (visibleAccionable.length ? "<input type='checkbox' id='wooSyncSelectAll'" + (allVisibleSelected ? " checked" : "") + ">" : "") + "</th>";
+    html += "<th style='min-width:90px'>Cambio</th><th>Código</th><th>Nombre / Descripción</th><th>Categoría</th><th>Detalle</th>";
+    html += "</tr></thead><tbody>";
+
+    if (!visible.length) {
+        html += "<tr><td colspan='6' style='text-align:center;padding:20px;color:#999'>Sin filas en este filtro</td></tr>";
+    }
+
+    visible.slice(0, 100).forEach(function (f) {
+        var it = f.it;
+        var badge = STATUS_BADGE[f.status];
+        html += "<tr style='background:" + STATUS_BG[f.status] + "'>";
+        if (f.status !== "SIN_CAMBIOS") {
+            html += "<td style='padding:6px 8px'><input type='checkbox' class='wooSyncChk' data-codigo='" + esc(it.codigo) + "'" + (_wooSyncSelected[it.codigo] ? " checked" : "") + "></td>";
+        } else {
+            html += "<td></td>";
+        }
+        html += "<td style='padding:6px 8px'><span class='imp-badge' style='background:" + badge.bg + ";color:" + badge.color + "'>" + badge.label + (it.es_variacion ? " · variación" : "") + "</span></td>";
+        html += "<td style='padding:6px 8px'>" + esc(it.codigo) + "</td>";
+        html += "<td style='padding:6px 8px'>" + esc(it.nombre || it.descripcion || "") + "</td>";
+        html += "<td style='padding:6px 8px'>" + esc(it.categoria || "") + "</td>";
+        if (f.status === "ACTUALIZA") {
+            html += "<td style='padding:6px 8px;font-size:12px'>" + wooFormatCambios(it.cambios) + "</td>";
+        } else if (f.status === "NUEVO") {
+            html += "<td style='padding:6px 8px;font-size:12px'>Precio: $" + Math.round(it.precio || 0) + " · Stock: " + esc(it.stock_status) + "</td>";
+        } else {
+            html += "<td></td>";
+        }
+        html += "</tr>";
+    });
+
+    if (visible.length > 100) {
+        html += "<tr><td colspan='6' style='text-align:center;padding:10px;color:#999;font-size:12px'>… y " + (visible.length - 100) + " filas más</td></tr>";
+    }
+
+    html += "</tbody></table></div>";
+    if (counts.SIN_CAMBIOS > 0) {
+        html += "<p style='font-size:12px;color:#888;margin-top:8px'>⏭ Las " + counts.SIN_CAMBIOS + " fila(s) sin cambios no se van a tocar.</p>";
+    }
+    return html;
+}
+
+function wooSyncFilterTab(value, label, count) {
+    var isActive = _wooSyncFilter === value;
+    var cls = "imp-tab" + (isActive ? " active" : "");
+    return "<button class='" + cls + "' onclick='setWooSyncFilter(\"" + value + "\")'>" + label + " (" + count + ")</button>";
+}
+
+function setWooSyncFilter(value) {
+    _wooSyncFilter = value;
+    if (wooSyncPreviewDiff) document.getElementById("wooSyncPreviewWrap").innerHTML = buildWooSyncPreviewHTML(wooSyncPreviewDiff);
+}
+
+function closeWooSyncPreviewModal() {
+    document.getElementById("wooSyncPreviewModal").classList.remove("open");
+    wooSyncPreviewDiff = null;
+}
+
+async function confirmarSyncWoo() {
+    var codigosIncluir = Object.keys(_wooSyncSelected).filter(function (c) { return _wooSyncSelected[c]; });
+    if (!codigosIncluir.length) { toast("Seleccioná al menos un producto", "#c62828"); return; }
+
+    var btn = document.getElementById("btnWooSyncConfirm");
+    btn.disabled = true;
+    btn.textContent = "Aplicando...";
+    try {
+        var res = await fetch(API + "?action=woo_sync_apply", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ _user: authUser, _pass: authPass, codigos_incluir: codigosIncluir }),
+        });
+        var json = await res.json();
+        if (!json.ok) { toast("Error: " + json.error, "#c62828"); return; }
+        toast("Sync minorista aplicada: " + json.actualizados + " actualizados, " + json.nuevos_creados + " nuevos (borrador)");
+        closeWooSyncPreviewModal();
+        loadWooSyncStatus();
+    } catch (e) {
+        toast("Error al aplicar la sync minorista", "#c62828");
+    } finally {
+        btn.disabled = false;
+        btn.textContent = "Confirmar y aplicar";
     }
 }
 
