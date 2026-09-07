@@ -380,6 +380,90 @@ function woo_call($method, $path, $body = null, $query = null) {
     return $data;
 }
 
+// Sube un binario a la biblioteca de medios de WordPress (wp/v2/media) --
+// distinto de woo_call: la API key de WooCommerce (wc/v3) NO sirve para esto,
+// hace falta un WP Application Password (usuario real de WordPress). Devuelve
+// el ID de medio de WordPress, para referenciar en `images: [{id: ...}]` del
+// producto. Requirió desactivar el bloqueo de Application Passwords que
+// Wordfence trae activado por defecto (decisión explícita de Mauricio,
+// 07/09/2026, ver Wordfence -> Todas las opciones -> Protección contra
+// ataques de fuerza bruta -> "Desactivar las contraseñas de aplicación").
+function wp_upload_media($binario, $filename) {
+    $ch = curl_init(WOO_STORE_URL . '/wp-json/wp/v2/media');
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_POST, true);
+    curl_setopt($ch, CURLOPT_USERPWD, WP_APP_USER . ':' . WP_APP_PASSWORD);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, [
+        'Content-Type: image/jpeg',
+        'Content-Disposition: attachment; filename="' . $filename . '"',
+    ]);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, $binario);
+    curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+    $resp = curl_exec($ch);
+    $err = curl_error($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+    if ($err) throw new Exception("wp/v2/media falló: $err");
+    $data = json_decode($resp, true);
+    if ($httpCode >= 400 || empty($data['id'])) throw new Exception("wp/v2/media error $httpCode: " . ($data['message'] ?? $resp));
+    return $data['id'];
+}
+
+// Redimensiona un binario de imagen al mismo pipeline que ya usa
+// manager_fetch_foto (800x800, fondo blanco, JPEG 85%) pero devuelve el
+// binario procesado en vez de guardarlo a un archivo -- reusable para subir
+// directo a WooCommerce sin pasar por el filesystem de este servidor
+// (Ferozo), que no es el mismo servidor que travelblue.com.ar (SiteGround).
+function woo_procesar_imagen_bytes($binarioOriginal) {
+    $src = @imagecreatefromstring($binarioOriginal);
+    if (!$src) return null;
+    $ow = imagesx($src); $oh = imagesy($src);
+    $ratio = min(800 / $ow, 800 / $oh);
+    $nw = intval($ow * $ratio); $nh = intval($oh * $ratio);
+    $ox = intval((800 - $nw) / 2); $oy = intval((800 - $nh) / 2);
+    $dst = imagecreatetruecolor(800, 800);
+    $white = imagecolorallocate($dst, 255, 255, 255);
+    imagefill($dst, 0, 0, $white);
+    imagecopyresampled($dst, $src, $ox, $oy, 0, 0, $nw, $nh, $ow, $oh);
+    ob_start();
+    imagejpeg($dst, null, 85);
+    $binarioProcesado = ob_get_clean();
+    imagedestroy($src);
+    imagedestroy($dst);
+    return $binarioProcesado;
+}
+
+// Trae TODAS las fotos de un artículo desde Manager (no solo la principal --
+// pedido explícito de Mauricio 07/09/2026), ya procesadas (800x800, fondo
+// blanco), ordenadas por Orden. Nunca debe frenar la creación del producto
+// por esto -- cualquier falla en una foto puntual se saltea, no aborta todo.
+function manager_fetch_todas_fotos($token, $codigo) {
+    try {
+        $imgs = manager_call($token, '/Api/ECommerce/GetDTArticulosImagenes', [
+            'DTRequest' => ['draw' => 1, 'order' => [], 'start' => 0, 'length' => 50],
+            'DefinicionTablaFiltros' => false,
+            'CalculaTotales' => false,
+            'ListFilters' => manager_dict_filtros(['CodigoArticulo' => manager_filtro_texto($codigo)]),
+        ]);
+        usort($imgs, function ($a, $b) { return intval($a['Orden'] ?? 0) <=> intval($b['Orden'] ?? 0); });
+
+        $binarios = [];
+        foreach ($imgs as $img) {
+            if (empty($img['PasoImagen'])) continue;
+            try {
+                $imgData = manager_call_raw($token, '/Api/Image/GetImage', ['ImageFullPath' => $img['PasoImagen']]);
+                if (empty($imgData['ImageContent'])) continue;
+                $procesado = woo_procesar_imagen_bytes(base64_decode($imgData['ImageContent']));
+                if ($procesado) $binarios[] = $procesado;
+            } catch (Exception $e) { /* se saltea esta foto puntual, sigue con las demas */ }
+        }
+        return $binarios;
+    } catch (Exception $e) {
+        return [];
+    }
+}
+
 // GET /products?sku=... hace match EXACTO — devuelve tanto productos simples
 // como VARIACIONES (modelos agrupados por color, ej. "Mochila XPERT" con
 // padre de sku inventado "3XPERT" y variaciones reales "33050"/"33051") con
@@ -544,7 +628,7 @@ function woo_sync_diff($token) {
 // (status=draft), así que la revisión humana ya está garantizada por eso — no
 // hace falta una aprobación aparte. Por eso solo hay 2 modos (manual/automático,
 // confirmado con Mauricio 07/09/2026), no 3.
-function woo_sync_aplicar($db, $diff, $modo, $runId) {
+function woo_sync_aplicar($db, $diff, $modo, $runId, $token) {
     $actualizados = 0; $nuevosCreados = 0; $errores = [];
 
     foreach ($diff['actualiza'] as $it) {
@@ -579,6 +663,21 @@ function woo_sync_aplicar($db, $diff, $modo, $runId) {
         ];
         if ($it['precio'] !== null) $payload['regular_price'] = $it['precio'];
         if ($idCategoria !== null) $payload['categories'] = [['id' => $idCategoria]];
+
+        // Sube TODAS las fotos del artículo (no solo la principal, pedido de
+        // Mauricio 07/09/2026) a la biblioteca de medios de WordPress antes de
+        // crear el producto, para poder referenciarlas por ID. Una foto que
+        // falla no frena el alta -- se crea igual con las que sí subieron.
+        $fotos = manager_fetch_todas_fotos($token, $it['codigo']);
+        $imagenes = [];
+        foreach ($fotos as $i => $binario) {
+            try {
+                $mediaId = wp_upload_media($binario, $it['codigo'] . '_' . ($i + 1) . '.jpg');
+                $imagenes[] = ['id' => $mediaId, 'position' => $i];
+            } catch (Exception $e) { /* se saltea esta foto puntual, sigue con las demas */ }
+        }
+        if ($imagenes) $payload['images'] = $imagenes;
+
         try {
             woo_create_product($payload);
             $nuevosCreados++;
@@ -1486,7 +1585,7 @@ switch ($action) {
             }
 
             $runId = 'woosync_' . date('Ymd_His') . '_' . substr(uniqid(), -4);
-            $resumen = woo_sync_aplicar($db, $diff, $modo, $runId);
+            $resumen = woo_sync_aplicar($db, $diff, $modo, $runId, $token);
             echo json_encode(['ok' => true, 'modo' => $modo, 'run_id' => $runId] + $resumen);
         } catch (Exception $e) {
             http_response_code(500);
@@ -1520,7 +1619,7 @@ switch ($action) {
             $token = manager_login();
             $diff = woo_sync_diff($token);
             $runId = 'woosync_' . date('Ymd_His') . '_' . substr(uniqid(), -4);
-            $resumen = woo_sync_aplicar($db, $diff, $modo, $runId);
+            $resumen = woo_sync_aplicar($db, $diff, $modo, $runId, $token);
             echo json_encode(['ok' => true, 'modo' => $modo, 'run_id' => $runId] + $resumen);
         } catch (Exception $e) {
             http_response_code(500);
