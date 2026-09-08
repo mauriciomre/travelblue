@@ -3846,51 +3846,27 @@ async function setWooSyncMode(modo) {
     if (json.ok) toast("Modo de sincronización minorista actualizado");
 }
 
-// Tamaño de tanda para el preview con progreso -- ver woo_sync_diff_lote en
-// api.php. Un valor chico da actualizaciones de progreso mas seguido; uno
-// grande hace menos round-trips. 20 es un equilibrio razonable para ~160
-// articulos (unas 8 tandas).
-var WOO_SYNC_LOTE = 20;
-
 async function sincronizarWooAhora() {
     var modoSel = document.querySelector('input[name="wooSyncMode"]:checked');
     modoSel = modoSel ? modoSel.value : "manual";
     var btn = document.getElementById("btnWooSyncNow");
     btn.disabled = true;
-    btn.textContent = "Consultando Manager...";
+    btn.textContent = "Consultando Manager y WooCommerce...";
     try {
         if (modoSel === "manual") {
-            // Paso 1: traer la lista completa de articulos (rapido, solo
-            // pega a Manager) -- recien ahi se sabe el total para la barra
-            // de progreso de las consultas lentas a WooCommerce.
-            var resItems = await fetch(API + "?action=woo_sync_items", {
+            // Una sola llamada -- desde la optimizacion del 07/09/2026,
+            // woo_sync_diff indexa todo el catalogo de WooCommerce de una
+            // pasada (~20-25 llamadas) en vez de consultar articulo por
+            // articulo (~160 llamadas antes), asi que ya no hace falta
+            // partir el preview en tandas con progreso.
+            var res = await fetch(API + "?action=woo_sync_preview", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ _user: authUser, _pass: authPass }),
             });
-            var jsonItems = await resItems.json();
-            if (!jsonItems.ok) { toast("Error: " + jsonItems.error, "#c62828"); return; }
-
-            var items = jsonItems.items;
-            var categorias = jsonItems.categorias;
-            var diff = { actualiza: [], nuevos: [], sin_cambios: [] };
-
-            // Paso 2: consultar WooCommerce por tandas, actualizando el
-            // texto del botón con el progreso real en cada vuelta.
-            for (var i = 0; i < items.length; i += WOO_SYNC_LOTE) {
-                var tanda = items.slice(i, i + WOO_SYNC_LOTE);
-                btn.textContent = "Consultando WooCommerce... " + Math.min(i + WOO_SYNC_LOTE, items.length) + "/" + items.length;
-                var resLote = await fetch(API + "?action=woo_sync_diff_lote", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ _user: authUser, _pass: authPass, items: tanda, categorias: categorias }),
-                });
-                var jsonLote = await resLote.json();
-                if (!jsonLote.ok) { toast("Error: " + jsonLote.error, "#c62828"); return; }
-                diff.actualiza = diff.actualiza.concat(jsonLote.actualiza);
-                diff.nuevos = diff.nuevos.concat(jsonLote.nuevos);
-                diff.sin_cambios = diff.sin_cambios.concat(jsonLote.sin_cambios);
-            }
+            var json = await res.json();
+            if (!json.ok) { toast("Error: " + json.error, "#c62828"); return; }
+            var diff = json;
 
             renderWooSyncPreview(diff);
             document.getElementById("wooSyncPreviewModal").classList.add("open");
@@ -3950,7 +3926,7 @@ function updateWooSyncConfirmState() {
 // tabla de Manager, acá los campos que cambian son dinámicos (regular_price/
 // sale_price/stock_status), no columnas fijas.
 function wooFormatCambios(cambios) {
-    var ETIQUETAS = { regular_price: "Precio", sale_price: "Precio oferta", stock_status: "Stock" };
+    var ETIQUETAS = { regular_price: "Precio", sale_price: "Precio oferta", stock_status: "Stock", status: "Estado" };
     return Object.keys(cambios).map(function (campo) {
         var c = cambios[campo];
         var label = ETIQUETAS[campo] || campo;

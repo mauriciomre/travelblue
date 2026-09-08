@@ -469,10 +469,61 @@ function manager_fetch_todas_fotos($token, $codigo) {
 // padre de sku inventado "3XPERT" y variaciones reales "33050"/"33051") con
 // el mismo shape relevante (regular_price/sale_price/stock_status/type/
 // parent_id) — hallazgo real 07/09/2026, ver conocimiento/manager2max.md.
+// Queda para casos puntuales (ej. probar un solo código) -- el diff completo
+// usa woo_indexar_productos() en su lugar, mucho mas rapido (ver abajo).
 function woo_find_by_sku($sku) {
     $productos = woo_call('GET', '/products', null, ['sku' => $sku]);
     return $productos[0] ?? null;
 }
+
+// Trae TODO el catálogo de WooCommerce en una sola pasada (paginado) y arma
+// un mapa sku -> producto/variación, en vez de consultar articulo por
+// articulo. Optimización pedida por Mauricio (07/09/2026): el preview hacia
+// 163 consultas individuales (~2-3 min); esto lo baja a un puñado de
+// llamadas (2 páginas de productos + 1 por cada producto variable para sus
+// variaciones, ~20-25 llamadas en vez de 163 para el catálogo real de hoy).
+function woo_indexar_productos() {
+    // status=any: sin esto, GET /products excluye productos que no estan en
+    // "publish" (ej. "pending" -- ni borrador ni publicado, un estado real
+    // que tienen varios productos padre de modelos agrupados en esta tienda).
+    //
+    // Bug real de la API de WooCommerce encontrado 08/09/2026 (Mauricio lo
+    // detecto comparando el resultado optimizado contra el que ya tenia
+    // confirmado en el panel): para productos en estado "pending", el campo
+    // `type` miente -- dice "simple" aunque el producto SI tenga variaciones
+    // reales (confirmado con "Mochila SMITHFIELD": type=simple, pero
+    // /products/{id}/variations devuelve 2 variaciones reales). Por eso NO
+    // alcanza con mirar `type==='variable'` para decidir si hay que pedir
+    // las variaciones -- para cualquier producto que no este 'publish' hay
+    // que pedirlas igual, por las dudas (WooCommerce devuelve rapido un
+    // array vacio para los que de verdad no tienen).
+    $indice = [];
+    $page = 1;
+    while (true) {
+        $lote = woo_call('GET', '/products', null, ['page' => $page, 'per_page' => 100, 'status' => 'any']);
+        if (!$lote) break;
+        foreach ($lote as $p) {
+            if (!empty($p['sku'])) $indice[$p['sku']] = $p;
+            $puedeTenerVariaciones = ($p['type'] ?? '') === 'variable' || ($p['status'] ?? '') !== 'publish';
+            if ($puedeTenerVariaciones) {
+                $vpage = 1;
+                while (true) {
+                    $variaciones = woo_call('GET', "/products/{$p['id']}/variations", null, ['page' => $vpage, 'per_page' => 100, 'status' => 'any']);
+                    if (!$variaciones) break;
+                    foreach ($variaciones as $v) {
+                        if (!empty($v['sku'])) $indice[$v['sku']] = $v;
+                    }
+                    if (count($variaciones) < 100) break;
+                    $vpage++;
+                }
+            }
+        }
+        if (count($lote) < 100) break;
+        $page++;
+    }
+    return $indice;
+}
+
 function woo_update_product($id, $payload) { return woo_call('PUT', "/products/$id", $payload); }
 function woo_update_variation($parentId, $variationId, $payload) { return woo_call('PUT', "/products/$parentId/variations/$variationId", $payload); }
 function woo_create_product($payload) { return woo_call('POST', '/products', $payload); }
@@ -601,6 +652,21 @@ function woo_diff_item($it, $producto, $categoriasWoo) {
         $cambios['stock_status'] = ['antes' => $producto['stock_status'] ?? '', 'despues' => $it['stock_status']];
     }
 
+    // Sube=0 en Manager -> el producto pasa a "pending" (fuera de venta,
+    // pero no borrado ni despublicado del todo); Sube=1 -> vuelve a
+    // "publish". Pedido explícito de Mauricio (08/09/2026) -- de hecho
+    // explica el bug de "pending" que se encontró hoy: ya habia productos
+    // en ese estado por este mismo motivo, aplicado a mano hasta ahora.
+    // Nunca se toca un "draft" (alta nueva sin revisar todavia por Mauricio)
+    // ni se aplica a variaciones (el estado se maneja a nivel del producto
+    // padre, no por variacion individual -- fuera de alcance de este cambio).
+    if (!$esVariacion && ($producto['status'] ?? '') !== 'draft') {
+        $statusDeseado = $it['stock_status'] === 'outofstock' ? 'pending' : 'publish';
+        if (($producto['status'] ?? '') !== $statusDeseado) {
+            $cambios['status'] = ['antes' => $producto['status'] ?? '', 'despues' => $statusDeseado];
+        }
+    }
+
     if (!$cambios) return ['tipo' => 'sin_cambios', 'data' => ['codigo' => $it['codigo']]];
 
     return ['tipo' => 'actualiza', 'data' => [
@@ -610,20 +676,19 @@ function woo_diff_item($it, $producto, $categoriasWoo) {
     ]];
 }
 
-// Compara Travel Blue (Manager) contra WooCommerce EN VIVO — a diferencia de
-// manager_sync_diff (que compara contra la tabla local `productos`), acá no
-// hay tabla espejo: cada corrida llama woo_find_by_sku por artículo (~160
-// llamadas, mismo costo que ya paga el tool Python, un par de minutos).
-// Usada por apply/cron, que no necesitan progreso incremental (corren de
-// una sola vez del lado del servidor). El preview manual usa en cambio
-// woo_sync_items + woo_sync_diff_lote (por tandas, con progreso visible).
+// Compara Travel Blue (Manager) contra WooCommerce — indexa TODO el catálogo
+// de WooCommerce de una sola pasada (woo_indexar_productos, ~20-25 llamadas
+// para el catálogo real de hoy) en vez de consultar articulo por articulo
+// (~160 llamadas, como se hacía antes de la optimización del 07/09/2026)
+// y despues compara todo en memoria, sin mas llamadas de red.
 function woo_sync_diff($token) {
     $items = woo_fetch_travelblue($token);
     $categoriasWoo = woo_list_categories();
+    $indiceWoo = woo_indexar_productos();
 
     $actualiza = []; $nuevos = []; $sinCambios = [];
     foreach ($items as $it) {
-        $r = woo_diff_item($it, woo_find_by_sku($it['codigo']), $categoriasWoo);
+        $r = woo_diff_item($it, $indiceWoo[$it['codigo']] ?? null, $categoriasWoo);
         if ($r['tipo'] === 'nuevo') $nuevos[] = $r['data'];
         elseif ($r['tipo'] === 'actualiza') $actualiza[] = $r['data'];
         else $sinCambios[] = $r['data'];
@@ -1565,51 +1630,6 @@ switch ($action) {
             $token = manager_login();
             $diff = woo_sync_diff($token);
             echo json_encode(['ok' => true] + $diff);
-        } catch (Exception $e) {
-            http_response_code(500);
-            echo json_encode(['error' => $e->getMessage()]);
-        }
-        break;
-
-    // Paso 1 del preview con progreso: solo Manager (2 llamadas, rapido) +
-    // categorias de WooCommerce -- devuelve la lista completa de articulos
-    // a sincronizar para que el frontend sepa el total y arme la barra de
-    // progreso, antes de arrancar con las consultas lentas a WooCommerce.
-    case 'woo_sync_items':
-        $data = json_decode(file_get_contents('php://input'), true);
-        checkAuth($data);
-        try {
-            $token = manager_login();
-            $items = woo_fetch_travelblue($token);
-            $categorias = woo_list_categories();
-            echo json_encode(['ok' => true, 'items' => $items, 'categorias' => $categorias]);
-        } catch (Exception $e) {
-            http_response_code(500);
-            echo json_encode(['error' => $e->getMessage()]);
-        }
-        break;
-
-    // Paso 2 del preview con progreso: recibe una TANDA de articulos (ya
-    // resueltos por woo_sync_items, el frontend los trae en lotes de a
-    // WOO_SYNC_LOTE) + las categorias, hace woo_find_by_sku de a uno para
-    // esta tanda nada mas, y devuelve el diff parcial. El frontend acumula
-    // los resultados de todas las tandas y arma el preview completo al final.
-    case 'woo_sync_diff_lote':
-        set_time_limit(60);
-        $data = json_decode(file_get_contents('php://input'), true);
-        checkAuth($data);
-        $items = $data['items'] ?? [];
-        $categorias = $data['categorias'] ?? [];
-        if (!$items) { echo json_encode(['ok' => true, 'actualiza' => [], 'nuevos' => [], 'sin_cambios' => []]); break; }
-        try {
-            $actualiza = []; $nuevos = []; $sinCambios = [];
-            foreach ($items as $it) {
-                $r = woo_diff_item($it, woo_find_by_sku($it['codigo']), $categorias);
-                if ($r['tipo'] === 'nuevo') $nuevos[] = $r['data'];
-                elseif ($r['tipo'] === 'actualiza') $actualiza[] = $r['data'];
-                else $sinCambios[] = $r['data'];
-            }
-            echo json_encode(['ok' => true, 'actualiza' => $actualiza, 'nuevos' => $nuevos, 'sin_cambios' => $sinCambios]);
         } catch (Exception $e) {
             http_response_code(500);
             echo json_encode(['error' => $e->getMessage()]);
