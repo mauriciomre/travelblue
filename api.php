@@ -567,57 +567,66 @@ function woo_fetch_travelblue($token) {
     return array_values($items);
 }
 
+// Decide que pasa con UN articulo ya transformado ($it, salido de
+// woo_fetch_travelblue) contra su producto real de WooCommerce (ya
+// resuelto via woo_find_by_sku, o null si no existe). Extraido de
+// woo_sync_diff para poder reusarlo tanto en la corrida completa de una
+// sola vez (woo_sync_diff, usada por apply/cron) como en el preview por
+// tandas con progreso (woo_sync_diff_lote, ver mas abajo) sin duplicar la
+// logica de comparacion.
+function woo_diff_item($it, $producto, $categoriasWoo) {
+    if ($producto === null) {
+        $idCategoria = null;
+        foreach ($categoriasWoo as $c) {
+            if (strcasecmp(trim($c['name']), $it['categoria']) === 0) { $idCategoria = $c['id']; break; }
+        }
+        return ['tipo' => 'nuevo', 'data' => array_merge($it, ['id_categoria' => $idCategoria])];
+    }
+
+    $esVariacion = ($producto['type'] ?? '') === 'variation';
+    $cambios = [];
+
+    if ($it['precio'] !== null) {
+        $precioActual = $producto['regular_price'] ?? '';
+        if ($precioActual === '' || abs(floatval($precioActual) - floatval($it['precio'])) >= 1) {
+            $cambios['regular_price'] = ['antes' => $precioActual, 'despues' => $it['precio']];
+            $salePromo = woo_recalcular_precio_promocional($precioActual, $producto['sale_price'] ?? null, $it['precio']);
+            if ($salePromo !== null) {
+                $cambios['sale_price'] = ['antes' => $producto['sale_price'], 'despues' => $salePromo];
+            }
+        }
+    }
+
+    if (($producto['stock_status'] ?? '') !== $it['stock_status']) {
+        $cambios['stock_status'] = ['antes' => $producto['stock_status'] ?? '', 'despues' => $it['stock_status']];
+    }
+
+    if (!$cambios) return ['tipo' => 'sin_cambios', 'data' => ['codigo' => $it['codigo']]];
+
+    return ['tipo' => 'actualiza', 'data' => [
+        'codigo' => $it['codigo'], 'nombre' => $producto['name'] ?? '',
+        'es_variacion' => $esVariacion, 'id' => $producto['id'], 'parent_id' => $producto['parent_id'] ?? null,
+        'cambios' => $cambios,
+    ]];
+}
+
 // Compara Travel Blue (Manager) contra WooCommerce EN VIVO — a diferencia de
 // manager_sync_diff (que compara contra la tabla local `productos`), acá no
 // hay tabla espejo: cada corrida llama woo_find_by_sku por artículo (~160
 // llamadas, mismo costo que ya paga el tool Python, un par de minutos).
+// Usada por apply/cron, que no necesitan progreso incremental (corren de
+// una sola vez del lado del servidor). El preview manual usa en cambio
+// woo_sync_items + woo_sync_diff_lote (por tandas, con progreso visible).
 function woo_sync_diff($token) {
     $items = woo_fetch_travelblue($token);
     $categoriasWoo = woo_list_categories();
 
-    $actualiza = [];
-    $nuevos = [];
-    $sinCambios = [];
-
+    $actualiza = []; $nuevos = []; $sinCambios = [];
     foreach ($items as $it) {
-        $producto = woo_find_by_sku($it['codigo']);
-
-        if ($producto === null) {
-            $idCategoria = null;
-            foreach ($categoriasWoo as $c) {
-                if (strcasecmp(trim($c['name']), $it['categoria']) === 0) { $idCategoria = $c['id']; break; }
-            }
-            $nuevos[] = array_merge($it, ['id_categoria' => $idCategoria]);
-            continue;
-        }
-
-        $esVariacion = ($producto['type'] ?? '') === 'variation';
-        $cambios = [];
-
-        if ($it['precio'] !== null) {
-            $precioActual = $producto['regular_price'] ?? '';
-            if ($precioActual === '' || abs(floatval($precioActual) - floatval($it['precio'])) >= 1) {
-                $cambios['regular_price'] = ['antes' => $precioActual, 'despues' => $it['precio']];
-                $salePromo = woo_recalcular_precio_promocional($precioActual, $producto['sale_price'] ?? null, $it['precio']);
-                if ($salePromo !== null) {
-                    $cambios['sale_price'] = ['antes' => $producto['sale_price'], 'despues' => $salePromo];
-                }
-            }
-        }
-
-        if (($producto['stock_status'] ?? '') !== $it['stock_status']) {
-            $cambios['stock_status'] = ['antes' => $producto['stock_status'] ?? '', 'despues' => $it['stock_status']];
-        }
-
-        if ($cambios) {
-            $actualiza[] = [
-                'codigo' => $it['codigo'], 'nombre' => $producto['name'] ?? '',
-                'es_variacion' => $esVariacion, 'id' => $producto['id'], 'parent_id' => $producto['parent_id'] ?? null,
-                'cambios' => $cambios,
-            ];
-        } else {
-            $sinCambios[] = ['codigo' => $it['codigo']];
-        }
+        $r = woo_diff_item($it, woo_find_by_sku($it['codigo']), $categoriasWoo);
+        if ($r['tipo'] === 'nuevo') $nuevos[] = $r['data'];
+        elseif ($r['tipo'] === 'actualiza') $actualiza[] = $r['data'];
+        else $sinCambios[] = $r['data'];
     }
 
     return ['actualiza' => $actualiza, 'nuevos' => $nuevos, 'sin_cambios' => $sinCambios];
@@ -1544,7 +1553,12 @@ switch ($action) {
         break;
 
     // ── SYNC MINORISTA CON WOOCOMMERCE (travelblue.com.ar) ──────────────────
+    // set_time_limit alto en preview/apply/cron: son corridas de ~160
+    // llamadas a WooCommerce (un par de minutos) -- sin esto, un hosting con
+    // max_execution_time bajo (ej. 30s default) podria cortar la corrida a
+    // mitad de camino sin ningun aviso claro.
     case 'woo_sync_preview':
+        set_time_limit(300);
         $data = json_decode(file_get_contents('php://input'), true);
         checkAuth($data);
         try {
@@ -1557,7 +1571,53 @@ switch ($action) {
         }
         break;
 
+    // Paso 1 del preview con progreso: solo Manager (2 llamadas, rapido) +
+    // categorias de WooCommerce -- devuelve la lista completa de articulos
+    // a sincronizar para que el frontend sepa el total y arme la barra de
+    // progreso, antes de arrancar con las consultas lentas a WooCommerce.
+    case 'woo_sync_items':
+        $data = json_decode(file_get_contents('php://input'), true);
+        checkAuth($data);
+        try {
+            $token = manager_login();
+            $items = woo_fetch_travelblue($token);
+            $categorias = woo_list_categories();
+            echo json_encode(['ok' => true, 'items' => $items, 'categorias' => $categorias]);
+        } catch (Exception $e) {
+            http_response_code(500);
+            echo json_encode(['error' => $e->getMessage()]);
+        }
+        break;
+
+    // Paso 2 del preview con progreso: recibe una TANDA de articulos (ya
+    // resueltos por woo_sync_items, el frontend los trae en lotes de a
+    // WOO_SYNC_LOTE) + las categorias, hace woo_find_by_sku de a uno para
+    // esta tanda nada mas, y devuelve el diff parcial. El frontend acumula
+    // los resultados de todas las tandas y arma el preview completo al final.
+    case 'woo_sync_diff_lote':
+        set_time_limit(60);
+        $data = json_decode(file_get_contents('php://input'), true);
+        checkAuth($data);
+        $items = $data['items'] ?? [];
+        $categorias = $data['categorias'] ?? [];
+        if (!$items) { echo json_encode(['ok' => true, 'actualiza' => [], 'nuevos' => [], 'sin_cambios' => []]); break; }
+        try {
+            $actualiza = []; $nuevos = []; $sinCambios = [];
+            foreach ($items as $it) {
+                $r = woo_diff_item($it, woo_find_by_sku($it['codigo']), $categorias);
+                if ($r['tipo'] === 'nuevo') $nuevos[] = $r['data'];
+                elseif ($r['tipo'] === 'actualiza') $actualiza[] = $r['data'];
+                else $sinCambios[] = $r['data'];
+            }
+            echo json_encode(['ok' => true, 'actualiza' => $actualiza, 'nuevos' => $nuevos, 'sin_cambios' => $sinCambios]);
+        } catch (Exception $e) {
+            http_response_code(500);
+            echo json_encode(['error' => $e->getMessage()]);
+        }
+        break;
+
     case 'woo_sync_apply':
+        set_time_limit(300);
         $data = json_decode(file_get_contents('php://input'), true);
         checkAuth($data);
 
@@ -1596,6 +1656,7 @@ switch ($action) {
         break;
 
     case 'woo_sync_cron':
+        set_time_limit(300);
         // Sin sesión — autenticado por token, para poder dispararse desde un Cron Job de Ferozo
         $token_recibido = $_GET['token'] ?? '';
         if (!hash_equals(WOO_SYNC_TOKEN, $token_recibido)) {
