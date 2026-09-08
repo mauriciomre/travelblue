@@ -529,12 +529,24 @@ function woo_indexar_productos() {
 // variaciones_lote mas abajo) sin arrastrar todo el objeto completo de
 // WooCommerce (descripcion, imagenes, atributos, etc.), que pesa mucho mas
 // de lo necesario para esto.
+function woo_meta_valor($p, $key) {
+    foreach ($p['meta_data'] ?? [] as $m) {
+        if (($m['key'] ?? '') === $key) return $m['value'];
+    }
+    return '';
+}
+
 function woo_producto_resumen($p) {
     return [
         'id' => $p['id'], 'type' => $p['type'] ?? '', 'parent_id' => $p['parent_id'] ?? null,
         'name' => $p['name'] ?? '', 'regular_price' => $p['regular_price'] ?? '',
         'sale_price' => $p['sale_price'] ?? '', 'stock_status' => $p['stock_status'] ?? '',
         'status' => $p['status'] ?? '', 'global_unique_id' => $p['global_unique_id'] ?? '',
+        // meta custom "ean" -- distinto del campo nativo global_unique_id de
+        // arriba. Lo usa el plugin Google Listings & Ads (feed de Google
+        // Shopping, ver meta _wc_gla_visibility en el mismo producto) --
+        // encontrado 08/09/2026, Mauricio via el plugin de bulk edit.
+        'ean_meta' => woo_meta_valor($p, 'ean'),
     ];
 }
 
@@ -686,11 +698,29 @@ function woo_diff_item($it, $producto, $categoriasWoo) {
         }
     }
 
-    // EAN/codigo de barras (CodigoAuxiliar de Manager -> global_unique_id de
-    // WooCommerce). Solo si Manager trae un valor -- nunca borra un EAN ya
-    // cargado en WooCommerce solo porque Manager no tiene ese dato.
-    if ($it['codigo_barras'] !== '' && ($producto['global_unique_id'] ?? '') !== $it['codigo_barras']) {
-        $cambios['global_unique_id'] = ['antes' => $producto['global_unique_id'] ?? '', 'despues' => $it['codigo_barras']];
+    // EAN/codigo de barras (CodigoAuxiliar de Manager) -- esta tienda lo
+    // guarda en DOS lugares distintos: el campo nativo global_unique_id, y
+    // un meta_data custom "ean" que usa el plugin de Google Listings & Ads
+    // para el feed de Google Shopping. "meta_ean" es un campo marcador -- se
+    // traduce a la estructura real meta_data:[{key,value}] recien al armar
+    // el payload (ver mas abajo y woo_sync_aplicar). Solo si Manager trae un
+    // valor -- nunca borra un EAN ya cargado en WooCommerce solo porque
+    // Manager no tiene ese dato.
+    //
+    // global_unique_id SOLO en productos/variaciones simples (sin
+    // hermanos de color) -- WooCommerce exige que sea UNICO, y Manager no
+    // diferencia EAN por color (las 3 variantes de un mismo articulo
+    // comparten el mismo CodigoAuxiliar). Escribirlo en mas de una
+    // variacion del mismo modelo choca con esa validacion ("GTIN, UPC, EAN
+    // o ISBN no válidos o duplicados", error real encontrado 08/09/2026).
+    // El meta "ean" no tiene esa restriccion, se sincroniza siempre.
+    if ($it['codigo_barras'] !== '') {
+        if (!$esVariacion && ($producto['global_unique_id'] ?? '') !== $it['codigo_barras']) {
+            $cambios['global_unique_id'] = ['antes' => $producto['global_unique_id'] ?? '', 'despues' => $it['codigo_barras']];
+        }
+        if (($producto['ean_meta'] ?? '') !== $it['codigo_barras']) {
+            $cambios['meta_ean'] = ['antes' => $producto['ean_meta'] ?? '', 'despues' => $it['codigo_barras']];
+        }
     }
 
     if (($producto['stock_status'] ?? '') !== $it['stock_status']) {
@@ -768,7 +798,16 @@ function woo_sync_aplicar($db, $diff, $modo, $runId, $token) {
 
     foreach ($diff['actualiza'] as $it) {
         $payload = [];
-        foreach ($it['cambios'] as $campo => $vals) $payload[$campo] = $vals['despues'];
+        foreach ($it['cambios'] as $campo => $vals) {
+            // "meta_ean" es un marcador (ver woo_diff_item) -- WooCommerce
+            // no acepta ese nombre de campo directo, hay que traducirlo a
+            // meta_data:[{key,value}].
+            if ($campo === 'meta_ean') {
+                $payload['meta_data'][] = ['key' => 'ean', 'value' => $vals['despues']];
+            } else {
+                $payload[$campo] = $vals['despues'];
+            }
+        }
         try {
             if ($it['es_variacion']) {
                 woo_update_variation($it['parent_id'], $it['id'], $payload);
@@ -798,7 +837,10 @@ function woo_sync_aplicar($db, $diff, $modo, $runId, $token) {
         ];
         if ($it['precio'] !== null) $payload['regular_price'] = $it['precio'];
         if ($idCategoria !== null) $payload['categories'] = [['id' => $idCategoria]];
-        if ($it['codigo_barras'] !== '') $payload['global_unique_id'] = $it['codigo_barras'];
+        if ($it['codigo_barras'] !== '') {
+            $payload['global_unique_id'] = $it['codigo_barras'];
+            $payload['meta_data'][] = ['key' => 'ean', 'value' => $it['codigo_barras']];
+        }
 
         // Sube TODAS las fotos del artículo (no solo la principal, pedido de
         // Mauricio 07/09/2026) a la biblioteca de medios de WordPress antes de
