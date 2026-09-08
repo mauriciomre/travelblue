@@ -3952,7 +3952,7 @@ function updateWooSyncConfirmState() {
 // tabla de Manager, acá los campos que cambian son dinámicos (regular_price/
 // sale_price/stock_status), no columnas fijas.
 function wooFormatCambios(cambios) {
-    var ETIQUETAS = { regular_price: "Precio", sale_price: "Precio oferta", stock_status: "Stock", status: "Estado" };
+    var ETIQUETAS = { regular_price: "Precio", sale_price: "Precio oferta", stock_status: "Stock", status: "Estado", global_unique_id: "EAN" };
     return Object.keys(cambios).map(function (campo) {
         var c = cambios[campo];
         var label = ETIQUETAS[campo] || campo;

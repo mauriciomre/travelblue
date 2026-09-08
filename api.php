@@ -534,7 +534,7 @@ function woo_producto_resumen($p) {
         'id' => $p['id'], 'type' => $p['type'] ?? '', 'parent_id' => $p['parent_id'] ?? null,
         'name' => $p['name'] ?? '', 'regular_price' => $p['regular_price'] ?? '',
         'sale_price' => $p['sale_price'] ?? '', 'stock_status' => $p['stock_status'] ?? '',
-        'status' => $p['status'] ?? '',
+        'status' => $p['status'] ?? '', 'global_unique_id' => $p['global_unique_id'] ?? '',
     ];
 }
 
@@ -604,6 +604,10 @@ function woo_fetch_travelblue($token) {
             'descripcion' => manager_limpiar_descripcion($a['Descripcion'] ?? '', WOO_MARCA),
             'categoria' => woo_categoria($a['Rubro'] ?? ''),
             'stock_status' => !empty($a['Sube']) ? 'instock' : 'outofstock',
+            // CodigoAuxiliar = EAN/codigo de barras (ver conocimiento/manager2max.md
+            // en el vault) -> campo nativo de WooCommerce global_unique_id
+            // (GTIN/UPC/EAN/ISBN, agregado en WC 8.x). Pedido de Mauricio 08/09/2026.
+            'codigo_barras' => trim($a['CodigoAuxiliar'] ?? ''),
             'precio' => null,
         ];
     }
@@ -680,6 +684,13 @@ function woo_diff_item($it, $producto, $categoriasWoo) {
                 $cambios['sale_price'] = ['antes' => $producto['sale_price'], 'despues' => $salePromo];
             }
         }
+    }
+
+    // EAN/codigo de barras (CodigoAuxiliar de Manager -> global_unique_id de
+    // WooCommerce). Solo si Manager trae un valor -- nunca borra un EAN ya
+    // cargado en WooCommerce solo porque Manager no tiene ese dato.
+    if ($it['codigo_barras'] !== '' && ($producto['global_unique_id'] ?? '') !== $it['codigo_barras']) {
+        $cambios['global_unique_id'] = ['antes' => $producto['global_unique_id'] ?? '', 'despues' => $it['codigo_barras']];
     }
 
     if (($producto['stock_status'] ?? '') !== $it['stock_status']) {
@@ -787,6 +798,7 @@ function woo_sync_aplicar($db, $diff, $modo, $runId, $token) {
         ];
         if ($it['precio'] !== null) $payload['regular_price'] = $it['precio'];
         if ($idCategoria !== null) $payload['categories'] = [['id' => $idCategoria]];
+        if ($it['codigo_barras'] !== '') $payload['global_unique_id'] = $it['codigo_barras'];
 
         // Sube TODAS las fotos del artículo (no solo la principal, pedido de
         // Mauricio 07/09/2026) a la biblioteca de medios de WordPress antes de
