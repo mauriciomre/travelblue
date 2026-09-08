@@ -524,6 +524,20 @@ function woo_indexar_productos() {
     return $indice;
 }
 
+// Solo los campos que realmente usa woo_diff_item -- para mandar el indice
+// al frontend (preview con progreso, ver woo_indexar_paso1/woo_indexar_
+// variaciones_lote mas abajo) sin arrastrar todo el objeto completo de
+// WooCommerce (descripcion, imagenes, atributos, etc.), que pesa mucho mas
+// de lo necesario para esto.
+function woo_producto_resumen($p) {
+    return [
+        'id' => $p['id'], 'type' => $p['type'] ?? '', 'parent_id' => $p['parent_id'] ?? null,
+        'name' => $p['name'] ?? '', 'regular_price' => $p['regular_price'] ?? '',
+        'sale_price' => $p['sale_price'] ?? '', 'stock_status' => $p['stock_status'] ?? '',
+        'status' => $p['status'] ?? '',
+    ];
+}
+
 function woo_update_product($id, $payload) { return woo_call('PUT', "/products/$id", $payload); }
 function woo_update_variation($parentId, $variationId, $payload) { return woo_call('PUT', "/products/$parentId/variations/$variationId", $payload); }
 function woo_create_product($payload) { return woo_call('POST', '/products', $payload); }
@@ -1618,10 +1632,100 @@ switch ($action) {
         break;
 
     // ── SYNC MINORISTA CON WOOCOMMERCE (travelblue.com.ar) ──────────────────
-    // set_time_limit alto en preview/apply/cron: son corridas de ~160
-    // llamadas a WooCommerce (un par de minutos) -- sin esto, un hosting con
+    // Preview con progreso real, en 3 pasos (pedido de Mauricio 08/09/2026 --
+    // sin esto, el boton queda en un texto fijo ~2-3 min y da sensacion de
+    // colgado). Arma el indice de WooCommerce del lado del cliente en vez
+    // del servidor: paso 1 trae los productos base + candidatos a tener
+    // variaciones (rapido, 1-2 llamadas); paso 2 el frontend pide las
+    // variaciones de a tandas, mostrando progreso real; paso 3 manda el
+    // indice ya armado para que el servidor haga el diff contra Manager
+    // (rapido, no vuelve a pegarle a WooCommerce). El resultado final es
+    // identico al de woo_sync_diff (usa la misma logica, woo_diff_item).
+
+    case 'woo_indexar_paso1':
+        set_time_limit(60);
+        $data = json_decode(file_get_contents('php://input'), true);
+        checkAuth($data);
+        try {
+            $indiceBase = []; $candidatos = [];
+            $page = 1;
+            while (true) {
+                $lote = woo_call('GET', '/products', null, ['page' => $page, 'per_page' => 100, 'status' => 'any']);
+                if (!$lote) break;
+                foreach ($lote as $p) {
+                    if (!empty($p['sku'])) $indiceBase[$p['sku']] = woo_producto_resumen($p);
+                    // Ver woo_indexar_productos: no alcanza con type==='variable',
+                    // los productos "pending" pueden tener variaciones aunque
+                    // digan type=simple.
+                    if (($p['type'] ?? '') === 'variable' || ($p['status'] ?? '') !== 'publish') {
+                        $candidatos[] = $p['id'];
+                    }
+                }
+                if (count($lote) < 100) break;
+                $page++;
+            }
+            echo json_encode(['ok' => true, 'indice_base' => $indiceBase, 'candidatos' => $candidatos]);
+        } catch (Exception $e) {
+            http_response_code(500);
+            echo json_encode(['error' => $e->getMessage()]);
+        }
+        break;
+
+    case 'woo_indexar_variaciones_lote':
+        set_time_limit(60);
+        $data = json_decode(file_get_contents('php://input'), true);
+        checkAuth($data);
+        $ids = $data['product_ids'] ?? [];
+        try {
+            $indice = [];
+            foreach ($ids as $id) {
+                $vpage = 1;
+                while (true) {
+                    $variaciones = woo_call('GET', "/products/" . intval($id) . "/variations", null, ['page' => $vpage, 'per_page' => 100, 'status' => 'any']);
+                    if (!$variaciones) break;
+                    foreach ($variaciones as $v) {
+                        if (!empty($v['sku'])) $indice[$v['sku']] = woo_producto_resumen($v);
+                    }
+                    if (count($variaciones) < 100) break;
+                    $vpage++;
+                }
+            }
+            echo json_encode(['ok' => true, 'indice' => $indice]);
+        } catch (Exception $e) {
+            http_response_code(500);
+            echo json_encode(['error' => $e->getMessage()]);
+        }
+        break;
+
+    case 'woo_sync_diff_indexado':
+        set_time_limit(60);
+        $data = json_decode(file_get_contents('php://input'), true);
+        checkAuth($data);
+        $indiceWoo = $data['indice'] ?? [];
+        try {
+            $token = manager_login();
+            $items = woo_fetch_travelblue($token);
+            $categoriasWoo = woo_list_categories();
+            $actualiza = []; $nuevos = []; $sinCambios = [];
+            foreach ($items as $it) {
+                $r = woo_diff_item($it, $indiceWoo[$it['codigo']] ?? null, $categoriasWoo);
+                if ($r['tipo'] === 'nuevo') $nuevos[] = $r['data'];
+                elseif ($r['tipo'] === 'actualiza') $actualiza[] = $r['data'];
+                else $sinCambios[] = $r['data'];
+            }
+            echo json_encode(['ok' => true, 'actualiza' => $actualiza, 'nuevos' => $nuevos, 'sin_cambios' => $sinCambios]);
+        } catch (Exception $e) {
+            http_response_code(500);
+            echo json_encode(['error' => $e->getMessage()]);
+        }
+        break;
+
+    // set_time_limit alto en preview/apply/cron: son corridas de ~100
+    // llamadas a WooCommerce (uno o dos minutos) -- sin esto, un hosting con
     // max_execution_time bajo (ej. 30s default) podria cortar la corrida a
-    // mitad de camino sin ningun aviso claro.
+    // mitad de camino sin ningun aviso claro. Usado por apply/cron (no
+    // necesitan progreso, corren de una sola vez del lado del servidor) y
+    // como fallback de una sola llamada si hiciera falta.
     case 'woo_sync_preview':
         set_time_limit(300);
         $data = json_decode(file_get_contents('php://input'), true);

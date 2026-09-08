@@ -3846,27 +3846,53 @@ async function setWooSyncMode(modo) {
     if (json.ok) toast("Modo de sincronización minorista actualizado");
 }
 
+// Tamaño de tanda para chequear variaciones (ver woo_indexar_variaciones_lote
+// en api.php) -- de a cuantos productos candidatos se piden las variaciones
+// por request, mostrando progreso real entre tanda y tanda.
+var WOO_VARIACIONES_LOTE = 15;
+
 async function sincronizarWooAhora() {
     var modoSel = document.querySelector('input[name="wooSyncMode"]:checked');
     modoSel = modoSel ? modoSel.value : "manual";
     var btn = document.getElementById("btnWooSyncNow");
     btn.disabled = true;
-    btn.textContent = "Consultando Manager y WooCommerce...";
+    btn.textContent = "Indexando WooCommerce...";
     try {
         if (modoSel === "manual") {
-            // Una sola llamada -- desde la optimizacion del 07/09/2026,
-            // woo_sync_diff indexa todo el catalogo de WooCommerce de una
-            // pasada (~20-25 llamadas) en vez de consultar articulo por
-            // articulo (~160 llamadas antes), asi que ya no hace falta
-            // partir el preview en tandas con progreso.
-            var res = await fetch(API + "?action=woo_sync_preview", {
+            // Preview en 3 pasos, con progreso real -- ver comentario de
+            // woo_indexar_paso1 en api.php.
+            var resBase = await fetch(API + "?action=woo_indexar_paso1", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ _user: authUser, _pass: authPass }),
             });
-            var json = await res.json();
-            if (!json.ok) { toast("Error: " + json.error, "#c62828"); return; }
-            var diff = json;
+            var jsonBase = await resBase.json();
+            if (!jsonBase.ok) { toast("Error: " + jsonBase.error, "#c62828"); return; }
+
+            var indice = jsonBase.indice_base;
+            var candidatos = jsonBase.candidatos;
+
+            for (var i = 0; i < candidatos.length; i += WOO_VARIACIONES_LOTE) {
+                var tanda = candidatos.slice(i, i + WOO_VARIACIONES_LOTE);
+                btn.textContent = "Chequeando variaciones... " + Math.min(i + WOO_VARIACIONES_LOTE, candidatos.length) + "/" + candidatos.length;
+                var resV = await fetch(API + "?action=woo_indexar_variaciones_lote", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ _user: authUser, _pass: authPass, product_ids: tanda }),
+                });
+                var jsonV = await resV.json();
+                if (!jsonV.ok) { toast("Error: " + jsonV.error, "#c62828"); return; }
+                Object.assign(indice, jsonV.indice);
+            }
+
+            btn.textContent = "Comparando con Manager...";
+            var resDiff = await fetch(API + "?action=woo_sync_diff_indexado", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ _user: authUser, _pass: authPass, indice: indice }),
+            });
+            var diff = await resDiff.json();
+            if (!diff.ok) { toast("Error: " + diff.error, "#c62828"); return; }
 
             renderWooSyncPreview(diff);
             document.getElementById("wooSyncPreviewModal").classList.add("open");
