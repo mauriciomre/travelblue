@@ -4060,10 +4060,21 @@ async function confirmarSyncWoo() {
     btn.disabled = true;
     btn.textContent = "Aplicando...";
     try {
-        var res = await fetch(API + "?action=woo_sync_apply", {
+        // El preview YA calculó todo el diff (wooSyncPreviewDiff) -- filtrar
+        // acá a lo tildado y mandarlo directo, en vez de pedirle al server
+        // que vuelva a indexar TODO WooCommerce de cero (~2-3 min) antes de
+        // aplicar. Bug real encontrado 08/09/2026: eso duplicaba el trabajo
+        // del preview en cada aplicación y arriesgaba cortarse por algun
+        // limite de tiempo del hosting que set_time_limit no evita.
+        var incluidos = {};
+        codigosIncluir.forEach(function (c) { incluidos[c] = true; });
+        var actualiza = wooSyncPreviewDiff.actualiza.filter(function (it) { return incluidos[it.codigo]; });
+        var nuevos = wooSyncPreviewDiff.nuevos.filter(function (it) { return incluidos[it.codigo]; });
+
+        var res = await fetch(API + "?action=woo_sync_apply_directo", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ _user: authUser, _pass: authPass, codigos_incluir: codigosIncluir }),
+            body: JSON.stringify({ _user: authUser, _pass: authPass, actualiza: actualiza, nuevos: nuevos }),
         });
         var json = await res.json();
         if (!json.ok) { toast("Error: " + json.error, "#c62828"); return; }

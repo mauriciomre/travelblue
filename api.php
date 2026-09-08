@@ -632,6 +632,26 @@ function woo_fetch_travelblue($token) {
     return array_values($items);
 }
 
+// Bug real de datos encontrado 08/09/2026 (Mauricio aplico un cambio de
+// precio real, no dio error, pero el precio no cambio de verdad): algunos
+// productos VARIABLE en esta tienda ademas tienen su propio SKU (igual al
+// CodigoArticulo de Manager, ej. "8232") aparte del de sus variaciones
+// reales por color ("8232-PUR"/"8232-GRE"/"8232-BLU") -- entonces
+// woo_find_by_sku/el indice matchea el PADRE, pero WooCommerce ignora
+// regular_price en un producto padre variable (el precio real vive en cada
+// variacion). Esta funcion detecta ese caso y devuelve las variaciones
+// reales (buscadas en el indice completo por parent_id) para actualizar
+// esas en vez del padre inerte. Si el producto encontrado no es variable,
+// o es variable pero no se le encuentran hijos reales (no deberia pasar,
+// defensivo), devuelve el producto tal cual.
+function woo_variantes_reales($producto, $indiceWoo) {
+    if (($producto['type'] ?? '') !== 'variable') return [$producto];
+    $hijos = array_values(array_filter($indiceWoo, function ($p) use ($producto) {
+        return ($p['parent_id'] ?? null) === $producto['id'];
+    }));
+    return $hijos ?: [$producto];
+}
+
 // Decide que pasa con UN articulo ya transformado ($it, salido de
 // woo_fetch_travelblue) contra su producto real de WooCommerce (ya
 // resuelto via woo_find_by_sku, o null si no existe). Extraido de
@@ -690,8 +710,33 @@ function woo_diff_item($it, $producto, $categoriasWoo) {
     ]];
 }
 
+// Recorre los articulos de Manager ya transformados contra un indice de
+// WooCommerce ya armado y arma el diff completo -- compartido entre
+// woo_sync_diff (indice armado del lado del servidor) y woo_sync_diff_indexado
+// (indice armado del lado del cliente, ver ese caso en el switch). Por cada
+// match, se expande a woo_variantes_reales() antes de comparar -- un mismo
+// CodigoArticulo de Manager puede terminar generando mas de una fila de
+// "actualiza" si el producto encontrado es un padre variable con variaciones
+// reales (ver docstring de woo_variantes_reales).
+function woo_calcular_diff($items, $indiceWoo, $categoriasWoo) {
+    $actualiza = []; $nuevos = []; $sinCambios = [];
+    foreach ($items as $it) {
+        $encontrado = $indiceWoo[$it['codigo']] ?? null;
+        if ($encontrado === null) {
+            $nuevos[] = woo_diff_item($it, null, $categoriasWoo)['data'];
+            continue;
+        }
+        foreach (woo_variantes_reales($encontrado, $indiceWoo) as $target) {
+            $r = woo_diff_item($it, $target, $categoriasWoo);
+            if ($r['tipo'] === 'actualiza') $actualiza[] = $r['data'];
+            else $sinCambios[] = $r['data'];
+        }
+    }
+    return ['actualiza' => $actualiza, 'nuevos' => $nuevos, 'sin_cambios' => $sinCambios];
+}
+
 // Compara Travel Blue (Manager) contra WooCommerce — indexa TODO el catálogo
-// de WooCommerce de una sola pasada (woo_indexar_productos, ~20-25 llamadas
+// de WooCommerce de una sola pasada (woo_indexar_productos, ~90-100 llamadas
 // para el catálogo real de hoy) en vez de consultar articulo por articulo
 // (~160 llamadas, como se hacía antes de la optimización del 07/09/2026)
 // y despues compara todo en memoria, sin mas llamadas de red.
@@ -699,16 +744,7 @@ function woo_sync_diff($token) {
     $items = woo_fetch_travelblue($token);
     $categoriasWoo = woo_list_categories();
     $indiceWoo = woo_indexar_productos();
-
-    $actualiza = []; $nuevos = []; $sinCambios = [];
-    foreach ($items as $it) {
-        $r = woo_diff_item($it, $indiceWoo[$it['codigo']] ?? null, $categoriasWoo);
-        if ($r['tipo'] === 'nuevo') $nuevos[] = $r['data'];
-        elseif ($r['tipo'] === 'actualiza') $actualiza[] = $r['data'];
-        else $sinCambios[] = $r['data'];
-    }
-
-    return ['actualiza' => $actualiza, 'nuevos' => $nuevos, 'sin_cambios' => $sinCambios];
+    return woo_calcular_diff($items, $indiceWoo, $categoriasWoo);
 }
 
 // Aplica un diff ya calculado. SIN cola de "pendientes" a diferencia del sync
@@ -1706,14 +1742,8 @@ switch ($action) {
             $token = manager_login();
             $items = woo_fetch_travelblue($token);
             $categoriasWoo = woo_list_categories();
-            $actualiza = []; $nuevos = []; $sinCambios = [];
-            foreach ($items as $it) {
-                $r = woo_diff_item($it, $indiceWoo[$it['codigo']] ?? null, $categoriasWoo);
-                if ($r['tipo'] === 'nuevo') $nuevos[] = $r['data'];
-                elseif ($r['tipo'] === 'actualiza') $actualiza[] = $r['data'];
-                else $sinCambios[] = $r['data'];
-            }
-            echo json_encode(['ok' => true, 'actualiza' => $actualiza, 'nuevos' => $nuevos, 'sin_cambios' => $sinCambios]);
+            $diff = woo_calcular_diff($items, $indiceWoo, $categoriasWoo);
+            echo json_encode(['ok' => true] + $diff);
         } catch (Exception $e) {
             http_response_code(500);
             echo json_encode(['error' => $e->getMessage()]);
@@ -1768,6 +1798,44 @@ switch ($action) {
                 }));
             }
 
+            $runId = 'woosync_' . date('Ymd_His') . '_' . substr(uniqid(), -4);
+            $resumen = woo_sync_aplicar($db, $diff, $modo, $runId, $token);
+            echo json_encode(['ok' => true, 'modo' => $modo, 'run_id' => $runId] + $resumen);
+        } catch (Exception $e) {
+            http_response_code(500);
+            echo json_encode(['error' => $e->getMessage()]);
+        } finally {
+            $db->query("SELECT RELEASE_LOCK('woo_sync_lock')");
+        }
+        break;
+
+    // Aplica un diff YA CALCULADO por el preview (woo_indexar_paso1 +
+    // woo_indexar_variaciones_lote + woo_sync_diff_indexado), filtrado del
+    // lado del cliente a las filas tildadas -- a diferencia de woo_sync_apply
+    // (que vuelve a indexar TODO WooCommerce antes de aplicar, pensado para
+    // el modo automático/cron que no tiene un preview previo), esto no le
+    // pega de nuevo a WooCommerce para armar el diff. Bug real encontrado
+    // 08/09/2026: confirmar desde el preview manual recalculaba el indice
+    // completo (~2-3 min) antes de aplicar 8 cambios, arriesgando cortarse
+    // por algun limite de tiempo del hosting.
+    case 'woo_sync_apply_directo':
+        set_time_limit(120);
+        $data = json_decode(file_get_contents('php://input'), true);
+        checkAuth($data);
+
+        $lockRow = $db->query("SELECT GET_LOCK('woo_sync_lock', 0) as l")->fetch_assoc();
+        if (!$lockRow || $lockRow['l'] != 1) {
+            http_response_code(409);
+            die(json_encode(['error' => 'Ya hay una sincronización minorista en curso, esperá a que termine']));
+        }
+        try {
+            $modoRow = $db->query("SELECT valor FROM config WHERE clave='woo_sync_mode'")->fetch_assoc();
+            $modo = $modoRow ? $modoRow['valor'] : 'manual';
+            $token = manager_login(); // solo para fotos de altas nuevas
+            $diff = [
+                'actualiza' => is_array($data['actualiza'] ?? null) ? $data['actualiza'] : [],
+                'nuevos' => is_array($data['nuevos'] ?? null) ? $data['nuevos'] : [],
+            ];
             $runId = 'woosync_' . date('Ymd_His') . '_' . substr(uniqid(), -4);
             $resumen = woo_sync_aplicar($db, $diff, $modo, $runId, $token);
             echo json_encode(['ok' => true, 'modo' => $modo, 'run_id' => $runId] + $resumen);
