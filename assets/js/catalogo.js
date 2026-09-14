@@ -428,7 +428,7 @@ function renderProds() {
         '<button class="sort-btn' +
         (sortMode === "price_desc" ? " on" : "") +
         '" data-sort="price_desc" onclick="setSort(\'price_desc\')">$ ↓</button>' +
-        '<div style="margin-left:auto;display:flex;align-items:center;gap:14px;flex-wrap:wrap">' +
+        '<div class="sort-extra">' +
         '<label style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--muted);cursor:pointer">' +
         '<input type="checkbox"' +
         (showAgotados ? " checked" : "") +
