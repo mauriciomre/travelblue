@@ -428,10 +428,14 @@ function renderProds() {
         '<button class="sort-btn' +
         (sortMode === "price_desc" ? " on" : "") +
         '" data-sort="price_desc" onclick="setSort(\'price_desc\')">$ ↓</button>' +
-        '<label style="margin-left:auto;display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--muted);cursor:pointer">' +
+        '<div style="margin-left:auto;display:flex;align-items:center;gap:14px;flex-wrap:wrap">' +
+        '<label style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--muted);cursor:pointer">' +
         '<input type="checkbox"' +
         (showAgotados ? " checked" : "") +
         ' onchange="toggleShowAgotados(this.checked)"> Mostrar agotados</label>' +
+        '<button class="excel-btn" id="btnExportExcel" onclick="exportCatalogoExcel()" title="Descargar el catálogo visible en un archivo Excel">' +
+        '<img src="https://cdn.jsdelivr.net/npm/lucide-static@0.462.0/icons/file-down.svg" alt="" style="width:14px;height:14px;display:block;filter: invert(13%) sepia(52%) saturate(1826%) hue-rotate(215deg) brightness(94%) contrast(93%)" /> Descargar Excel</button>' +
+        "</div>" +
         "</div>";
 
     if (viewMode === "grid") renderGrid(list, el, sortBar);
@@ -1579,4 +1583,132 @@ function closeBarcodeScanner() {
         var r = document.getElementById("scannerReader");
         if (r) r.innerHTML = "";
     }
+}
+
+// ── Exportar catálogo a Excel (con foto) ──────────────────────────────────────
+// Usa el mismo listado que ya llegó del servidor: como el endpoint público
+// nunca devuelve productos con mostrar=0, acá no hace falta filtrarlos de nuevo.
+async function exportCatalogoExcel() {
+    if (typeof ExcelJS === "undefined") {
+        alert("La librería de Excel todavía está cargando, probá de nuevo en un segundo.");
+        return;
+    }
+    if (!products.length) {
+        alert("No hay productos para exportar.");
+        return;
+    }
+    var btn = document.getElementById("btnExportExcel");
+    var originalHTML = btn ? btn.innerHTML : "";
+    if (btn) {
+        btn.setAttribute("disabled", "disabled");
+        btn.innerHTML = "Generando...";
+    }
+    try {
+        var wb = new ExcelJS.Workbook();
+        var ws = wb.addWorksheet("Catálogo");
+        ws.columns = [
+            { header: "FOTO", key: "foto", width: 9 },
+            { header: "CODIGO", key: "codigo", width: 14 },
+            { header: "CODIGO_BARRAS", key: "codigo_barras", width: 16 },
+            { header: "DESCRIPCION", key: "descripcion", width: 40 },
+            { header: "CATEGORIA", key: "categoria", width: 22 },
+            { header: "PRECIO_MAYORISTA", key: "precio_mayorista", width: 18 },
+            { header: "PVP", key: "pvp", width: 12 },
+            { header: "ESTADO", key: "estado", width: 12 },
+        ];
+        ws.getRow(1).font = { bold: true };
+
+        products.forEach(function (p) {
+            var row = ws.addRow({
+                codigo: p.CODIGO || "",
+                codigo_barras: p.CODIGO_BARRAS || "",
+                descripcion: p.DESCRIPCION || "",
+                categoria: p.CATEGORIA || "",
+                precio_mayorista: p.PRECIO_MAYORISTA != null ? Number(p.PRECIO_MAYORISTA) : "",
+                pvp: p.PVP != null ? Number(p.PVP) : "",
+                estado: p.ESTADO || "",
+            });
+            row.height = 34;
+        });
+
+        // Fotos: se descargan en paralelo (con tope de concurrencia) y se
+        // embeben en la columna A. Si una falla (producto sin foto real
+        // todavía), esa fila queda sin imagen pero no corta el resto.
+        var CONCURRENCY = 8;
+        var idx = 0, done = 0;
+        function pullNext() {
+            if (idx >= products.length) return Promise.resolve();
+            var i = idx++;
+            if (btn) btn.innerHTML = "Descargando fotos " + (done + 1) + "/" + products.length + "...";
+            return fetchProductImage(products[i])
+                .then(function (img) {
+                    if (img) {
+                        var imgId = wb.addImage({ buffer: img.buffer, extension: img.extension });
+                        ws.addImage(imgId, {
+                            tl: { col: 0, row: i + 1 },
+                            ext: { width: 40, height: 40 },
+                            editAs: "oneCell",
+                        });
+                    }
+                })
+                .catch(function () {})
+                .then(function () {
+                    done++;
+                    return pullNext();
+                });
+        }
+        var workers = [];
+        for (var w = 0; w < CONCURRENCY; w++) workers.push(pullNext());
+        await Promise.all(workers);
+
+        if (btn) btn.innerHTML = "Armando archivo...";
+        var buffer = await wb.xlsx.writeBuffer();
+        var blob = new Blob([buffer], {
+            type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement("a");
+        var fecha = new Date().toISOString().slice(0, 10);
+        a.href = url;
+        a.download = "catalogo_travelblue_" + fecha + ".xlsx";
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(function () {
+            URL.revokeObjectURL(url);
+        }, 4000);
+    } catch (e) {
+        alert("Error al generar el Excel: " + e.message);
+    } finally {
+        if (btn) {
+            btn.removeAttribute("disabled");
+            btn.innerHTML = originalHTML;
+        }
+    }
+}
+
+function fetchProductImage(p) {
+    var src = getImgSrc(p);
+    var ext = extFromUrl(src);
+    if (!ext) return Promise.resolve(null);
+    return fetch(src)
+        .then(function (res) {
+            if (!res.ok) return null;
+            return res.arrayBuffer().then(function (buffer) {
+                return { buffer: buffer, extension: ext };
+            });
+        })
+        .catch(function () {
+            return null;
+        });
+}
+
+function extFromUrl(url) {
+    var clean = url.split("?")[0].split("#")[0];
+    var m = /\.([a-zA-Z0-9]+)$/.exec(clean);
+    if (!m) return null;
+    var e = m[1].toLowerCase();
+    if (e === "jpg") e = "jpeg";
+    if (e !== "jpeg" && e !== "png" && e !== "gif") return null;
+    return e;
 }

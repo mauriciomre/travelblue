@@ -1161,6 +1161,36 @@ header {
     border-color: var(--blue)
 }
 
+.excel-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: #fff;
+    border: 1.5px solid var(--green);
+    color: var(--green);
+    padding: 5px 12px;
+    border-radius: 16px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all .15s
+}
+
+.excel-btn:hover {
+    background: var(--green);
+    color: #fff
+}
+
+.excel-btn:hover img {
+    filter: brightness(0) invert(1) !important
+}
+
+.excel-btn[disabled] {
+    opacity: .6;
+    cursor: default;
+    pointer-events: none
+}
+
 .multiplo-hint {
     font-size: 10px;
     color: var(--muted);
