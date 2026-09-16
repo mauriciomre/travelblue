@@ -375,6 +375,15 @@
             </div>
         </div>
 
+        <!-- LIGHTBOX de foto de producto — un solo elemento compartido por
+             grilla y lista, ver openLightbox() en catalogo.js. La animación
+             de "crecer" mueve/agranda esta misma etiqueta <img> desde el
+             rect exacto de la miniatura clickeada. -->
+        <div class="lightbox-bg" id="lightboxBg" onclick="if(event.target===this) closeLightbox()">
+            <button class="lightbox-close" onclick="closeLightbox()" aria-label="Cerrar"><img src="https://cdn.jsdelivr.net/npm/lucide-static@0.462.0/icons/x.svg" alt="" style="width:18px;height:18px;display:block;filter: invert(13%) sepia(52%) saturate(1826%) hue-rotate(215deg) brightness(94%) contrast(93%)" /></button>
+            <img class="lightbox-img" id="lightboxImg" alt="" />
+        </div>
+
         <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
         <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
         <script src="assets/js/catalogo.js"></script>

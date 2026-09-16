@@ -1422,3 +1422,65 @@ header {
     outline: 3px solid #0d6efd;
     box-shadow: 0 0 0 4px rgba(13,110,253,.10);
 }
+
+/* ── Lightbox de foto de producto ─────────────────────────────────────────
+   La animación "crece desde la miniatura" no es un fade genérico: openLightbox()
+   arranca este mismo <img> parado exacto donde estaba la miniatura (mismo
+   rect, sin transición) y en el frame siguiente le anima top/left/width/height
+   hacia el tamaño grande centrado — closeLightbox() hace el camino inverso
+   antes de ocultar. Por eso .lightbox-img usa position:fixed con top/left/
+   width/height puestos por JS en cada apertura, no por CSS. */
+.lightbox-bg {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(10, 8, 6, 0);
+    z-index: 600;
+    align-items: center;
+    justify-content: center
+}
+
+.lightbox-bg.open {
+    display: flex
+}
+
+.lightbox-img {
+    position: fixed;
+    object-fit: contain;
+    border-radius: 10px;
+    background: var(--pale);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, .4);
+    transform-origin: 50% 50%;
+    cursor: zoom-in;
+    /* El gesto de pellizco/paneo lo maneja JS (pointer events) — sin esto,
+       el navegador compite tratando de hacer scroll/zoom nativo de la
+       página con los mismos dedos. */
+    touch-action: none
+}
+
+.lightbox-img.zoomed {
+    cursor: grab
+}
+
+.lightbox-close {
+    position: fixed;
+    top: 16px;
+    right: 16px;
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    border: none;
+    background: rgba(255, 255, 255, .92);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity .2s;
+    pointer-events: none
+}
+
+.lightbox-bg.open .lightbox-close {
+    opacity: 1;
+    pointer-events: auto
+}

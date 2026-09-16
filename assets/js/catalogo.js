@@ -100,6 +100,242 @@ function getImgSrc(p) {
     return "imgs/" + (p.CODIGO || "").replace(/\//g, "_") + ".jpeg" + "?v=" + v;
 }
 
+// ── Lightbox de foto de producto (grilla y lista) ──────────────────────────
+// La animación "crece desde la miniatura" se arma a mano con un solo <img>
+// compartido (#lightboxImg, en index.html): se lo para primero exacto en el
+// rect de la miniatura clickeada (sin transición) y recién en el frame
+// siguiente se le anima top/left/width/height al tamaño grande — closeLightbox
+// hace el camino inverso antes de ocultar. Sin esto (aplicar el tamaño final
+// de una) se vería un fundido genérico, no la miniatura "creciendo".
+var lightboxOriginRect = null;
+
+function openLightbox(imgEl) {
+    // Sin foto real todavía (rota / no cargó) no hay nada que agrandar.
+    if (!imgEl.src || imgEl.naturalWidth === 0) return;
+    var bg = document.getElementById("lightboxBg");
+    var img = document.getElementById("lightboxImg");
+    var rect = imgEl.getBoundingClientRect();
+    lightboxOriginRect = rect;
+
+    img.src = imgEl.src;
+    img.style.transition = "none";
+    img.style.top = rect.top + "px";
+    img.style.left = rect.left + "px";
+    img.style.width = rect.width + "px";
+    img.style.height = rect.height + "px";
+    bg.style.transition = "none";
+    bg.style.backgroundColor = "rgba(10,8,6,0)";
+    bg.classList.add("open");
+
+    // Forzar reflow antes de animar — si no, el navegador puede fusionar el
+    // estado inicial y el final en un solo paso y no se ve ningún movimiento.
+    void img.offsetWidth;
+
+    lbResetZoom();
+
+    requestAnimationFrame(function () {
+        var target = lightboxTargetRect();
+        img.style.transition = "top .3s cubic-bezier(.2,.8,.2,1), left .3s cubic-bezier(.2,.8,.2,1), width .3s cubic-bezier(.2,.8,.2,1), height .3s cubic-bezier(.2,.8,.2,1)";
+        bg.style.transition = "background-color .3s ease";
+        bg.style.backgroundColor = "rgba(10,8,6,.85)";
+        img.style.top = target.top + "px";
+        img.style.left = target.left + "px";
+        img.style.width = target.width + "px";
+        img.style.height = target.height + "px";
+        // Base para el cálculo de zoom/pan — el rect "grande" final, no el
+        // de la miniatura de origen (ese ya cumplió su función acá).
+        lbBaseRect = target;
+    });
+}
+
+function lightboxTargetRect() {
+    var w = Math.min(window.innerWidth * 0.92, 640);
+    var h = Math.min(window.innerHeight * 0.8, 640);
+    return {
+        top: (window.innerHeight - h) / 2,
+        left: (window.innerWidth - w) / 2,
+        width: w,
+        height: h,
+    };
+}
+
+function closeLightbox() {
+    var bg = document.getElementById("lightboxBg");
+    if (!bg.classList.contains("open")) return;
+    var img = document.getElementById("lightboxImg");
+    var r = lightboxOriginRect;
+    lbResetZoom();
+    bg.style.backgroundColor = "rgba(10,8,6,0)";
+    if (r) {
+        img.style.top = r.top + "px";
+        img.style.left = r.left + "px";
+        img.style.width = r.width + "px";
+        img.style.height = r.height + "px";
+    }
+    setTimeout(function () {
+        bg.classList.remove("open");
+        lightboxOriginRect = null;
+    }, 300);
+}
+
+document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape") closeLightbox();
+});
+
+// ── Zoom / paneo dentro del lightbox ────────────────────────────────────────
+// Todo vía CSS transform (translate+scale) sobre el mismo #lightboxImg, en
+// paralelo con la animación de apertura/cierre (que mueve top/left/width/
+// height — propiedades distintas, no chocan). lbBaseRect es el rect "grande"
+// ya calculado en openLightbox — el zoom/paneo se mide siempre contra ese
+// rect fijo, nunca contra getBoundingClientRect() en vivo (que ya incluye el
+// transform actual y daría un cálculo circular).
+var lbZoom = 1,
+    lbPanX = 0,
+    lbPanY = 0,
+    lbBaseRect = null;
+var lbPointers = {};
+var lbPinchStartDist = 0,
+    lbPinchStartZoom = 1;
+var lbDragStart = null;
+var lbLastTapTime = 0,
+    lbLastTapX = 0,
+    lbLastTapY = 0;
+
+function lbApplyTransform() {
+    var img = document.getElementById("lightboxImg");
+    img.style.transform = "translate(" + lbPanX + "px," + lbPanY + "px) scale(" + lbZoom + ")";
+    img.classList.toggle("zoomed", lbZoom > 1);
+}
+
+function lbClampPan() {
+    if (!lbBaseRect) return;
+    var maxX = (lbBaseRect.width * (lbZoom - 1)) / 2;
+    var maxY = (lbBaseRect.height * (lbZoom - 1)) / 2;
+    lbPanX = Math.max(-maxX, Math.min(maxX, lbPanX));
+    lbPanY = Math.max(-maxY, Math.min(maxY, lbPanY));
+}
+
+// clientX/clientY es el punto (mouse, dedo, o punto medio del pellizco) que
+// tiene que quedar fijo en pantalla mientras cambia el zoom — sin esto,
+// cada pellizco/scroll "saltaría" el punto de interés en vez de acercarlo.
+function lbZoomAt(newZoom, clientX, clientY) {
+    if (!lbBaseRect) return;
+    newZoom = Math.max(1, Math.min(4, newZoom));
+    var cx = lbBaseRect.left + lbBaseRect.width / 2;
+    var cy = lbBaseRect.top + lbBaseRect.height / 2;
+    var relX = clientX - cx,
+        relY = clientY - cy;
+    var origX = (relX - lbPanX) / lbZoom;
+    var origY = (relY - lbPanY) / lbZoom;
+    lbPanX = relX - newZoom * origX;
+    lbPanY = relY - newZoom * origY;
+    lbZoom = newZoom <= 1.02 ? 1 : newZoom;
+    if (lbZoom === 1) {
+        lbPanX = 0;
+        lbPanY = 0;
+    }
+    lbClampPan();
+    lbApplyTransform();
+}
+
+function lbResetZoom() {
+    lbZoom = 1;
+    lbPanX = 0;
+    lbPanY = 0;
+    lbBaseRect = null;
+    lbPointers = {};
+    lbDragStart = null;
+    lbApplyTransform();
+}
+
+function lbToggleZoom(clientX, clientY) {
+    lbZoomAt(lbZoom > 1 ? 1 : 2.5, clientX, clientY);
+}
+
+function lbInitZoomHandlers() {
+    var img = document.getElementById("lightboxImg");
+
+    img.addEventListener("wheel", function (e) {
+        if (lbZoom === 1 && e.deltaY > 0) return; // ya está en 1:1, dejar scrollear la página si hiciera falta
+        e.preventDefault();
+        lbZoomAt(lbZoom * (1 - e.deltaY * 0.0015), e.clientX, e.clientY);
+    }, { passive: false });
+
+    img.addEventListener("pointerdown", function (e) {
+        lbPointers[e.pointerId] = { x: e.clientX, y: e.clientY };
+        // Capturar SIEMPRE el puntero al target, no solo cuando arranca un
+        // arrastre — sin esto, en un pellizco de 2 dedos apenas uno se
+        // despega visualmente del área de la foto (algo casi inevitable al
+        // separarlos) el navegador deja de mandarle sus pointermove al
+        // <img> y el pellizco se queda "trabado" a mitad de gesto en mobile.
+        // Va en un try/catch: si por lo que sea falla, no tiene que tirar
+        // abajo el resto de la lógica de seguimiento del pellizco.
+        try { img.setPointerCapture(e.pointerId); } catch (err) {}
+        var ids = Object.keys(lbPointers);
+        if (ids.length === 2) {
+            var p1 = lbPointers[ids[0]], p2 = lbPointers[ids[1]];
+            lbPinchStartDist = Math.hypot(p2.x - p1.x, p2.y - p1.y) || 1;
+            lbPinchStartZoom = lbZoom;
+            lbDragStart = null;
+            return;
+        }
+        // Doble tap (solo touch/pen — el mouse ya tiene su propio "dblclick"
+        // más abajo; si contara acá también, un doble click de mouse
+        // alternaría el zoom dos veces y quedaría como si no hubiera pasado
+        // nada).
+        if (e.pointerType !== "mouse") {
+            var now = Date.now();
+            if (now - lbLastTapTime < 300 && Math.hypot(e.clientX - lbLastTapX, e.clientY - lbLastTapY) < 30) {
+                lbToggleZoom(e.clientX, e.clientY);
+                lbLastTapTime = 0;
+                return;
+            }
+            lbLastTapTime = now;
+            lbLastTapX = e.clientX;
+            lbLastTapY = e.clientY;
+        }
+        if (lbZoom > 1) {
+            lbDragStart = { x: e.clientX, y: e.clientY, panX: lbPanX, panY: lbPanY };
+        }
+    });
+
+    img.addEventListener("pointermove", function (e) {
+        if (!(e.pointerId in lbPointers)) return;
+        lbPointers[e.pointerId] = { x: e.clientX, y: e.clientY };
+        var ids = Object.keys(lbPointers);
+        if (ids.length === 2) {
+            var p1 = lbPointers[ids[0]], p2 = lbPointers[ids[1]];
+            var dist = Math.hypot(p2.x - p1.x, p2.y - p1.y) || 1;
+            lbZoomAt(lbPinchStartZoom * (dist / lbPinchStartDist), (p1.x + p2.x) / 2, (p1.y + p2.y) / 2);
+        } else if (ids.length === 1 && lbDragStart) {
+            lbPanX = lbDragStart.panX + (e.clientX - lbDragStart.x);
+            lbPanY = lbDragStart.panY + (e.clientY - lbDragStart.y);
+            lbClampPan();
+            lbApplyTransform();
+        }
+    });
+
+    function lbPointerEnd(e) {
+        delete lbPointers[e.pointerId];
+        lbDragStart = null;
+        var ids = Object.keys(lbPointers);
+        if (ids.length === 1 && lbZoom > 1) {
+            // Quedó un dedo apoyado (se levantó uno de un pellizco de a dos)
+            // — retomar el paneo desde ahí en vez de cortarlo en seco.
+            var p = lbPointers[ids[0]];
+            lbDragStart = { x: p.x, y: p.y, panX: lbPanX, panY: lbPanY };
+        }
+    }
+    img.addEventListener("pointerup", lbPointerEnd);
+    img.addEventListener("pointercancel", lbPointerEnd);
+
+    img.addEventListener("dblclick", function (e) {
+        e.preventDefault();
+        lbToggleZoom(e.clientX, e.clientY);
+    });
+}
+lbInitZoomHandlers();
+
 function setView(v) {
     viewMode = v;
     document.getElementById("btnGrid").classList.toggle("on", v === "grid");
@@ -496,7 +732,7 @@ function cardHTML(p) {
         src +
         '" alt="' +
         p.DESCRIPCION +
-        '" onerror="this.style.display=\'none\'"></div>';
+        '" onclick="openLightbox(this)" onerror="this.style.display=\'none\'"></div>';
     html += '<div class="card-body">';
     html +=
         '<div class="c-top"><span class="code">' +
@@ -697,7 +933,7 @@ function listRowHTML(p) {
     html +=
         '<td><img class="list-thumb" data-src="' +
         src +
-        '" alt="" onerror="this.style.display=\'none\'"></td>';
+        '" alt="" onclick="openLightbox(this)" onerror="this.style.display=\'none\'"></td>';
     html +=
         '<td><span class="code">' +
         p.CODIGO +
