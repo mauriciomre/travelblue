@@ -2499,6 +2499,7 @@ var SYSTEM_FIELDS = [
     { key: "PVP",              label: "PVP",              required: false },
     { key: "ESTADO",           label: "Estado",           required: false },
     { key: "MOSTRAR",          label: "Mostrar en catálogo", required: false },
+    { key: "MULTIPLO",         label: "Múltiplo",         required: false },
 ];
 
 var FIELD_ALIASES = {
@@ -2510,6 +2511,7 @@ var FIELD_ALIASES = {
     "PVP":              ["PVP", "PRECIO_VENTA", "PRECIO_PUBLICO", "RETAIL", "PRECIO_SUGERIDO"],
     "ESTADO":           ["ESTADO", "STATUS", "STATE", "DISPONIBILIDAD", "ACTIVO"],
     "MOSTRAR":          ["MOSTRAR", "VISIBLE", "MOSTRAR_CATALOGO", "SHOW", "PUBLICADO"],
+    "MULTIPLO":         ["MULTIPLO", "MÚLTIPLO", "MULTIPLE", "CANTIDAD_MINIMA", "MULTIPLO_VENTA", "PACK"],
 };
 
 // Interpretación permisiva de una celda booleana (columna MOSTRAR del Excel)
@@ -2689,6 +2691,8 @@ function getRowStatus(row, existingData) {
     }
     if (row["PRECIO_MAYORISTA"] && isNaN(parseFloat(row["PRECIO_MAYORISTA"])))
         errors.push("PRECIO_MAYORISTA no es un número");
+    if (row["MULTIPLO"] && (isNaN(parseInt(row["MULTIPLO"])) || parseInt(row["MULTIPLO"]) < 1))
+        errors.push("MULTIPLO debe ser un número entero mayor o igual a 1");
 
     if (errors.length) return { status: "ERROR", errors: errors, existing: existing };
     if (!existing)     return { status: "NUEVO",       errors: [], existing: null };
@@ -2702,6 +2706,7 @@ function getRowStatus(row, existingData) {
         ESTADO:           "estado",
         CODIGO_BARRAS:    "codigo_barras",
         MOSTRAR:          "mostrar",
+        MULTIPLO:         "multiplo",
     };
     var changed = false;
     Object.keys(fieldMap).forEach(function(k) {
@@ -2714,6 +2719,8 @@ function getRowStatus(row, existingData) {
             if (newV.toUpperCase() !== oldV.toUpperCase()) changed = true;
         } else if (k === "MOSTRAR") {
             if (mostrarBool(newV) !== (oldV === "1")) changed = true;
+        } else if (k === "MULTIPLO") {
+            if (Math.max(1, parseInt(newV) || 1) !== Math.max(1, parseInt(oldV) || 1)) changed = true;
         } else {
             if (newV !== oldV) changed = true;
         }
@@ -2743,7 +2750,7 @@ function renderImportPreview(rows, existingData) {
     enriched.forEach(function(r) { counts[r._status.status]++; });
 
     // Detectar qué campos vinieron en el archivo
-    var ORDERED = ["CODIGO","CODIGO_BARRAS","DESCRIPCION","CATEGORIA","PRECIO_MAYORISTA","PVP","ESTADO","MOSTRAR"];
+    var ORDERED = ["CODIGO","CODIGO_BARRAS","DESCRIPCION","CATEGORIA","PRECIO_MAYORISTA","PVP","ESTADO","MOSTRAR","MULTIPLO"];
     var activeFields = ORDERED.filter(function(f) {
         return rows.some(function(r) { return r[f] !== undefined && r[f] !== ""; });
     });
@@ -2766,7 +2773,7 @@ function buildImportPreviewHTML(enriched, counts, activeFields) {
         DESCRIPCION: "descripcion", CATEGORIA: "categoria",
         PRECIO_MAYORISTA: "precio_mayorista", PVP: "pvp",
         ESTADO: "estado", CODIGO_BARRAS: "codigo_barras",
-        MOSTRAR: "mostrar",
+        MOSTRAR: "mostrar", MULTIPLO: "multiplo",
     };
 
     var html = "";
@@ -2847,7 +2854,9 @@ function buildImportPreviewHTML(enriched, counts, activeFields) {
                 var numFields = ["PRECIO_MAYORISTA", "PVP"];
                 var reallyChanged = numFields.indexOf(f) >= 0
                     ? Math.round(parseFloat(val) * 100) !== Math.round(parseFloat(oldVal) * 100)
-                    : val.toUpperCase() !== oldVal.toUpperCase();
+                    : f === "MULTIPLO"
+                        ? Math.max(1, parseInt(val) || 1) !== Math.max(1, parseInt(oldVal) || 1)
+                        : val.toUpperCase() !== oldVal.toUpperCase();
                 if (reallyChanged) {
                     html += '<td style="padding:6px 8px;font-size:12px">'
                         + '<span style="text-decoration:line-through;color:#aaa">' + esc(oldVal) + '</span>'
@@ -3006,13 +3015,13 @@ async function undoLastImport(import_id) {
 // ── Exportar plantilla vacía ──────────────────────────────────────────────────
 function exportTemplate() {
     if (typeof XLSX === 'undefined') { alert('Cargando SheetJS, intentá de nuevo.'); return; }
-    var headers = ['CODIGO', 'CODIGO_BARRAS', 'DESCRIPCION', 'CATEGORIA', 'PRECIO_MAYORISTA', 'PVP', 'ESTADO', 'MOSTRAR'];
+    var headers = ['CODIGO', 'CODIGO_BARRAS', 'DESCRIPCION', 'CATEGORIA', 'PRECIO_MAYORISTA', 'PVP', 'ESTADO', 'MOSTRAR', 'MULTIPLO'];
     var wb = XLSX.utils.book_new();
     var ws = XLSX.utils.aoa_to_sheet([headers]);
     // Ancho de columna aproximado
     ws['!cols'] = [
         {wch: 14}, {wch: 16}, {wch: 40}, {wch: 22},
-        {wch: 18}, {wch: 12}, {wch: 12}, {wch: 10}
+        {wch: 18}, {wch: 12}, {wch: 12}, {wch: 10}, {wch: 10}
     ];
     XLSX.utils.book_append_sheet(wb, ws, 'Productos');
     XLSX.writeFile(wb, 'plantilla_importacion_travelblue.xlsx');
@@ -3029,7 +3038,7 @@ async function exportCatalog() {
         });
         var json = await res.json();
         if (!Array.isArray(json) || !json.length) { alert('No hay productos para exportar.'); return; }
-        var headers = ['CODIGO', 'CODIGO_BARRAS', 'DESCRIPCION', 'CATEGORIA', 'PRECIO_MAYORISTA', 'PVP', 'ESTADO', 'MOSTRAR'];
+        var headers = ['CODIGO', 'CODIGO_BARRAS', 'DESCRIPCION', 'CATEGORIA', 'PRECIO_MAYORISTA', 'PVP', 'ESTADO', 'MOSTRAR', 'MULTIPLO'];
         var rows = json.map(function(p) {
             return [
                 p.codigo        || '',
@@ -3039,14 +3048,15 @@ async function exportCatalog() {
                 p.precio_mayorista != null ? Number(p.precio_mayorista) : '',
                 p.pvp           != null    ? Number(p.pvp)              : '',
                 p.estado        || '',
-                p.mostrar != 0  ? 'SI' : 'NO'
+                p.mostrar != 0  ? 'SI' : 'NO',
+                p.multiplo != null ? Number(p.multiplo) : 1
             ];
         });
         var wb = XLSX.utils.book_new();
         var ws = XLSX.utils.aoa_to_sheet([headers].concat(rows));
         ws['!cols'] = [
             {wch: 14}, {wch: 16}, {wch: 40}, {wch: 22},
-            {wch: 18}, {wch: 12}, {wch: 12}, {wch: 10}
+            {wch: 18}, {wch: 12}, {wch: 12}, {wch: 10}, {wch: 10}
         ];
         XLSX.utils.book_append_sheet(wb, ws, 'Productos');
         var fecha = new Date().toISOString().slice(0, 10);

@@ -296,7 +296,7 @@ function manager_sync_aplicar($db, $diff, $modo, $runId, $token) {
     $actualizados = 0; $nuevosCreados = 0; $nuevosPendientes = 0;
 
     foreach ($diff['actualiza'] as $it) {
-        $prevStmt = $db->prepare("SELECT codigo,descripcion,categoria,precio_mayorista,pvp,estado,codigo_barras,mostrar FROM productos WHERE id=?");
+        $prevStmt = $db->prepare("SELECT codigo,descripcion,categoria,precio_mayorista,pvp,estado,codigo_barras,mostrar,multiplo FROM productos WHERE id=?");
         $prevStmt->bind_param('i', $it['id']);
         $prevStmt->execute();
         $prev = $prevStmt->get_result()->fetch_assoc();
@@ -1285,7 +1285,7 @@ switch ($action) {
             if (!$codigo) { $errors[] = ['codigo' => '(vacío)', 'motivo' => 'CODIGO obligatorio']; continue; }
 
             // ¿Existe el producto?
-            $chk = $db->prepare("SELECT codigo,descripcion,categoria,precio_mayorista,pvp,estado,codigo_barras,mostrar FROM productos WHERE codigo=?");
+            $chk = $db->prepare("SELECT codigo,descripcion,categoria,precio_mayorista,pvp,estado,codigo_barras,mostrar,multiplo FROM productos WHERE codigo=?");
             $chk->bind_param('s', $codigo); $chk->execute();
             $existing = $chk->get_result()->fetch_assoc();
 
@@ -1305,6 +1305,7 @@ switch ($action) {
                 if (isset($p['ESTADO'])         && $p['ESTADO']         !== '') { $sets[] = 'estado=?';           $params[] = strtoupper(trim($p['ESTADO']));    $types .= 's'; }
                 if (isset($p['CODIGO_BARRAS'])  && $p['CODIGO_BARRAS']  !== '') { $sets[] = 'codigo_barras=?';    $params[] = trim($p['CODIGO_BARRAS']);          $types .= 's'; }
                 if (isset($p['MOSTRAR'])        && $p['MOSTRAR']        !== '') { $sets[] = 'mostrar=?';          $params[] = parse_mostrar_valor($p['MOSTRAR']); $types .= 'i'; }
+                if (isset($p['MULTIPLO'])       && $p['MULTIPLO']       !== '') { $sets[] = 'multiplo=?';         $params[] = max(1, intval($p['MULTIPLO']));    $types .= 'i'; }
                 if (empty($sets)) { $updated++; continue; }
                 $params[] = $codigo; $types .= 's';
                 $stmt = $db->prepare("UPDATE productos SET " . implode(',', $sets) . " WHERE codigo=?");
@@ -1325,7 +1326,8 @@ switch ($action) {
                 $cb     = isset($p['CODIGO_BARRAS']) && $p['CODIGO_BARRAS'] !== '' ? trim($p['CODIGO_BARRAS']) : null;
                 $mostrar = isset($p['MOSTRAR']) && $p['MOSTRAR'] !== '' ? parse_mostrar_valor($p['MOSTRAR']) : 1;
                 if (!$desc || !$cat) { $errors[] = ['codigo' => $codigo, 'motivo' => 'DESCRIPCION y CATEGORIA obligatorias para producto nuevo']; continue; }
-                $o = 0; $multiplo = 1;
+                $o = 0;
+                $multiplo = isset($p['MULTIPLO']) && $p['MULTIPLO'] !== '' ? max(1, intval($p['MULTIPLO'])) : 1;
                 $stmt = $db->prepare("INSERT INTO productos (codigo,descripcion,categoria,precio_mayorista,pvp,estado,orden,multiplo,codigo_barras,mostrar) VALUES (?,?,?,?,?,?,?,?,?,?)");
                 $stmt->bind_param('sssddsiisi', $codigo, $desc, $cat, $may, $pvp, $estado, $o, $multiplo, $cb, $mostrar);
                 if ($stmt->execute()) $imported++;
@@ -1351,7 +1353,7 @@ switch ($action) {
         if (!$codigos) { echo json_encode(['ok' => true, 'productos' => (object)[]]); break; }
         $ph = implode(',', array_fill(0, count($codigos), '?'));
         $types = str_repeat('s', count($codigos));
-        $stmt = $db->prepare("SELECT codigo, descripcion, categoria, precio_mayorista, pvp, estado, codigo_barras, mostrar FROM productos WHERE codigo IN ($ph)");
+        $stmt = $db->prepare("SELECT codigo, descripcion, categoria, precio_mayorista, pvp, estado, codigo_barras, mostrar, multiplo FROM productos WHERE codigo IN ($ph)");
         $stmt->bind_param($types, ...$codigos);
         $stmt->execute();
         $res = $stmt->get_result();
@@ -1390,11 +1392,12 @@ switch ($action) {
                     $est   = $prev['estado']          ?? 'DISPONIBLE';
                     $cb    = isset($prev['codigo_barras']) && $prev['codigo_barras'] !== null ? strval($prev['codigo_barras']) : null;
                     $mostrar = isset($prev['mostrar']) ? intval($prev['mostrar']) : 1;
+                    $multiplo = isset($prev['multiplo']) ? max(1, intval($prev['multiplo'])) : 1;
                     $cod   = $row['codigo'];
 
-                    $stmt = $db->prepare("UPDATE productos SET descripcion=?,categoria=?,precio_mayorista=?,pvp=?,estado=?,codigo_barras=?,mostrar=? WHERE codigo=?");
+                    $stmt = $db->prepare("UPDATE productos SET descripcion=?,categoria=?,precio_mayorista=?,pvp=?,estado=?,codigo_barras=?,mostrar=?,multiplo=? WHERE codigo=?");
                     if (!$stmt) throw new Exception("prepare UPDATE falló para " . $cod . ": " . $db->error);
-                    $stmt->bind_param('ssddssis', $desc, $cat, $pmay, $pvp, $est, $cb, $mostrar, $cod);
+                    $stmt->bind_param('ssddssiis', $desc, $cat, $pmay, $pvp, $est, $cb, $mostrar, $multiplo, $cod);
                     if ($stmt->execute()) $restored++;
                     else $errors[] = ['codigo' => $cod, 'motivo' => $stmt->error];
                     $stmt->close();
