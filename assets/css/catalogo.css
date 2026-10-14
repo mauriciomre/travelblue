@@ -1492,3 +1492,72 @@ header {
     opacity: 1;
     pointer-events: auto
 }
+
+/* ── Letra grande del teléfono (accesibilidad) ───────────────────────────────
+   Con "tamaño de fuente" grande en Android todo el texto crece, incluso el
+   definido en px: nada puede tener ancho/alto fijo ni forzarse a una sola
+   línea. El precio y el PVP pasan a otra línea antes de salirse de la card, el
+   total del carrito se parte en vez de cortarse, y las palabras largas de la
+   descripción se parten antes de recortarse (la card tiene overflow:hidden).
+   Con letra normal y en escritorio no cambia nada: lo único que hace es
+   permitir el salto de línea cuando ya no entra. */
+.c-top {
+    flex-wrap: wrap;
+    row-gap: 4px
+}
+
+.c-top .badge {
+    max-width: 100%;
+    overflow-wrap: anywhere
+}
+
+.name {
+    overflow-wrap: anywhere
+}
+
+.prices {
+    flex-wrap: wrap;
+    row-gap: 2px
+}
+
+.price {
+    white-space: normal;
+    min-width: 0;
+    overflow-wrap: anywhere
+}
+
+.pvp {
+    /* flex-basis 0 + min-width: min-content: el PVP solo salta debajo del precio cuando ni
+       su palabra más larga entra al lado; mientras entre se comporta igual que antes. */
+    flex: 1 1 0;
+    min-width: min-content
+}
+
+.total-row {
+    flex-wrap: wrap
+}
+
+.total-lbl,
+.total-val {
+    white-space: normal;
+    overflow-wrap: anywhere
+}
+
+.total-val {
+    margin-left: auto
+}
+
+.cart-toast.show {
+    max-height: 200px
+}
+
+/* Formulario de datos del checkout: los pares de campos (CUIT/Email, Localidad/CP)
+   van lado a lado con letra normal y se apilan cuando el ancho mínimo en "rem"
+   (que crece con la letra) ya no entra, en vez de recortar lo escrito. */
+.field-row {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 7.3rem), 1fr))
+}
+
+.tel-row input:first-child {
+    min-width: calc(4ch + 28px)
+}

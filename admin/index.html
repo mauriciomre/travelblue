@@ -1484,7 +1484,7 @@
                     <!-- Campos del cliente -->
                     <div>
                         <div style="font-weight:700;font-size:13px;margin-bottom:8px;color:#262c63">Datos del cliente a mostrar</div>
-                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 16px">
+                        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,max(8.5rem,45%)),1fr));gap:4px 16px">
                             <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" name="pclientField" value="nombre" data-label="Nombre / Razón social" checked> Nombre / Razón social</label>
                             <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" name="pclientField" value="cuit" data-label="CUIT" checked> CUIT</label>
                             <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" name="pclientField" value="condicion_fiscal" data-label="Condición fiscal" checked> Condición fiscal</label>
@@ -1521,7 +1521,7 @@
                     <!-- Agrupación por categoría -->
                     <div>
                         <div style="font-weight:700;font-size:13px;margin-bottom:8px;color:#262c63">Agrupación</div>
-                        <div style="display:flex;gap:20px;margin-bottom:10px">
+                        <div style="display:flex;flex-wrap:wrap;gap:6px 20px;margin-bottom:10px">
                             <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
                                 <input type="radio" name="pGroupBy" value="categoria" checked onchange="togglePrintCatOrder(this)"> Separar por categoría
                             </label>
@@ -1573,10 +1573,10 @@
                 </div>
                 <div style="padding:20px 24px">
                     <!-- Indicador de paso -->
-                    <div id="importStepBar" style="display:flex;gap:0;margin-bottom:16px;border-radius:8px;overflow:hidden;font-size:12px;font-weight:700">
-                        <div id="importStep1" style="flex:1;padding:7px 0;text-align:center;background:#262c63;color:#fff">① Archivo</div>
-                        <div id="importStep2" style="flex:1;padding:7px 0;text-align:center;background:#e8eaf6;color:#999">② Mapear columnas</div>
-                        <div id="importStep3" style="flex:1;padding:7px 0;text-align:center;background:#e8eaf6;color:#999">③ Revisar y confirmar</div>
+                    <div id="importStepBar" style="display:flex;flex-wrap:wrap;gap:0;margin-bottom:16px;border-radius:8px;overflow:hidden;font-size:12px;font-weight:700">
+                        <div id="importStep1" style="flex:1 1 7em;padding:7px 0;text-align:center;background:#262c63;color:#fff">① Archivo</div>
+                        <div id="importStep2" style="flex:1 1 7em;padding:7px 0;text-align:center;background:#e8eaf6;color:#999">② Mapear columnas</div>
+                        <div id="importStep3" style="flex:1 1 7em;padding:7px 0;text-align:center;background:#e8eaf6;color:#999">③ Revisar y confirmar</div>
                     </div>
                     <!-- PASO 1: seleccionar archivo -->
                     <div id="importStep1Wrap">

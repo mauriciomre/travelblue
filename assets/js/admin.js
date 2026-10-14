@@ -1956,9 +1956,9 @@ async function openPedidoModal(id) {
     var p = pedidoActual;
     var fecha = new Date(p.created_at).toLocaleString("es-AR");
     var html =
-        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">';
+        '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,7rem),1fr));gap:16px;margin-bottom:16px">';
     html +=
-        '<div><div style="font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase;margin-bottom:4px">Cliente</div>';
+        '<div style="min-width:0;overflow-wrap:anywhere"><div style="font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase;margin-bottom:4px">Cliente</div>';
     html += "<strong>" + p.cliente_nombre + "</strong><br>";
     html +=
         '<a href="https://wa.me/' +
@@ -1970,7 +1970,7 @@ async function openPedidoModal(id) {
     if (p.email) html += "<br>" + p.email;
     html += "</div>";
     html +=
-        '<div><div style="font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase;margin-bottom:4px">Envío</div>';
+        '<div style="min-width:0;overflow-wrap:anywhere"><div style="font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase;margin-bottom:4px">Envío</div>';
     if (p.domicilio) html += p.domicilio + "<br>";
     if (p.localidad) html += p.localidad + " (" + (p.cp || "") + ")<br>";
     if (p.provincia) html += p.provincia + "<br>";
@@ -1978,7 +1978,7 @@ async function openPedidoModal(id) {
     html += "</div></div>";
     // Estado
     html +=
-        '<div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;padding:12px;background:#f8f9fb;border-radius:8px">';
+        '<div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;margin-bottom:16px;padding:12px;background:#f8f9fb;border-radius:8px">';
     html += '<span style="font-weight:700;font-size:13px">Estado:</span>';
     html +=
         '<select id="pedidoEstadoSel" style="padding:6px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px">';
@@ -2779,7 +2779,7 @@ function buildImportPreviewHTML(enriched, counts, activeFields) {
     var html = "";
 
     // ── Stat tiles ──
-    html += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px">';
+    html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,max(3.4rem,20%)),1fr));gap:8px;margin-bottom:12px">';
     html += importStatTile("✅ Nuevos",      counts.NUEVO,       "#1b5e20", "#e8f5e9");
     html += importStatTile("🔄 Actualizan", counts.ACTUALIZA,   "#0d47a1", "#e3f2fd");
     html += importStatTile("❌ Errores",    counts.ERROR,        "#b71c1c", "#ffebee");

@@ -813,7 +813,7 @@ td.editing {
 
 .row2 {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 8.75rem), 1fr));
     gap: 12px
 }
 
@@ -1182,7 +1182,7 @@ td.editing {
 /* ── Grid de herramientas / configuración ── */
 .tools-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr));
     gap: 16px;
     align-items: start;
 }
@@ -1362,4 +1362,100 @@ td.editing {
     to {
         background-position: 160% 0
     }
+}
+
+/* ── Letra grande del teléfono (accesibilidad) ───────────────────────────────
+   La barra de arriba tiene alto fijo (52px) porque el resto del panel se acomoda a ella:
+   en vez de crecer, lo que no entra se acorta con "…" y "Salir" nunca se sale de la pantalla.
+   La barra de favoritos (.favbar, flex:1 con scroll) ya cede espacio sola. */
+.topbar-brand {
+    flex: 0 0 auto
+}
+
+.topbar-right {
+    min-width: 0;
+    flex: 0 10 auto
+}
+
+.catalog-link {
+    min-width: 0;
+    flex: 0 10 auto;
+    overflow: hidden;
+    text-overflow: ellipsis
+}
+
+.logout {
+    flex: none
+}
+
+/* A 375px con letra normal el contenido de la barra ya invadía ~8px del padding derecho;
+   ahora que puede achicarse, sin esto "Ver catálogo" se recortaría incluso con letra normal.
+   Se le devuelve ese margen solo en pantallas de celular (en escritorio sobra lugar). */
+@media (max-width: 420px) {
+    .topbar-right {
+        margin-right: -8px
+    }
+}
+
+/* Campos de búsqueda y de alta rápida: el <input> trae un ancho mínimo propio (por su
+   atributo size) que, con letra grande, empuja al botón o al contenedor fuera de su lugar. */
+.toolbar .hdr-search {
+    min-width: 0;
+    max-width: 100%
+}
+
+.cat-inline input:not([type=checkbox]) {
+    min-width: 0
+}
+
+/* Formularios de los modales con letra grande: las columnas pueden achicarse y los
+   botones tipo interruptor no empujan al vecino. */
+.modal .field {
+    min-width: 0
+}
+
+.btn-toggle {
+    max-width: 100%;
+    white-space: normal;
+    overflow-wrap: anywhere
+}
+
+/* Los botones del pie de los modales pasan a otra línea en vez de salirse, y el selector
+   de archivo nativo (que trae un ancho propio) no se sale del modal. */
+.modal-foot {
+    flex-wrap: wrap
+}
+
+.modal input[type=file] {
+    max-width: 100%
+}
+
+/* Modal de configurar impresión: cada fila de categoría puede partirse (nombre arriba, ▲▼ abajo)
+   cuando con letra grande ya no entran en una sola línea. */
+.pcat-item {
+    flex-wrap: wrap;
+    gap: 4px 8px
+}
+
+.pcat-item .pcat-name {
+    min-width: 0;
+    overflow-wrap: anywhere
+}
+
+#printConfigModal .modal-body > div {
+    min-width: 0
+}
+
+#printConfigModal select {
+    max-width: 100%
+}
+
+#printConfigModal .modal-body > div > div {
+    min-width: 0;
+    max-width: 100%
+}
+
+#undoBanner {
+    flex-wrap: wrap;
+    row-gap: 6px
 }
