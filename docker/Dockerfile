@@ -1,4 +1,4 @@
-FROM php:8.0-apache
+FROM php:8.4-apache
 
 RUN apt-get update && apt-get install -y libzip-dev zlib1g-dev libpng-dev libjpeg-dev libwebp-dev \
     && docker-php-ext-configure gd --with-jpeg --with-webp \
